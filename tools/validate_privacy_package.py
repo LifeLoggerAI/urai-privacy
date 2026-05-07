@@ -110,7 +110,9 @@ REQUIRED_FILES = [
     "tests/fixtures/invalid-biometric-without-c5.privacy.yaml",
     "tests/fixtures/invalid-data-sharing-without-c8.privacy.yaml",
     "tests/test_privacy_validators.py",
+    "tests/test_website_e2e.py",
     ".github/CODEOWNERS",
+    ".github/dependabot.yml",
     ".github/pull_request_template.md",
     ".github/workflows/pages.yml",
     ".github/workflows/privacy-package.yml",
@@ -137,6 +139,7 @@ REQUIRED_TERMS = {
     "POLICY_VERSIONING.md": ["MAJOR.MINOR.PATCH", "Version Adoption", "Legal Review Marker"],
     "LAUNCH_READINESS.md": ["Governance Package", "Website and Public Notices", "Product Repo Adoption", "Launch Decision"],
     ".github/CODEOWNERS": ["@LifeLoggerAI", "/policy/", "/legal/"],
+    ".github/dependabot.yml": ["package-ecosystem", "pip", "github-actions", "security"],
     ".github/workflows/pages.yml": ["Deploy URAI Privacy website", "actions/deploy-pages", "path: website"],
     ".github/workflows/privacy-package.yml": ["Privacy package validation", "check_secrets.py", "unittest discover", "validate_privacy_package.py"],
     ".github/workflows/website.yml": ["Website validation", "check_website.py"],
@@ -161,6 +164,7 @@ REQUIRED_TERMS = {
     "tools/check_website.py": ["Static health checks", "REQUIRED_PAGES", "sitemap"],
     "tools/check_secrets.py": ["Lightweight repository secret scanner", "GitHub token", "Private key block"],
     "tests/test_privacy_validators.py": ["Regression tests", "FeatureManifestValidationTests", "SecretScannerTests"],
+    "tests/test_website_e2e.py": ["Static end-to-end smoke tests", "WebsiteStaticE2ETests", "404 edge path"],
     "architecture/README.md": ["Consent Lifecycle", "Deletion Lifecycle", "Export Lifecycle"],
     "architecture/CONSENT_LIFECYCLE.md": ["flowchart TD", "consent.changed", "Revocation"],
     "architecture/DELETION_LIFECYCLE.md": ["flowchart TD", "deletionJobs", "derived_records_deleted_or_recomputed"],
@@ -388,7 +392,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, dependency automation, tests, static E2E smoke tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
