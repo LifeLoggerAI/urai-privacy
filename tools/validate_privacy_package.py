@@ -44,6 +44,8 @@ REQUIRED_FILES = [
     "website/sitemap.xml",
     "website/README.md",
     "website/PUBLISHING.md",
+    "tools/validate_website.py",
+    ".github/workflows/pages.yml",
     "architecture/README.md",
     "architecture/CONSENT_LIFECYCLE.md",
     "architecture/DELETION_LIFECYCLE.md",
@@ -133,6 +135,8 @@ REQUIRED_TERMS = {
     ".github/ISSUE_TEMPLATE/vendor_review.md": ["Vendor / processor review", "Risk Level", "Data Classes"],
     ".github/ISSUE_TEMPLATE/release_tracking.md": ["Privacy release tracking", "VERSION.md", "Product Repo Adoption"],
     ".github/ISSUE_TEMPLATE/legal_review.md": ["Legal review", "Review Trigger", "Needs external counsel"],
+    ".github/workflows/pages.yml": ["Deploy URAI Privacy website", "upload-pages-artifact", "deploy-pages", "tools/validate_website.py"],
+    "tools/validate_website.py": ["Smoke-test the static URAI Privacy website", "sitemap.xml", "styles.css", "uraiprivacy.com"],
     "website/index.html": ["URAI Privacy", "canonical", "./styles.css", "principles.html", "rights.html", "governance.html", "legal.html", "contact.html"],
     "website/principles.html": ["Privacy is not a feature", "Default decision bias", "./styles.css"],
     "website/rights.html": ["User rights", "Data export", "Consent Revocation", "./styles.css"],
@@ -372,7 +376,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, website deployment tooling, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
