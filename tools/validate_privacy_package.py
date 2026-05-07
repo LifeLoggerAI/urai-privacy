@@ -31,8 +31,19 @@ REQUIRED_FILES = [
     "LAUNCH_READINESS.md",
     "CNAME",
     "website/CNAME",
+    "website/.nojekyll",
     "website/index.html",
+    "website/principles.html",
+    "website/rights.html",
+    "website/governance.html",
+    "website/legal.html",
+    "website/contact.html",
+    "website/404.html",
+    "website/styles.css",
+    "website/robots.txt",
+    "website/sitemap.xml",
     "website/README.md",
+    "website/PUBLISHING.md",
     "architecture/README.md",
     "architecture/CONSENT_LIFECYCLE.md",
     "architecture/DELETION_LIFECYCLE.md",
@@ -122,8 +133,18 @@ REQUIRED_TERMS = {
     ".github/ISSUE_TEMPLATE/vendor_review.md": ["Vendor / processor review", "Risk Level", "Data Classes"],
     ".github/ISSUE_TEMPLATE/release_tracking.md": ["Privacy release tracking", "VERSION.md", "Product Repo Adoption"],
     ".github/ISSUE_TEMPLATE/legal_review.md": ["Legal review", "Review Trigger", "Needs external counsel"],
-    "website/index.html": ["URAI Privacy", "uraiprivacy.com", "LifeLoggerAI/urai-privacy"],
-    "website/README.md": ["uraiprivacy.com", "GitHub Pages"],
+    "website/index.html": ["URAI Privacy", "canonical", "./styles.css", "principles.html", "rights.html", "governance.html", "legal.html", "contact.html"],
+    "website/principles.html": ["Privacy is not a feature", "Default decision bias", "./styles.css"],
+    "website/rights.html": ["User rights", "Data export", "Consent Revocation", "./styles.css"],
+    "website/governance.html": ["The repo is built to be enforceable", "Policy registry", "Release gate", "./styles.css"],
+    "website/legal.html": ["Legal notices", "Privacy policy", "Data-sharing notice", "qualified counsel"],
+    "website/contact.html": ["Contact", "privacy@urai.app", "security@urai.app", "Do not post sensitive data publicly"],
+    "website/404.html": ["Page not found", "Return home", "Report a broken link"],
+    "website/styles.css": ["--accent", "site-header", "card-grid", "site-footer"],
+    "website/robots.txt": ["Sitemap: https://uraiprivacy.com/sitemap.xml"],
+    "website/sitemap.xml": ["https://uraiprivacy.com/", "principles.html", "contact.html"],
+    "website/README.md": ["Pages", "Static Files", "GitHub Pages"],
+    "website/PUBLISHING.md": ["GitHub Pages Setup", "DNS Notes", "Pre-Publish Checklist"],
     "architecture/README.md": ["Consent Lifecycle", "Deletion Lifecycle", "Export Lifecycle"],
     "architecture/CONSENT_LIFECYCLE.md": ["flowchart TD", "consent.changed", "Revocation"],
     "architecture/DELETION_LIFECYCLE.md": ["flowchart TD", "deletionJobs", "derived_records_deleted_or_recomputed"],
@@ -351,7 +372,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
