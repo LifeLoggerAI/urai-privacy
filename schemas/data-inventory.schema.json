@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://uraiprivacy.com/schemas/data-inventory.schema.json",
+  "title": "URAI Privacy Data Inventory",
+  "type": "object",
+  "required": ["repo", "privacyGovernanceVersion", "owner", "lastReviewed", "fields"],
+  "additionalProperties": false,
+  "properties": {
+    "repo": {"type": "string", "minLength": 1},
+    "privacyGovernanceVersion": {"const": "0.1.0-draft"},
+    "owner": {"type": "string", "minLength": 1},
+    "lastReviewed": {"type": "string"},
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/inventoryField"}
+    }
+  },
+  "$defs": {
+    "dataClass": {"enum": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7"]},
+    "consentTier": {"enum": ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"]},
+    "retentionClass": {"enum": ["R0", "R1", "R2", "R3", "R4", "R5", "R6"]},
+    "source": {"enum": ["user", "device", "system", "model", "admin", "partner"]},
+    "inventoryField": {
+      "type": "object",
+      "required": [
+        "name",
+        "collectionOrTable",
+        "source",
+        "dataClass",
+        "purpose",
+        "consentTier",
+        "retentionClass",
+        "exportable",
+        "deletable",
+        "monetizable",
+        "aiTrainingAllowed",
+        "adminAccessible",
+        "auditRequired"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "collectionOrTable": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/source"},
+        "dataClass": {"$ref": "#/$defs/dataClass"},
+        "purpose": {"type": "string", "minLength": 1},
+        "consentTier": {"$ref": "#/$defs/consentTier"},
+        "retentionClass": {"$ref": "#/$defs/retentionClass"},
+        "exportable": {"type": "boolean"},
+        "deletable": {"type": "boolean"},
+        "monetizable": {"type": "boolean"},
+        "aiTrainingAllowed": {"type": "boolean"},
+        "adminAccessible": {"type": "boolean"},
+        "auditRequired": {"type": "boolean"},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}
