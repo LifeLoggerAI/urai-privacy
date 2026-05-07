@@ -38,12 +38,14 @@ REQUIRED_FILES = [
     "website/governance.html",
     "website/legal.html",
     "website/contact.html",
+    "website/status.html",
     "website/404.html",
     "website/styles.css",
     "website/robots.txt",
     "website/sitemap.xml",
     "website/README.md",
     "website/PUBLISHING.md",
+    "tools/check_website.py",
     "architecture/README.md",
     "architecture/CONSENT_LIFECYCLE.md",
     "architecture/DELETION_LIFECYCLE.md",
@@ -107,6 +109,9 @@ REQUIRED_FILES = [
     "tests/fixtures/invalid-data-sharing-without-c8.privacy.yaml",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
+    ".github/workflows/pages.yml",
+    ".github/workflows/privacy-package.yml",
+    ".github/workflows/website.yml",
     ".github/ISSUE_TEMPLATE/privacy_gap.md",
     ".github/ISSUE_TEMPLATE/adoption_rollout.md",
     ".github/ISSUE_TEMPLATE/dpia_review.md",
@@ -128,6 +133,9 @@ REQUIRED_TERMS = {
     "POLICY_VERSIONING.md": ["MAJOR.MINOR.PATCH", "Version Adoption", "Legal Review Marker"],
     "LAUNCH_READINESS.md": ["Governance Package", "Website and Public Notices", "Product Repo Adoption", "Launch Decision"],
     ".github/CODEOWNERS": ["@LifeLoggerAI", "/policy/", "/legal/"],
+    ".github/workflows/pages.yml": ["Deploy URAI Privacy website", "actions/deploy-pages", "path: website"],
+    ".github/workflows/privacy-package.yml": ["Privacy package validation", "validate_privacy_package.py"],
+    ".github/workflows/website.yml": ["Website validation", "check_website.py"],
     ".github/ISSUE_TEMPLATE/adoption_rollout.md": ["Privacy adoption rollout", "privacy/PRIVACY_VERSION.md", "L6/data-sharing uses C8"],
     ".github/ISSUE_TEMPLATE/dpia_review.md": ["DPIA review", "Sensitive AI inference", "Decision"],
     ".github/ISSUE_TEMPLATE/vendor_review.md": ["Vendor / processor review", "Risk Level", "Data Classes"],
@@ -139,12 +147,14 @@ REQUIRED_TERMS = {
     "website/governance.html": ["The repo is built to be enforceable", "Policy registry", "Release gate", "./styles.css"],
     "website/legal.html": ["Legal notices", "Privacy policy", "Data-sharing notice", "qualified counsel"],
     "website/contact.html": ["Contact", "privacy@urai.app", "security@urai.app", "Do not post sensitive data publicly"],
+    "website/status.html": ["Status", "Operational governance draft", "Launch blockers to clear"],
     "website/404.html": ["Page not found", "Return home", "Report a broken link"],
     "website/styles.css": ["--accent", "site-header", "card-grid", "site-footer"],
     "website/robots.txt": ["Sitemap: https://uraiprivacy.com/sitemap.xml"],
-    "website/sitemap.xml": ["https://uraiprivacy.com/", "principles.html", "contact.html"],
+    "website/sitemap.xml": ["https://uraiprivacy.com/", "principles.html", "status.html"],
     "website/README.md": ["Pages", "Static Files", "GitHub Pages"],
     "website/PUBLISHING.md": ["GitHub Pages Setup", "DNS Notes", "Pre-Publish Checklist"],
+    "tools/check_website.py": ["Static health checks", "REQUIRED_PAGES", "sitemap"],
     "architecture/README.md": ["Consent Lifecycle", "Deletion Lifecycle", "Export Lifecycle"],
     "architecture/CONSENT_LIFECYCLE.md": ["flowchart TD", "consent.changed", "Revocation"],
     "architecture/DELETION_LIFECYCLE.md": ["flowchart TD", "deletionJobs", "derived_records_deleted_or_recomputed"],
@@ -372,7 +382,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
