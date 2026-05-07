@@ -28,6 +28,7 @@ CHECKS = (
     Check("committed secret scan", (sys.executable, "tools/check_secrets.py")),
     Check("local Markdown link validation", (sys.executable, "tools/check_markdown_links.py")),
     Check("static website validation", (sys.executable, "tools/check_website.py")),
+    Check("privacy health report", (sys.executable, "tools/privacy_health_report.py")),
     Check("privacy package validation", (sys.executable, "tools/validate_privacy_package.py")),
 )
 
