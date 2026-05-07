@@ -37,6 +37,12 @@ body::before {
 
 a { color: inherit; }
 
+a:focus-visible,
+.button:focus-visible {
+  outline: 3px solid var(--accent-2);
+  outline-offset: 4px;
+}
+
 .skip-link {
   position: absolute;
   left: 16px;
@@ -157,6 +163,10 @@ p, li {
   border-radius: 999px;
   padding: 12px 16px;
   background: rgba(17, 24, 39, .86);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
 }
 
 .button.primary {
@@ -245,7 +255,13 @@ th { color: var(--text); }
 
 .footer-inner a { color: var(--muted); }
 
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
 @media (max-width: 720px) {
   .nav { align-items: flex-start; flex-direction: column; }
   main { padding-top: 42px; }
+  .actions { flex-direction: column; }
+  .button { width: 100%; }
 }

@@ -95,16 +95,32 @@ A URAI feature is not release-ready unless it has:
 5. Audit logs for admin, system, sensitive, biometric, and monetization actions.
 6. Privacy review approval.
 
-## Validation
+## Local Setup
 
-Run:
+This repository is intentionally lightweight: it is primarily governance, policy, schema, legal-template, and static website content. The required local runtime is Python 3.11+.
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+## Validation
+
+Run the same checks used by CI:
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py'
+python tools/check_secrets.py
+python tools/check_website.py
 python tools/validate_privacy_package.py
 ```
 
-The GitHub Actions workflow validates the governance package, policy registries, examples, and invalid fixtures on pull requests and pushes.
+The GitHub Actions workflow validates the governance package, policy registries, examples, invalid fixtures, static website, unit tests, and committed-secret scan on pull requests and pushes.
+
+## Safe Configuration
+
+Do not commit real `.env` files, private keys, local credentials, service-account JSON, tokens, or generated build/cache artifacts. Use local environment variables or the deployment platform's secret manager for any private operational values.
 
 ## Status
 
