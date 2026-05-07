@@ -1,0 +1,45 @@
+version: 0.1.0-draft
+tiers:
+  C0:
+    name: Essential Operations
+    revocable: false
+    description: Required account, security, and operational processing.
+  C1:
+    name: Personal Memory Storage
+    revocable: true
+    description: User-approved memories, transcripts, and timeline records.
+  C2:
+    name: Passive Behavioral Context
+    revocable: true
+    description: App/device behavior and contextual metadata.
+  C3:
+    name: Location Context
+    revocable: true
+    description: GPS, place, route, and routine context.
+  C4:
+    name: Sensitive AI Inference
+    revocable: true
+    separatePromptRequired: true
+    explainabilityRequired: true
+    description: Mood, mental load, crisis, trauma, relationship, deception, and similar sensitive inferences.
+  C5:
+    name: Biometric Identity
+    revocable: true
+    separatePromptRequired: true
+    biometricDeletionRequired: true
+    description: Voiceprints, face embeddings, speaker identity, and biometric identity signals.
+  C6:
+    name: Personalization / AI Learning
+    revocable: true
+    resetRequired: true
+    description: Long-term personalization, companion memory, and model adaptation.
+  C7:
+    name: Export / Portability
+    revocable: false
+    description: Authenticated data export and portability operations.
+  C8:
+    name: Anonymized Data Sharing
+    revocable: true
+    separatePromptRequired: true
+    monetizationLedgerRequired: true
+    description: Cohort-level anonymized data-sharing or monetization participation.
