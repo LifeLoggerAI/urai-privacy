@@ -12,6 +12,11 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None
 
+try:
+    from jsonschema import Draft202012Validator
+except ImportError:  # pragma: no cover
+    Draft202012Validator = None
+
 REQUIRED_FILES = [
     "README.md",
     "VERSION.md",
@@ -53,6 +58,8 @@ REQUIRED_FILES = [
     "docs/VENDOR_AND_PROCESSOR_REVIEW.md",
     "docs/SECURITY_PRIVACY_REVIEW.md",
     "schemas/firestore-privacy-schema.json",
+    "schemas/data-inventory.schema.json",
+    "schemas/feature-privacy-manifest.schema.json",
     "api/privacy-api.yaml",
     "legal/PRIVACY_POLICY_TEMPLATE.md",
     "legal/BIOMETRIC_AND_AI_INFERENCE_NOTICE_TEMPLATE.md",
@@ -90,6 +97,8 @@ REQUIRED_FILES = [
 
 REQUIRED_TERMS = {
     "README.md": ["https://uraiprivacy.com", "website/", "policy/"],
+    "schemas/data-inventory.schema.json": ["URAI Privacy Data Inventory", "privacyGovernanceVersion", "L0", "C8", "R6"],
+    "schemas/feature-privacy-manifest.schema.json": ["URAI Privacy Feature Manifest", "dataProcessing", "userRights", "monetization"],
     "RELEASE_PROCESS.md": ["Release Requirements", "Release Steps", "privacy-vX.Y.Z"],
     "MIGRATION_GUIDE.md": ["Migration Checklist", "Breaking-Change Examples", "Rollback"],
     "POLICY_VERSIONING.md": ["MAJOR.MINOR.PATCH", "Version Adoption", "Legal Review Marker"],
@@ -111,7 +120,7 @@ REQUIRED_TERMS = {
     "sops/EMPLOYEE_ACCESS_REMOVAL.md": ["Required Removal Checklist", "High-Risk Access", "credential"],
     "sops/INCIDENT_ESCALATION_MATRIX.md": ["Severity Matrix", "Escalation Triggers", "Required First Hour Actions"],
     "adoption/ci/README.md": ["Cross-Repo Privacy CI Enforcement", "validate_repo_privacy.py", "privacy/"],
-    "adoption/ci/validate_repo_privacy.py": ["Validate a URAI product repo privacy adoption folder", "L4", "C4", "minimumCohortSize"],
+    "adoption/ci/validate_repo_privacy.py": ["Validate a URAI product repo privacy adoption folder", "jsonschema", "minimumCohortSize"],
     "adoption/ci/privacy-adoption-workflow.yml": ["Privacy adoption validation", "validate_repo_privacy.py", "PyYAML"],
     "adoption/ci/sample-privacy-folder/PRIVACY_VERSION.md": ["0.1.0-draft", "LifeLoggerAI/urai-privacy"],
     "adoption/ci/sample-privacy-folder/data-inventory.yaml": ["privacyGovernanceVersion", "L4", "C4"],
@@ -153,6 +162,29 @@ def load_yaml(path: str):
         return yaml.safe_load((ROOT / path).read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001
         fail(f"Invalid YAML in {path}: {exc}")
+
+
+def load_json(path: str):
+    try:
+        return json.loads((ROOT / path).read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        fail(f"Invalid JSON in {path}: {exc}")
+
+
+def validate_json_schema(schema_path: str, instance_path: str, instance: dict | None = None) -> None:
+    if Draft202012Validator is None:
+        fail("jsonschema is required for JSON Schema validation")
+    schema = load_json(schema_path)
+    try:
+        Draft202012Validator.check_schema(schema)
+    except Exception as exc:  # noqa: BLE001
+        fail(f"Invalid JSON Schema {schema_path}: {exc}")
+    if instance_path:
+        data = instance if instance is not None else load_yaml(instance_path)
+        errors = sorted(Draft202012Validator(schema).iter_errors(data), key=lambda err: list(err.path))
+        if errors:
+            first = errors[0]
+            fail(f"{instance_path} failed {schema_path}: {first.message}")
 
 
 def collect_feature_fields(feature: dict) -> list[dict]:
@@ -281,6 +313,10 @@ def main() -> None:
     }
     validate_registry_consistency(registries)
 
+    validate_json_schema("schemas/data-inventory.schema.json", "adoption/ci/sample-privacy-folder/data-inventory.yaml")
+    validate_json_schema("schemas/feature-privacy-manifest.schema.json", "examples/valid-feature.privacy.yaml")
+    validate_json_schema("schemas/feature-privacy-manifest.schema.json", "adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml")
+
     valid_feature = load_yaml("examples/valid-feature.privacy.yaml")
     valid_errors = validate_feature_manifest("examples/valid-feature.privacy.yaml", valid_feature, registries)
     if valid_errors:
@@ -297,7 +333,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
