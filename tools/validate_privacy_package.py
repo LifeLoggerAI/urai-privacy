@@ -43,6 +43,12 @@ REQUIRED_FILES = [
     "api/privacy-api.yaml",
     "legal/PRIVACY_POLICY_TEMPLATE.md",
     "legal/BIOMETRIC_AND_AI_INFERENCE_NOTICE_TEMPLATE.md",
+    "legal/TERMS_PRIVACY_CLAUSES_TEMPLATE.md",
+    "legal/DATA_SHARING_NOTICE_TEMPLATE.md",
+    "legal/CHILDREN_AND_MINOR_PRIVACY_POLICY.md",
+    "legal/COOKIE_AND_LOCAL_STORAGE_NOTICE.md",
+    "legal/TRANSPARENCY_REPORT_TEMPLATE.md",
+    "legal/USER_RIGHTS_REQUEST_NOTICE.md",
     "adoption/ADOPTION_GUIDE.md",
     "adoption/REPO_ROLLOUT_PLAN.md",
     "adoption/templates/PRIVACY_VERSION.md",
@@ -72,6 +78,12 @@ REQUIRED_TERMS = {
     ".github/CODEOWNERS": ["@LifeLoggerAI", "/policy/", "/legal/"],
     "website/index.html": ["URAI Privacy", "uraiprivacy.com", "LifeLoggerAI/urai-privacy"],
     "website/README.md": ["uraiprivacy.com", "GitHub Pages"],
+    "legal/TERMS_PRIVACY_CLAUSES_TEMPLATE.md": ["User Consent", "User Control", "Sensitive AI Inference", "Data-Sharing Restrictions"],
+    "legal/DATA_SHARING_NOTICE_TEMPLATE.md": ["Separate Opt-In Required", "What Must Not Be Shared", "Cohort and Re-Identification Controls", "Opt-Out"],
+    "legal/CHILDREN_AND_MINOR_PRIVACY_POLICY.md": ["Current Position", "Default Restrictions", "Consent and Guardian Controls", "Launch Requirement"],
+    "legal/COOKIE_AND_LOCAL_STORAGE_NOTICE.md": ["Essential Storage", "Preference Storage", "No Silent Escalation", "User Controls"],
+    "legal/TRANSPARENCY_REPORT_TEMPLATE.md": ["User Rights Requests", "Government / Law Enforcement Requests", "Privacy Incidents", "Data-Sharing Participation"],
+    "legal/USER_RIGHTS_REQUEST_NOTICE.md": ["Data Export", "Deletion", "Consent Revocation", "Human Review"],
     "docs/CONSENT_TIERS.md": ["C0", "C4", "C5", "C8", "revoked"],
     "docs/DATA_CLASSIFICATION.md": ["L4", "L5", "L6", "Default Deny"],
     "docs/RETENTION_AND_DELETION.md": ["R0", "R6", "derived", "biometric"],
@@ -242,7 +254,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
