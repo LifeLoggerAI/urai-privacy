@@ -114,17 +114,18 @@ Run the same checks used by CI with the single validation runner:
 python tools/run_validation.py
 ```
 
-The runner executes the unit and smoke tests, committed-secret scan, local Markdown link validation, static website validation, and full privacy package validation. You can still run individual checks while debugging:
+The runner executes the unit and smoke tests, committed-secret scan, local Markdown link validation, static website validation, governance health report, and full privacy package validation. You can still run individual checks while debugging:
 
 ```bash
 python -m unittest discover -s tests -p 'test_*.py'
 python tools/check_secrets.py
 python tools/check_markdown_links.py
 python tools/check_website.py
+python tools/privacy_health_report.py
 python tools/validate_privacy_package.py
 ```
 
-The GitHub Actions workflow validates the governance package, policy registries, examples, invalid fixtures, static website, Markdown links, unit tests, static E2E smoke tests, cross-repo adoption tests, and committed-secret scan on pull requests and pushes.
+The GitHub Actions workflow validates the governance package, policy registries, examples, invalid fixtures, static website, Markdown links, governance health report, unit tests, static E2E smoke tests, cross-repo adoption tests, and committed-secret scan on pull requests and pushes.
 
 ## Safe Configuration
 
