@@ -16,6 +16,10 @@ REQUIRED_FILES = [
     "README.md",
     "VERSION.md",
     "CHANGELOG.md",
+    "CNAME",
+    "website/CNAME",
+    "website/index.html",
+    "website/README.md",
     "docs/GOVERNANCE_INDEX.md",
     "docs/DATA_CLASSIFICATION.md",
     "docs/DATA_COLLECTION_BOUNDARIES.md",
@@ -55,6 +59,9 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_TERMS = {
+    "README.md": ["https://uraiprivacy.com", "website/", "policy/"],
+    "website/index.html": ["URAI Privacy", "uraiprivacy.com", "LifeLoggerAI/urai-privacy"],
+    "website/README.md": ["uraiprivacy.com", "GitHub Pages"],
     "docs/CONSENT_TIERS.md": ["C0", "C4", "C5", "C8", "revoked"],
     "docs/DATA_CLASSIFICATION.md": ["L4", "L5", "L6", "Default Deny"],
     "docs/RETENTION_AND_DELETION.md": ["R0", "R6", "derived", "biometric"],
@@ -173,10 +180,19 @@ def validate_registry_consistency(registries: dict) -> None:
             fail(f"{class_id} references unknown defaultConsentTier {tier}")
 
 
+def validate_domain_files() -> None:
+    for path in ["CNAME", "website/CNAME"]:
+        domain = (ROOT / path).read_text(encoding="utf-8").strip()
+        if domain != "uraiprivacy.com":
+            fail(f"{path} must contain exactly uraiprivacy.com")
+
+
 def main() -> None:
     missing = [path for path in REQUIRED_FILES if not (ROOT / path).exists()]
     if missing:
         fail("Missing required files: " + ", ".join(missing))
+
+    validate_domain_files()
 
     for path, terms in REQUIRED_TERMS.items():
         text = (ROOT / path).read_text(encoding="utf-8")
@@ -216,7 +232,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, website domain, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":

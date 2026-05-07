@@ -1,5 +1,7 @@
 # URAI Privacy & Data Governance
 
+Public website: **https://uraiprivacy.com**
+
 This repository defines the binding privacy, consent, data governance, legal notice, and enforcement framework for the URAI ecosystem.
 
 URAI is designed with **privacy-by-architecture**, **user sovereignty**, **minimal data exposure**, and **no silent escalation** as first-class system constraints.
@@ -9,6 +11,12 @@ URAI is designed with **privacy-by-architecture**, **user sovereignty**, **minim
 Current version: **0.1.0-draft**
 
 See [`VERSION.md`](./VERSION.md) and [`CHANGELOG.md`](./CHANGELOG.md).
+
+## Website
+
+The public-facing privacy governance landing page lives in [`website/`](./website/) and is configured for the custom domain `uraiprivacy.com` via [`CNAME`](./CNAME).
+
+The website is a plain-language entry point for users, partners, reviewers, and contributors. It links back to the governance repo, governance index, and legal/privacy templates.
 
 ## Scope
 
@@ -48,6 +56,8 @@ Implementation contracts:
 - [`schemas/firestore-privacy-schema.json`](./schemas/firestore-privacy-schema.json)
 - [`api/privacy-api.yaml`](./api/privacy-api.yaml)
 - [`legal/`](./legal/)
+- [`policy/`](./policy/)
+- [`examples/`](./examples/)
 - [`tools/validate_privacy_package.py`](./tools/validate_privacy_package.py)
 
 ## Design Principles
@@ -90,10 +100,11 @@ A URAI feature is not release-ready unless it has:
 Run:
 
 ```bash
+pip install -r requirements.txt
 python tools/validate_privacy_package.py
 ```
 
-The GitHub Actions workflow validates the governance package on pull requests and pushes.
+The GitHub Actions workflow validates the governance package, policy registries, examples, and invalid fixtures on pull requests and pushes.
 
 ## Status
 
