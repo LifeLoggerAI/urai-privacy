@@ -54,7 +54,8 @@ class FeatureManifestValidationTests(unittest.TestCase):
 class SecretScannerTests(unittest.TestCase):
     def test_detects_common_secret_patterns(self) -> None:
         fake_path = ROOT / "tmp-secret-test.txt"
-        fake_path.write_text('service_token = "ghp_abcdefghijklmnopqrstuvwxyzABCDE1234567890"\n', encoding="utf-8")
+        fake_token = "ghp_" + "abcdefghijklmnopqrstuvwxyzABCDE1234567890"
+        fake_path.write_text(f'service_token = "{fake_token}"\n', encoding="utf-8")
         try:
             findings = secret_scanner.scan_file(fake_path)
         finally:
