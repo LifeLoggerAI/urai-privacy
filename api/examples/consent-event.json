@@ -1,0 +1,9 @@
+{
+  "userId": "user_123",
+  "consentTier": "C4",
+  "status": "granted",
+  "purpose": "sensitive_mood_inference",
+  "source": "user",
+  "recordedAt": "2026-05-07T20:00:00Z",
+  "policyVersion": "0.1.0-draft"
+}

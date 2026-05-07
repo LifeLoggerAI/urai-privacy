@@ -1,0 +1,9 @@
+{
+  "eventId": "audit_evt_123",
+  "userId": "user_123",
+  "eventType": "consent.changed",
+  "actorType": "user",
+  "occurredAt": "2026-05-07T20:20:00Z",
+  "summary": "User granted C4 consent for sensitive mood inference.",
+  "policyVersion": "0.1.0-draft"
+}
