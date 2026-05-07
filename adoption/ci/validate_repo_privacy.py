@@ -9,6 +9,7 @@ It validates the local `privacy/` folder against URAI Privacy governance version
 """
 
 from pathlib import Path
+import json
 import sys
 
 try:
@@ -17,8 +18,15 @@ except ImportError:  # pragma: no cover
     print("[repo-privacy] FAIL: PyYAML is required")
     sys.exit(1)
 
+try:
+    from jsonschema import Draft202012Validator
+except ImportError:  # pragma: no cover
+    print("[repo-privacy] FAIL: jsonschema is required")
+    sys.exit(1)
+
 ROOT = Path.cwd()
 PRIVACY_DIR = ROOT / "privacy"
+SCHEMA_DIR = ROOT / "schemas"
 
 DATA_CLASSES = {"L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7"}
 CONSENT_TIERS = {"C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"}
@@ -36,6 +44,27 @@ def load_yaml(path: Path):
         return yaml.safe_load(path.read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001
         fail(f"Invalid YAML in {path}: {exc}")
+
+
+def load_json(path: Path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        fail(f"Invalid JSON in {path}: {exc}")
+
+
+def validate_schema(schema_path: Path, instance_path: Path, instance: dict) -> None:
+    if not schema_path.exists():
+        fail(f"Missing schema file: {schema_path}")
+    schema = load_json(schema_path)
+    try:
+        Draft202012Validator.check_schema(schema)
+    except Exception as exc:  # noqa: BLE001
+        fail(f"Invalid JSON Schema {schema_path}: {exc}")
+    errors = sorted(Draft202012Validator(schema).iter_errors(instance), key=lambda err: list(err.path))
+    if errors:
+        first = errors[0]
+        fail(f"{instance_path} failed {schema_path.name}: {first.message}")
 
 
 def validate_field(path: Path, field: dict) -> list[str]:
@@ -79,6 +108,7 @@ def validate_data_inventory() -> list[str]:
         return ["privacy/data-inventory.yaml is required"]
 
     data = load_yaml(path)
+    validate_schema(SCHEMA_DIR / "data-inventory.schema.json", path, data)
     errors: list[str] = []
 
     if data.get("privacyGovernanceVersion") != GOVERNANCE_VERSION:
@@ -101,6 +131,7 @@ def collect_manifest_fields(manifest: dict) -> list[dict]:
 
 def validate_feature_manifest(path: Path) -> list[str]:
     manifest = load_yaml(path)
+    validate_schema(SCHEMA_DIR / "feature-privacy-manifest.schema.json", path, manifest)
     errors: list[str] = []
 
     if manifest.get("privacyGovernanceVersion") != GOVERNANCE_VERSION:
