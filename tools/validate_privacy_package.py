@@ -109,6 +109,7 @@ REQUIRED_FILES = [
     "tests/fixtures/invalid-sensitive-without-c4.privacy.yaml",
     "tests/fixtures/invalid-biometric-without-c5.privacy.yaml",
     "tests/fixtures/invalid-data-sharing-without-c8.privacy.yaml",
+    "tests/test_adoption_validator.py",
     "tests/test_privacy_validators.py",
     "tests/test_website_e2e.py",
     ".github/CODEOWNERS",
@@ -163,6 +164,7 @@ REQUIRED_TERMS = {
     "website/PUBLISHING.md": ["GitHub Pages Setup", "DNS Notes", "Pre-Publish Checklist"],
     "tools/check_website.py": ["Static health checks", "REQUIRED_PAGES", "sitemap"],
     "tools/check_secrets.py": ["Lightweight repository secret scanner", "GitHub token", "Private key block"],
+    "tests/test_adoption_validator.py": ["Integration tests", "AdoptionValidatorIntegrationTests", "PRIVACY_VERSION.md is required"],
     "tests/test_privacy_validators.py": ["Regression tests", "FeatureManifestValidationTests", "SecretScannerTests"],
     "tests/test_website_e2e.py": ["Static end-to-end smoke tests", "WebsiteStaticE2ETests", "404 edge path"],
     "architecture/README.md": ["Consent Lifecycle", "Deletion Lifecycle", "Export Lifecycle"],
@@ -392,7 +394,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, dependency automation, tests, static E2E smoke tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, cross-repo adoption tests, dependency automation, tests, static E2E smoke tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
