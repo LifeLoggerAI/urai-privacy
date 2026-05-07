@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +15,7 @@ def load_module(relative_path: str, module_name: str):
     if spec is None or spec.loader is None:  # pragma: no cover
         raise RuntimeError(f"Could not load {relative_path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
