@@ -24,6 +24,13 @@ REQUIRED_FILES = [
     "website/CNAME",
     "website/index.html",
     "website/README.md",
+    "architecture/README.md",
+    "architecture/CONSENT_LIFECYCLE.md",
+    "architecture/DELETION_LIFECYCLE.md",
+    "architecture/EXPORT_LIFECYCLE.md",
+    "architecture/ANONYMIZATION_DATA_SHARING_LIFECYCLE.md",
+    "architecture/AUDIT_LIFECYCLE.md",
+    "architecture/INCIDENT_RESPONSE_LIFECYCLE.md",
     "docs/GOVERNANCE_INDEX.md",
     "docs/DATA_CLASSIFICATION.md",
     "docs/DATA_COLLECTION_BOUNDARIES.md",
@@ -78,6 +85,13 @@ REQUIRED_TERMS = {
     ".github/CODEOWNERS": ["@LifeLoggerAI", "/policy/", "/legal/"],
     "website/index.html": ["URAI Privacy", "uraiprivacy.com", "LifeLoggerAI/urai-privacy"],
     "website/README.md": ["uraiprivacy.com", "GitHub Pages"],
+    "architecture/README.md": ["Consent Lifecycle", "Deletion Lifecycle", "Export Lifecycle"],
+    "architecture/CONSENT_LIFECYCLE.md": ["flowchart TD", "consent.changed", "Revocation"],
+    "architecture/DELETION_LIFECYCLE.md": ["flowchart TD", "deletionJobs", "derived_records_deleted_or_recomputed"],
+    "architecture/EXPORT_LIFECYCLE.md": ["flowchart TD", "exportJobs", "Integrity manifest"],
+    "architecture/ANONYMIZATION_DATA_SHARING_LIFECYCLE.md": ["flowchart TD", "C8", "minimum cohort"],
+    "architecture/AUDIT_LIFECYCLE.md": ["flowchart TD", "dataAccessLogs", "append-only"],
+    "architecture/INCIDENT_RESPONSE_LIFECYCLE.md": ["flowchart TD", "incidentReports", "Postmortem"],
     "legal/TERMS_PRIVACY_CLAUSES_TEMPLATE.md": ["User Consent", "User Control", "Sensitive AI Inference", "Data-Sharing Restrictions"],
     "legal/DATA_SHARING_NOTICE_TEMPLATE.md": ["Separate Opt-In Required", "What Must Not Be Shared", "Cohort and Re-Identification Controls", "Opt-Out"],
     "legal/CHILDREN_AND_MINOR_PRIVACY_POLICY.md": ["Current Position", "Default Restrictions", "Consent and Guardian Controls", "Launch Requirement"],
@@ -254,7 +268,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
