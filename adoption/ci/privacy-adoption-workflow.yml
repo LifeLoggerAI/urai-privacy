@@ -17,6 +17,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install PyYAML>=6.0.1
+        run: pip install PyYAML>=6.0.1 jsonschema>=4.21.1
       - name: Validate privacy adoption folder
         run: python tools/validate_repo_privacy.py
