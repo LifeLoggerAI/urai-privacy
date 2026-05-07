@@ -25,6 +25,7 @@ REQUIRED_FILES = [
     "docs/DPIA_TEMPLATE.md",
     "docs/LAW_ENFORCEMENT_REQUEST_POLICY.md",
     "docs/VENDOR_AND_PROCESSOR_REVIEW.md",
+    "docs/SECURITY_PRIVACY_REVIEW.md",
     "schemas/firestore-privacy-schema.json",
     "api/privacy-api.yaml",
     "legal/PRIVACY_POLICY_TEMPLATE.md",
@@ -49,6 +50,7 @@ REQUIRED_TERMS = {
     ".github/pull_request_template.md": ["Privacy Impact", "No silent escalation", "Validator passes"],
     "docs/DPIA_TEMPLATE.md": ["Risk Assessment", "Safeguards", "Decision"],
     "docs/VENDOR_AND_PROCESSOR_REVIEW.md": ["Vendor Risk Levels", "data classes", "deletion support"],
+    "docs/SECURITY_PRIVACY_REVIEW.md": ["Access Control", "Threats and Controls", "Logging and Monitoring"],
 }
 
 
