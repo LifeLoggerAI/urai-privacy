@@ -1,0 +1,54 @@
+feature: REPLACE_WITH_FEATURE_NAME
+repo: REPLACE_WITH_REPO_NAME
+owner: REPLACE_WITH_OWNER
+privacyGovernanceVersion: 0.1.0-draft
+status: draft | review | approved | blocked
+lastReviewed: YYYY-MM-DD
+
+summary:
+  purpose: REPLACE_WITH_USER_FACING_PURPOSE
+  userBenefit: REPLACE_WITH_BENEFIT
+  releaseTarget: REPLACE_WITH_RELEASE_TARGET
+
+dataProcessing:
+  collectedFields:
+    - name: REPLACE_WITH_FIELD_NAME
+      dataClass: L0 | L1 | L2 | L3 | L4 | L5 | L6 | L7
+      source: user | device | system | model | admin | partner
+      purpose: REPLACE_WITH_PURPOSE
+      consentTier: C0 | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8
+      retentionClass: R0 | R1 | R2 | R3 | R4 | R5 | R6
+      exportable: true
+      deletable: true
+      auditRequired: true
+  derivedFields:
+    - name: REPLACE_WITH_DERIVED_FIELD
+      dataClass: L0 | L1 | L2 | L3 | L4 | L5 | L6 | L7
+      sourceFields:
+        - REPLACE_WITH_SOURCE_FIELD
+      purpose: REPLACE_WITH_PURPOSE
+      consentTier: C0 | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8
+      retentionClass: R0 | R1 | R2 | R3 | R4 | R5 | R6
+      explainabilityRequired: true
+
+userRights:
+  exportSupported: true
+  deletionSupported: true
+  consentRevocationSupported: true
+  explanationSupported: true
+
+adminAccess:
+  allowed: false
+  roles: []
+  auditEventTypes: []
+
+monetization:
+  participatesInDataSharing: false
+  requiresC8Consent: false
+  anonymizationBatchRequired: false
+  minimumCohortSize: 100
+
+review:
+  reviewer: REPLACE_WITH_REVIEWER
+  decision: approved | approved_with_conditions | blocked | pending
+  notes: REPLACE_WITH_NOTES
