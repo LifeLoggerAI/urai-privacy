@@ -1,0 +1,54 @@
+feature: mood-weather-report
+repo: sample-urai-repo
+owner: product-privacy
+privacyGovernanceVersion: 0.1.0-draft
+status: approved
+lastReviewed: 2026-05-06
+
+summary:
+  purpose: Generate a user-facing mood weather summary from consented context signals.
+  userBenefit: Helps users understand changes in emotional and cognitive rhythm.
+  releaseTarget: sample
+
+dataProcessing:
+  collectedFields:
+    - name: app_interaction_rhythm
+      dataClass: L2
+      source: device
+      purpose: support user-facing context summaries
+      consentTier: C2
+      retentionClass: R1
+      exportable: true
+      deletable: true
+      auditRequired: true
+  derivedFields:
+    - name: mood_weather_state
+      dataClass: L4
+      sourceFields:
+        - app_interaction_rhythm
+      purpose: user-facing mood weather inference
+      consentTier: C4
+      retentionClass: R3
+      explainabilityRequired: true
+
+userRights:
+  exportSupported: true
+  deletionSupported: true
+  consentRevocationSupported: true
+  explanationSupported: true
+
+adminAccess:
+  allowed: false
+  roles: []
+  auditEventTypes: []
+
+monetization:
+  participatesInDataSharing: false
+  requiresC8Consent: false
+  anonymizationBatchRequired: false
+  minimumCohortSize: 100
+
+review:
+  reviewer: privacy-governance
+  decision: approved
+  notes: Sample valid product repo manifest.
