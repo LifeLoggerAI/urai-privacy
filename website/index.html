@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>URAI Privacy</title>
+  <meta name="description" content="URAI Privacy is the public governance layer for privacy, consent, data rights, and data-use enforcement across the URAI ecosystem." />
+  <style>
+    :root { color-scheme: dark; --bg:#070a12; --panel:#111827; --text:#f8fafc; --muted:#cbd5e1; --line:#334155; --accent:#a78bfa; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at top left, #1e1b4b 0, #070a12 34rem); color:var(--text); }
+    main { max-width: 1040px; margin: 0 auto; padding: 72px 24px; }
+    .eyebrow { color: var(--accent); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 13px; }
+    h1 { font-size: clamp(42px, 7vw, 78px); line-height: .95; margin: 16px 0 24px; }
+    p { color: var(--muted); font-size: 18px; line-height: 1.65; max-width: 760px; }
+    .card-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap:16px; margin-top:42px; }
+    .card { border: 1px solid var(--line); background: color-mix(in srgb, var(--panel), transparent 10%); border-radius: 22px; padding: 22px; box-shadow: 0 16px 48px rgba(0,0,0,.24); }
+    .card h2 { margin:0 0 8px; font-size:18px; }
+    .card p { margin:0; font-size:15px; line-height:1.55; }
+    .actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:32px; }
+    a.button { color:var(--text); text-decoration:none; border:1px solid var(--line); border-radius:999px; padding:12px 16px; background:#111827; }
+    a.button.primary { background:var(--accent); color:#111827; border-color:var(--accent); font-weight:700; }
+    footer { border-top:1px solid var(--line); margin-top:64px; padding-top:24px; color:var(--muted); font-size:14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">URAI Privacy</div>
+    <h1>Privacy rules the whole URAI ecosystem must obey.</h1>
+    <p>
+      URAI Privacy is the public governance layer for consent, data classification, retention, deletion,
+      export, anonymization, audit logging, incident response, and data-sharing enforcement across URAI.
+    </p>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/LifeLoggerAI/urai-privacy">View governance repo</a>
+      <a class="button" href="https://github.com/LifeLoggerAI/urai-privacy/blob/main/docs/GOVERNANCE_INDEX.md">Governance index</a>
+      <a class="button" href="https://github.com/LifeLoggerAI/urai-privacy/blob/main/legal/PRIVACY_POLICY_TEMPLATE.md">Privacy policy template</a>
+    </div>
+    <section class="card-grid" aria-label="Privacy governance pillars">
+      <div class="card"><h2>Consent first</h2><p>Granular, revocable consent tiers for sensitive inference, biometrics, personalization, location, and anonymized data-sharing.</p></div>
+      <div class="card"><h2>User rights</h2><p>Export, deletion, revocation, explanation, and privacy-history controls are treated as product requirements.</p></div>
+      <div class="card"><h2>Enforceable policy</h2><p>Machine-readable registries and CI checks define data classes, consent tiers, retention classes, audit events, and blocked uses.</p></div>
+      <div class="card"><h2>No silent escalation</h2><p>URAI features must not expand collection, inference, sharing, monetization, or retention without renewed review and consent.</p></div>
+    </section>
+    <footer>
+      Domain: uraiprivacy.com · Repository: LifeLoggerAI/urai-privacy · Status: operational governance draft pending legal review before production launch.
+    </footer>
+  </main>
+</body>
+</html>
