@@ -14,6 +14,7 @@ This repo is the binding privacy and data governance layer for the URAI ecosyste
 8. [Incident Response](./INCIDENT_RESPONSE.md)
 9. [Audit Logging Standard](./AUDIT_LOGGING_STANDARD.md)
 10. [Privacy Review Checklist](./PRIVACY_REVIEW_CHECKLIST.md)
+11. [Branch Protection Standard](./BRANCH_PROTECTION.md)
 
 ## Implementation Contracts
 
@@ -21,6 +22,7 @@ This repo is the binding privacy and data governance layer for the URAI ecosyste
 - [Privacy API Contract](../api/privacy-api.yaml)
 - [Legal Templates](../legal/)
 - [CI Validator](../tools/validate_privacy_package.py)
+- [Full Validation Runner](../tools/run_validation.py)
 
 ## Release Gate
 
@@ -33,5 +35,6 @@ A URAI repo is privacy-ready only when it can answer all of the following:
 - Are admin and automated accesses logged?
 - Does the feature avoid silent escalation of collection or inference?
 - Does anonymized monetization use the required cohort and re-identification controls?
+- Are the required validation and branch-protection controls enabled before launch?
 
 If any answer is missing, the feature must not ship.
