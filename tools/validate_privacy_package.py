@@ -31,6 +31,12 @@ REQUIRED_FILES = [
     "architecture/ANONYMIZATION_DATA_SHARING_LIFECYCLE.md",
     "architecture/AUDIT_LIFECYCLE.md",
     "architecture/INCIDENT_RESPONSE_LIFECYCLE.md",
+    "sops/README.md",
+    "sops/ADMIN_ACCESS_APPROVAL.md",
+    "sops/BREAK_GLASS_ACCESS.md",
+    "sops/AUDIT_REVIEW_CADENCE.md",
+    "sops/EMPLOYEE_ACCESS_REMOVAL.md",
+    "sops/INCIDENT_ESCALATION_MATRIX.md",
     "docs/GOVERNANCE_INDEX.md",
     "docs/DATA_CLASSIFICATION.md",
     "docs/DATA_COLLECTION_BOUNDARIES.md",
@@ -92,6 +98,12 @@ REQUIRED_TERMS = {
     "architecture/ANONYMIZATION_DATA_SHARING_LIFECYCLE.md": ["flowchart TD", "C8", "minimum cohort"],
     "architecture/AUDIT_LIFECYCLE.md": ["flowchart TD", "dataAccessLogs", "append-only"],
     "architecture/INCIDENT_RESPONSE_LIFECYCLE.md": ["flowchart TD", "incidentReports", "Postmortem"],
+    "sops/README.md": ["Admin Access Approval", "Break-Glass Access", "Audit Review Cadence"],
+    "sops/ADMIN_ACCESS_APPROVAL.md": ["Approval Requirements", "Curiosity access is prohibited", "admin.user_data_accessed"],
+    "sops/BREAK_GLASS_ACCESS.md": ["When Allowed", "When Not Allowed", "post-access review"],
+    "sops/AUDIT_REVIEW_CADENCE.md": ["Review Cadence", "Required Review Questions", "Escalation"],
+    "sops/EMPLOYEE_ACCESS_REMOVAL.md": ["Required Removal Checklist", "High-Risk Access", "credential"],
+    "sops/INCIDENT_ESCALATION_MATRIX.md": ["Severity Matrix", "Escalation Triggers", "Required First Hour Actions"],
     "legal/TERMS_PRIVACY_CLAUSES_TEMPLATE.md": ["User Consent", "User Control", "Sensitive AI Inference", "Data-Sharing Restrictions"],
     "legal/DATA_SHARING_NOTICE_TEMPLATE.md": ["Separate Opt-In Required", "What Must Not Be Shared", "Cohort and Re-Identification Controls", "Opt-Out"],
     "legal/CHILDREN_AND_MINOR_PRIVACY_POLICY.md": ["Current Position", "Default Restrictions", "Consent and Guardian Controls", "Launch Requirement"],
@@ -268,7 +280,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
