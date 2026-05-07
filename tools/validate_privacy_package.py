@@ -110,6 +110,7 @@ REQUIRED_FILES = [
     "tests/fixtures/invalid-biometric-without-c5.privacy.yaml",
     "tests/fixtures/invalid-data-sharing-without-c8.privacy.yaml",
     "tests/test_privacy_validators.py",
+    "tests/test_website_e2e.py",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
     ".github/workflows/pages.yml",
@@ -161,6 +162,7 @@ REQUIRED_TERMS = {
     "tools/check_website.py": ["Static health checks", "REQUIRED_PAGES", "sitemap"],
     "tools/check_secrets.py": ["Lightweight repository secret scanner", "GitHub token", "Private key block"],
     "tests/test_privacy_validators.py": ["Regression tests", "FeatureManifestValidationTests", "SecretScannerTests"],
+    "tests/test_website_e2e.py": ["Static end-to-end smoke tests", "WebsiteStaticE2ETests", "404 edge path"],
     "architecture/README.md": ["Consent Lifecycle", "Deletion Lifecycle", "Export Lifecycle"],
     "architecture/CONSENT_LIFECYCLE.md": ["flowchart TD", "consent.changed", "Revocation"],
     "architecture/DELETION_LIFECYCLE.md": ["flowchart TD", "deletionJobs", "derived_records_deleted_or_recomputed"],
@@ -388,7 +390,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, tests, static E2E smoke tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
