@@ -26,6 +26,7 @@ class Check:
 CHECKS = (
     Check("unit and smoke tests", (sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py")),
     Check("committed secret scan", (sys.executable, "tools/check_secrets.py")),
+    Check("local Markdown link validation", (sys.executable, "tools/check_markdown_links.py")),
     Check("static website validation", (sys.executable, "tools/check_website.py")),
     Check("privacy package validation", (sys.executable, "tools/validate_privacy_package.py")),
 )
