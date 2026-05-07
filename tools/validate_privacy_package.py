@@ -46,6 +46,7 @@ REQUIRED_FILES = [
     "website/sitemap.xml",
     "website/README.md",
     "website/PUBLISHING.md",
+    "tools/check_markdown_links.py",
     "tools/check_website.py",
     "tools/check_secrets.py",
     "tools/run_validation.py",
@@ -163,9 +164,10 @@ REQUIRED_TERMS = {
     "website/sitemap.xml": ["https://uraiprivacy.com/", "principles.html", "status.html"],
     "website/README.md": ["Pages", "Static Files", "GitHub Pages"],
     "website/PUBLISHING.md": ["GitHub Pages Setup", "DNS Notes", "Pre-Publish Checklist"],
+    "tools/check_markdown_links.py": ["Validate local links in Markdown files", "broken local Markdown links", "local Markdown links resolve"],
     "tools/check_website.py": ["Static health checks", "REQUIRED_PAGES", "sitemap"],
     "tools/check_secrets.py": ["Lightweight repository secret scanner", "GitHub token", "Private key block"],
-    "tools/run_validation.py": ["Run the full local/CI validation suite", "CHECKS", "all checks passed"],
+    "tools/run_validation.py": ["Run the full local/CI validation suite", "check_markdown_links.py", "all checks passed"],
     "tests/test_adoption_validator.py": ["Integration tests", "AdoptionValidatorIntegrationTests", "PRIVACY_VERSION.md is required"],
     "tests/test_privacy_validators.py": ["Regression tests", "FeatureManifestValidationTests", "SecretScannerTests"],
     "tests/test_website_e2e.py": ["Static end-to-end smoke tests", "WebsiteStaticE2ETests", "404 edge path"],
@@ -396,7 +398,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, cross-repo adoption tests, single validation runner, dependency automation, tests, static E2E smoke tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, cross-repo adoption tests, Markdown link validation, single validation runner, dependency automation, tests, static E2E smoke tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
