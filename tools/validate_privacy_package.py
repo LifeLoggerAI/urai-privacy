@@ -16,6 +16,10 @@ REQUIRED_FILES = [
     "README.md",
     "VERSION.md",
     "CHANGELOG.md",
+    "RELEASE_PROCESS.md",
+    "MIGRATION_GUIDE.md",
+    "POLICY_VERSIONING.md",
+    "LAUNCH_READINESS.md",
     "CNAME",
     "website/CNAME",
     "website/index.html",
@@ -54,12 +58,18 @@ REQUIRED_FILES = [
     "tests/fixtures/invalid-sensitive-without-c4.privacy.yaml",
     "tests/fixtures/invalid-biometric-without-c5.privacy.yaml",
     "tests/fixtures/invalid-data-sharing-without-c8.privacy.yaml",
+    ".github/CODEOWNERS",
     ".github/pull_request_template.md",
     ".github/ISSUE_TEMPLATE/privacy_gap.md",
 ]
 
 REQUIRED_TERMS = {
     "README.md": ["https://uraiprivacy.com", "website/", "policy/"],
+    "RELEASE_PROCESS.md": ["Release Requirements", "Release Steps", "privacy-vX.Y.Z"],
+    "MIGRATION_GUIDE.md": ["Migration Checklist", "Breaking-Change Examples", "Rollback"],
+    "POLICY_VERSIONING.md": ["MAJOR.MINOR.PATCH", "Version Adoption", "Legal Review Marker"],
+    "LAUNCH_READINESS.md": ["Governance Package", "Website and Public Notices", "Product Repo Adoption", "Launch Decision"],
+    ".github/CODEOWNERS": ["@LifeLoggerAI", "/policy/", "/legal/"],
     "website/index.html": ["URAI Privacy", "uraiprivacy.com", "LifeLoggerAI/urai-privacy"],
     "website/README.md": ["uraiprivacy.com", "GitHub Pages"],
     "docs/CONSENT_TIERS.md": ["C0", "C4", "C5", "C8", "revoked"],
@@ -232,7 +242,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, website domain, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
