@@ -68,6 +68,12 @@ REQUIRED_FILES = [
     "adoption/templates/data-inventory.yaml",
     "adoption/templates/feature.privacy.yaml",
     "adoption/templates/privacy-review-record.md",
+    "adoption/ci/README.md",
+    "adoption/ci/validate_repo_privacy.py",
+    "adoption/ci/privacy-adoption-workflow.yml",
+    "adoption/ci/sample-privacy-folder/PRIVACY_VERSION.md",
+    "adoption/ci/sample-privacy-folder/data-inventory.yaml",
+    "adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml",
     "policy/data-classes.yaml",
     "policy/consent-tiers.yaml",
     "policy/retention-classes.yaml",
@@ -104,6 +110,12 @@ REQUIRED_TERMS = {
     "sops/AUDIT_REVIEW_CADENCE.md": ["Review Cadence", "Required Review Questions", "Escalation"],
     "sops/EMPLOYEE_ACCESS_REMOVAL.md": ["Required Removal Checklist", "High-Risk Access", "credential"],
     "sops/INCIDENT_ESCALATION_MATRIX.md": ["Severity Matrix", "Escalation Triggers", "Required First Hour Actions"],
+    "adoption/ci/README.md": ["Cross-Repo Privacy CI Enforcement", "validate_repo_privacy.py", "privacy/"],
+    "adoption/ci/validate_repo_privacy.py": ["Validate a URAI product repo privacy adoption folder", "L4", "C4", "minimumCohortSize"],
+    "adoption/ci/privacy-adoption-workflow.yml": ["Privacy adoption validation", "validate_repo_privacy.py", "PyYAML"],
+    "adoption/ci/sample-privacy-folder/PRIVACY_VERSION.md": ["0.1.0-draft", "LifeLoggerAI/urai-privacy"],
+    "adoption/ci/sample-privacy-folder/data-inventory.yaml": ["privacyGovernanceVersion", "L4", "C4"],
+    "adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml": ["mood-weather-report", "deletionSupported", "consentRevocationSupported"],
     "legal/TERMS_PRIVACY_CLAUSES_TEMPLATE.md": ["User Consent", "User Control", "Sensitive AI Inference", "Data-Sharing Restrictions"],
     "legal/DATA_SHARING_NOTICE_TEMPLATE.md": ["Separate Opt-In Required", "What Must Not Be Shared", "Cohort and Re-Identification Controls", "Opt-Out"],
     "legal/CHILDREN_AND_MINOR_PRIVACY_POLICY.md": ["Current Position", "Default Restrictions", "Consent and Guardian Controls", "Launch Requirement"],
@@ -274,13 +286,18 @@ def main() -> None:
     if valid_errors:
         fail("Valid example failed validation: " + "; ".join(valid_errors))
 
+    sample_feature = load_yaml("adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml")
+    sample_errors = validate_feature_manifest("adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml", sample_feature, registries)
+    if sample_errors:
+        fail("Sample adoption manifest failed validation: " + "; ".join(sample_errors))
+
     for fixture_path in sorted(EXPECTED_INVALID_FIXTURES):
         fixture = load_yaml(fixture_path)
         errors = validate_feature_manifest(fixture_path, fixture, registries)
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
