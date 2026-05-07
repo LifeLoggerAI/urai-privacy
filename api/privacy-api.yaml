@@ -1,0 +1,71 @@
+openapi: 3.1.0
+info:
+  title: URAI Privacy API Contract
+  version: 0.1.0-draft
+  description: Contract for consent, user rights, export, deletion, audit, and data-sharing controls across URAI services.
+paths:
+  /consent:
+    get:
+      summary: Get current consent state for the authenticated user
+      operationId: getConsentState
+      responses:
+        '200':
+          description: Current consent state
+    post:
+      summary: Record a consent grant, denial, or revocation
+      operationId: recordConsentEvent
+      responses:
+        '201':
+          description: Consent event recorded
+  /requests/export:
+    post:
+      summary: Request a user data export
+      operationId: requestDataExport
+      responses:
+        '202':
+          description: Export request queued
+  /requests/delete:
+    post:
+      summary: Request deletion of account, category, range, biometric-only, or record-level data
+      operationId: requestDeletion
+      responses:
+        '202':
+          description: Deletion request queued
+  /data-sharing/opt-out:
+    post:
+      summary: Opt out of future anonymized data-sharing participation
+      operationId: optOutOfDataSharing
+      responses:
+        '202':
+          description: Opt-out recorded
+  /audit/history:
+    get:
+      summary: Get user-visible privacy audit history
+      operationId: getPrivacyAuditHistory
+      responses:
+        '200':
+          description: Privacy history events
+  /explain/{insightId}:
+    get:
+      summary: Explain why a user-facing insight exists
+      operationId: explainInsight
+      parameters:
+        - name: insightId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Insight explanation
+components:
+  schemas:
+    ConsentTier:
+      type: string
+      enum: [C0, C1, C2, C3, C4, C5, C6, C7, C8]
+    ConsentStatus:
+      type: string
+      enum: [granted, denied, revoked, expired]
+    RequestStatus:
+      type: string
+      enum: [received, validated, queued, processing, completed, failed, cancelled]
