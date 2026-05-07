@@ -48,6 +48,7 @@ REQUIRED_FILES = [
     "website/PUBLISHING.md",
     "tools/check_website.py",
     "tools/check_secrets.py",
+    "tools/run_validation.py",
     "architecture/README.md",
     "architecture/CONSENT_LIFECYCLE.md",
     "architecture/DELETION_LIFECYCLE.md",
@@ -127,7 +128,7 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_TERMS = {
-    "README.md": ["https://uraiprivacy.com", "website/", "policy/", "check_secrets.py", "unittest"],
+    "README.md": ["https://uraiprivacy.com", "website/", "policy/", "check_secrets.py", "run_validation.py", "unittest"],
     "CONTRIBUTING.md": ["Contribution Rules", "Sensitive Change Areas", "Legal Review"],
     "SECURITY.md": ["Reporting Security or Privacy Issues", "High-Risk Report Categories", "S0-S4"],
     "SUPPORT.md": ["https://uraiprivacy.com", "What to Open as a GitHub Issue", "What Not to Open Publicly"],
@@ -142,7 +143,7 @@ REQUIRED_TERMS = {
     ".github/CODEOWNERS": ["@LifeLoggerAI", "/policy/", "/legal/"],
     ".github/dependabot.yml": ["package-ecosystem", "pip", "github-actions", "security"],
     ".github/workflows/pages.yml": ["Deploy URAI Privacy website", "actions/deploy-pages", "path: website"],
-    ".github/workflows/privacy-package.yml": ["Privacy package validation", "check_secrets.py", "unittest discover", "validate_privacy_package.py"],
+    ".github/workflows/privacy-package.yml": ["Privacy package validation", "run_validation.py", "python-version", "3.11"],
     ".github/workflows/website.yml": ["Website validation", "check_website.py"],
     ".github/ISSUE_TEMPLATE/adoption_rollout.md": ["Privacy adoption rollout", "privacy/PRIVACY_VERSION.md", "L6/data-sharing uses C8"],
     ".github/ISSUE_TEMPLATE/dpia_review.md": ["DPIA review", "Sensitive AI inference", "Decision"],
@@ -164,6 +165,7 @@ REQUIRED_TERMS = {
     "website/PUBLISHING.md": ["GitHub Pages Setup", "DNS Notes", "Pre-Publish Checklist"],
     "tools/check_website.py": ["Static health checks", "REQUIRED_PAGES", "sitemap"],
     "tools/check_secrets.py": ["Lightweight repository secret scanner", "GitHub token", "Private key block"],
+    "tools/run_validation.py": ["Run the full local/CI validation suite", "CHECKS", "all checks passed"],
     "tests/test_adoption_validator.py": ["Integration tests", "AdoptionValidatorIntegrationTests", "PRIVACY_VERSION.md is required"],
     "tests/test_privacy_validators.py": ["Regression tests", "FeatureManifestValidationTests", "SecretScannerTests"],
     "tests/test_website_e2e.py": ["Static end-to-end smoke tests", "WebsiteStaticE2ETests", "404 edge path"],
@@ -394,7 +396,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, cross-repo adoption tests, dependency automation, tests, static E2E smoke tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, cross-repo adoption tests, single validation runner, dependency automation, tests, static E2E smoke tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":

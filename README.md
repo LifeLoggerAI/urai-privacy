@@ -58,6 +58,7 @@ Implementation contracts:
 - [`legal/`](./legal/)
 - [`policy/`](./policy/)
 - [`examples/`](./examples/)
+- [`tools/run_validation.py`](./tools/run_validation.py)
 - [`tools/validate_privacy_package.py`](./tools/validate_privacy_package.py)
 
 ## Design Principles
@@ -107,7 +108,13 @@ pip install -r requirements.txt
 
 ## Validation
 
-Run the same checks used by CI:
+Run the same checks used by CI with the single validation runner:
+
+```bash
+python tools/run_validation.py
+```
+
+The runner executes the unit and smoke tests, committed-secret scan, static website validation, and full privacy package validation. You can still run individual checks while debugging:
 
 ```bash
 python -m unittest discover -s tests -p 'test_*.py'
@@ -116,7 +123,7 @@ python tools/check_website.py
 python tools/validate_privacy_package.py
 ```
 
-The GitHub Actions workflow validates the governance package, policy registries, examples, invalid fixtures, static website, unit tests, and committed-secret scan on pull requests and pushes.
+The GitHub Actions workflow validates the governance package, policy registries, examples, invalid fixtures, static website, unit tests, static E2E smoke tests, cross-repo adoption tests, and committed-secret scan on pull requests and pushes.
 
 ## Safe Configuration
 
