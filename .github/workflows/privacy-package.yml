@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - complete-governance-package
+      - add-policy-registry-enforcement
 
 jobs:
   validate:
@@ -17,5 +17,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install validator dependencies
+        run: pip install -r requirements.txt
       - name: Validate privacy package
         run: python tools/validate_privacy_package.py

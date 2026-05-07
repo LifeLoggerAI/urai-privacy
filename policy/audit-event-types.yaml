@@ -1,0 +1,26 @@
+version: 0.1.0-draft
+eventTypes:
+  consent.changed:
+    requiredFor: [consent_grant, consent_denial, consent_revocation, consent_expiration]
+    requiredFields: [eventId, eventType, actorType, actorId, targetUserId, policyVersion, timestamp, outcome]
+  export.requested:
+    requiredFor: [data_export_request]
+    requiredFields: [eventId, eventType, actorType, actorId, targetUserId, requestId, policyVersion, timestamp, outcome]
+  deletion.requested:
+    requiredFor: [deletion_request]
+    requiredFields: [eventId, eventType, actorType, actorId, targetUserId, requestId, policyVersion, timestamp, outcome]
+  admin.user_data_accessed:
+    requiredFor: [admin_access_to_user_data]
+    requiredFields: [eventId, eventType, actorType, actorId, targetUserId, purpose, policyVersion, timestamp, outcome]
+  biometric.enrolled:
+    requiredFor: [biometric_enrollment]
+    requiredFields: [eventId, eventType, actorType, actorId, targetUserId, dataClasses, policyVersion, timestamp, outcome]
+  biometric.deleted:
+    requiredFor: [biometric_deletion]
+    requiredFields: [eventId, eventType, actorType, actorId, targetUserId, dataClasses, policyVersion, timestamp, outcome]
+  data_sharing.batch_approved:
+    requiredFor: [anonymized_data_product_release]
+    requiredFields: [eventId, eventType, actorType, actorId, dataClasses, purpose, policyVersion, timestamp, outcome]
+  incident.created:
+    requiredFor: [privacy_incident]
+    requiredFields: [eventId, eventType, actorType, actorId, dataClasses, policyVersion, timestamp, outcome]
