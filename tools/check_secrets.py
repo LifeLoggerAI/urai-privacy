@@ -28,6 +28,7 @@ SKIP_DIRS = {
 
 SKIP_FILES = {
     "tools/check_secrets.py",  # contains detector regexes by design
+    "tests/test_privacy_validators.py",  # intentionally constructs fake secrets
 }
 
 TEXT_EXTENSIONS = {
