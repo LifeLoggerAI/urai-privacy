@@ -19,6 +19,10 @@ except ImportError:  # pragma: no cover
 
 REQUIRED_FILES = [
     "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "GOVERNANCE.md",
     "VERSION.md",
     "CHANGELOG.md",
     "RELEASE_PROCESS.md",
@@ -93,10 +97,19 @@ REQUIRED_FILES = [
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
     ".github/ISSUE_TEMPLATE/privacy_gap.md",
+    ".github/ISSUE_TEMPLATE/adoption_rollout.md",
+    ".github/ISSUE_TEMPLATE/dpia_review.md",
+    ".github/ISSUE_TEMPLATE/vendor_review.md",
+    ".github/ISSUE_TEMPLATE/release_tracking.md",
+    ".github/ISSUE_TEMPLATE/legal_review.md",
 ]
 
 REQUIRED_TERMS = {
     "README.md": ["https://uraiprivacy.com", "website/", "policy/"],
+    "CONTRIBUTING.md": ["Contribution Rules", "Sensitive Change Areas", "Legal Review"],
+    "SECURITY.md": ["Reporting Security or Privacy Issues", "High-Risk Report Categories", "S0-S4"],
+    "SUPPORT.md": ["https://uraiprivacy.com", "What to Open as a GitHub Issue", "What Not to Open Publicly"],
+    "GOVERNANCE.md": ["Governance Principles", "Decision Bias", "Prohibited Governance Patterns"],
     "schemas/data-inventory.schema.json": ["URAI Privacy Data Inventory", "privacyGovernanceVersion", "L0", "C8", "R6"],
     "schemas/feature-privacy-manifest.schema.json": ["URAI Privacy Feature Manifest", "dataProcessing", "userRights", "monetization"],
     "RELEASE_PROCESS.md": ["Release Requirements", "Release Steps", "privacy-vX.Y.Z"],
@@ -104,6 +117,11 @@ REQUIRED_TERMS = {
     "POLICY_VERSIONING.md": ["MAJOR.MINOR.PATCH", "Version Adoption", "Legal Review Marker"],
     "LAUNCH_READINESS.md": ["Governance Package", "Website and Public Notices", "Product Repo Adoption", "Launch Decision"],
     ".github/CODEOWNERS": ["@LifeLoggerAI", "/policy/", "/legal/"],
+    ".github/ISSUE_TEMPLATE/adoption_rollout.md": ["Privacy adoption rollout", "privacy/PRIVACY_VERSION.md", "L6/data-sharing uses C8"],
+    ".github/ISSUE_TEMPLATE/dpia_review.md": ["DPIA review", "Sensitive AI inference", "Decision"],
+    ".github/ISSUE_TEMPLATE/vendor_review.md": ["Vendor / processor review", "Risk Level", "Data Classes"],
+    ".github/ISSUE_TEMPLATE/release_tracking.md": ["Privacy release tracking", "VERSION.md", "Product Repo Adoption"],
+    ".github/ISSUE_TEMPLATE/legal_review.md": ["Legal review", "Review Trigger", "Needs external counsel"],
     "website/index.html": ["URAI Privacy", "uraiprivacy.com", "LifeLoggerAI/urai-privacy"],
     "website/README.md": ["uraiprivacy.com", "GitHub Pages"],
     "architecture/README.md": ["Consent Lifecycle", "Deletion Lifecycle", "Export Lifecycle"],
@@ -333,7 +351,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
