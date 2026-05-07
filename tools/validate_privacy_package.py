@@ -29,6 +29,7 @@ REQUIRED_FILES = [
     "MIGRATION_GUIDE.md",
     "POLICY_VERSIONING.md",
     "LAUNCH_READINESS.md",
+    ".gitignore",
     "CNAME",
     "website/CNAME",
     "website/.nojekyll",
@@ -46,6 +47,7 @@ REQUIRED_FILES = [
     "website/README.md",
     "website/PUBLISHING.md",
     "tools/check_website.py",
+    "tools/check_secrets.py",
     "architecture/README.md",
     "architecture/CONSENT_LIFECYCLE.md",
     "architecture/DELETION_LIFECYCLE.md",
@@ -107,6 +109,7 @@ REQUIRED_FILES = [
     "tests/fixtures/invalid-sensitive-without-c4.privacy.yaml",
     "tests/fixtures/invalid-biometric-without-c5.privacy.yaml",
     "tests/fixtures/invalid-data-sharing-without-c8.privacy.yaml",
+    "tests/test_privacy_validators.py",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
     ".github/workflows/pages.yml",
@@ -121,11 +124,12 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_TERMS = {
-    "README.md": ["https://uraiprivacy.com", "website/", "policy/"],
+    "README.md": ["https://uraiprivacy.com", "website/", "policy/", "check_secrets.py", "unittest"],
     "CONTRIBUTING.md": ["Contribution Rules", "Sensitive Change Areas", "Legal Review"],
     "SECURITY.md": ["Reporting Security or Privacy Issues", "High-Risk Report Categories", "S0-S4"],
     "SUPPORT.md": ["https://uraiprivacy.com", "What to Open as a GitHub Issue", "What Not to Open Publicly"],
     "GOVERNANCE.md": ["Governance Principles", "Decision Bias", "Prohibited Governance Patterns"],
+    ".gitignore": [".env", "*.pem", "node_modules/"],
     "schemas/data-inventory.schema.json": ["URAI Privacy Data Inventory", "privacyGovernanceVersion", "L0", "C8", "R6"],
     "schemas/feature-privacy-manifest.schema.json": ["URAI Privacy Feature Manifest", "dataProcessing", "userRights", "monetization"],
     "RELEASE_PROCESS.md": ["Release Requirements", "Release Steps", "privacy-vX.Y.Z"],
@@ -134,14 +138,14 @@ REQUIRED_TERMS = {
     "LAUNCH_READINESS.md": ["Governance Package", "Website and Public Notices", "Product Repo Adoption", "Launch Decision"],
     ".github/CODEOWNERS": ["@LifeLoggerAI", "/policy/", "/legal/"],
     ".github/workflows/pages.yml": ["Deploy URAI Privacy website", "actions/deploy-pages", "path: website"],
-    ".github/workflows/privacy-package.yml": ["Privacy package validation", "validate_privacy_package.py"],
+    ".github/workflows/privacy-package.yml": ["Privacy package validation", "check_secrets.py", "unittest discover", "validate_privacy_package.py"],
     ".github/workflows/website.yml": ["Website validation", "check_website.py"],
     ".github/ISSUE_TEMPLATE/adoption_rollout.md": ["Privacy adoption rollout", "privacy/PRIVACY_VERSION.md", "L6/data-sharing uses C8"],
     ".github/ISSUE_TEMPLATE/dpia_review.md": ["DPIA review", "Sensitive AI inference", "Decision"],
     ".github/ISSUE_TEMPLATE/vendor_review.md": ["Vendor / processor review", "Risk Level", "Data Classes"],
     ".github/ISSUE_TEMPLATE/release_tracking.md": ["Privacy release tracking", "VERSION.md", "Product Repo Adoption"],
     ".github/ISSUE_TEMPLATE/legal_review.md": ["Legal review", "Review Trigger", "Needs external counsel"],
-    "website/index.html": ["URAI Privacy", "canonical", "./styles.css", "principles.html", "rights.html", "governance.html", "legal.html", "contact.html"],
+    "website/index.html": ["URAI Privacy", "canonical", "./styles.css", "principles.html", "rights.html", "governance.html", "legal.html", "contact.html", "status.html"],
     "website/principles.html": ["Privacy is not a feature", "Default decision bias", "./styles.css"],
     "website/rights.html": ["User rights", "Data export", "Consent Revocation", "./styles.css"],
     "website/governance.html": ["The repo is built to be enforceable", "Policy registry", "Release gate", "./styles.css"],
@@ -149,12 +153,14 @@ REQUIRED_TERMS = {
     "website/contact.html": ["Contact", "privacy@urai.app", "security@urai.app", "Do not post sensitive data publicly"],
     "website/status.html": ["Status", "Operational governance draft", "Launch blockers to clear"],
     "website/404.html": ["Page not found", "Return home", "Report a broken link"],
-    "website/styles.css": ["--accent", "site-header", "card-grid", "site-footer"],
+    "website/styles.css": ["--accent", "site-header", "card-grid", "site-footer", "focus-visible", "prefers-reduced-motion"],
     "website/robots.txt": ["Sitemap: https://uraiprivacy.com/sitemap.xml"],
     "website/sitemap.xml": ["https://uraiprivacy.com/", "principles.html", "status.html"],
     "website/README.md": ["Pages", "Static Files", "GitHub Pages"],
     "website/PUBLISHING.md": ["GitHub Pages Setup", "DNS Notes", "Pre-Publish Checklist"],
     "tools/check_website.py": ["Static health checks", "REQUIRED_PAGES", "sitemap"],
+    "tools/check_secrets.py": ["Lightweight repository secret scanner", "GitHub token", "Private key block"],
+    "tests/test_privacy_validators.py": ["Regression tests", "FeatureManifestValidationTests", "SecretScannerTests"],
     "architecture/README.md": ["Consent Lifecycle", "Deletion Lifecycle", "Export Lifecycle"],
     "architecture/CONSENT_LIFECYCLE.md": ["flowchart TD", "consent.changed", "Revocation"],
     "architecture/DELETION_LIFECYCLE.md": ["flowchart TD", "deletionJobs", "derived_records_deleted_or_recomputed"],
@@ -382,7 +388,7 @@ def main() -> None:
         if not errors:
             fail(f"Invalid fixture unexpectedly passed: {fixture_path}")
 
-    print("[privacy-package] OK: governance package, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
+    print("[privacy-package] OK: governance package, tests, secret scanning, website deploy/status, expanded website, repo quality templates, JSON Schemas, cross-repo toolkit, SOPs, architecture lifecycles, legal notices, website domain, release docs, policy registry, and fixtures validated")
 
 
 if __name__ == "__main__":
