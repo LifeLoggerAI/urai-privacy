@@ -11,33 +11,77 @@ paths:
       responses:
         '200':
           description: Current consent state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentStateResponse'
     post:
       summary: Record a consent grant, denial, or revocation
       operationId: recordConsentEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentEventRequest'
       responses:
         '201':
           description: Consent event recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentEventResponse'
   /requests/export:
     post:
       summary: Request a user data export
       operationId: requestDataExport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
       responses:
         '202':
           description: Export request queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRightsRequestResponse'
   /requests/delete:
     post:
       summary: Request deletion of account, category, range, biometric-only, or record-level data
       operationId: requestDeletion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeletionRequest'
       responses:
         '202':
           description: Deletion request queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRightsRequestResponse'
   /data-sharing/opt-out:
     post:
       summary: Opt out of future anonymized data-sharing participation
       operationId: optOutOfDataSharing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataSharingOptOutRequest'
       responses:
         '202':
           description: Opt-out recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRightsRequestResponse'
   /audit/history:
     get:
       summary: Get user-visible privacy audit history
@@ -45,6 +89,10 @@ paths:
       responses:
         '200':
           description: Privacy history events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditHistoryResponse'
   /explain/{insightId}:
     get:
       summary: Explain why a user-facing insight exists
@@ -58,6 +106,10 @@ paths:
       responses:
         '200':
           description: Insight explanation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightExplanationResponse'
 components:
   schemas:
     ConsentTier:
@@ -69,3 +121,189 @@ components:
     RequestStatus:
       type: string
       enum: [received, validated, queued, processing, completed, failed, cancelled]
+    PolicyVersion:
+      type: string
+      const: 0.1.0-draft
+    DataClass:
+      type: string
+      enum: [L0, L1, L2, L3, L4, L5, L6, L7]
+    Timestamp:
+      type: string
+      format: date-time
+    ConsentRecord:
+      type: object
+      additionalProperties: false
+      required: [consentTier, status, purpose, updatedAt, policyVersion]
+      properties:
+        consentTier:
+          $ref: '#/components/schemas/ConsentTier'
+        status:
+          $ref: '#/components/schemas/ConsentStatus'
+        purpose:
+          type: string
+        updatedAt:
+          $ref: '#/components/schemas/Timestamp'
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    ConsentStateResponse:
+      type: object
+      additionalProperties: false
+      required: [userId, consents, policyVersion]
+      properties:
+        userId:
+          type: string
+        consents:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsentRecord'
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    ConsentEventRequest:
+      type: object
+      additionalProperties: false
+      required: [userId, consentTier, status, purpose, source, recordedAt, policyVersion]
+      properties:
+        userId:
+          type: string
+        consentTier:
+          $ref: '#/components/schemas/ConsentTier'
+        status:
+          $ref: '#/components/schemas/ConsentStatus'
+        purpose:
+          type: string
+        source:
+          type: string
+          enum: [user, admin, system]
+        recordedAt:
+          $ref: '#/components/schemas/Timestamp'
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    ConsentEventResponse:
+      type: object
+      additionalProperties: false
+      required: [eventId, status, policyVersion]
+      properties:
+        eventId:
+          type: string
+        status:
+          type: string
+          enum: [recorded]
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    ExportRequest:
+      type: object
+      additionalProperties: false
+      required: [userId, requestType, format, requestedAt, policyVersion]
+      properties:
+        userId:
+          type: string
+        requestType:
+          type: string
+          enum: [full_export, category_export]
+        format:
+          type: string
+          enum: [json]
+        requestedAt:
+          $ref: '#/components/schemas/Timestamp'
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    DeletionRequest:
+      type: object
+      additionalProperties: false
+      required: [userId, scope, reason, requestedAt, policyVersion]
+      properties:
+        userId:
+          type: string
+        scope:
+          type: string
+          enum: [account, category, date_range, biometric_only, record]
+        reason:
+          type: string
+        requestedAt:
+          $ref: '#/components/schemas/Timestamp'
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    DataSharingOptOutRequest:
+      type: object
+      additionalProperties: false
+      required: [userId, effectiveAt, reason, policyVersion]
+      properties:
+        userId:
+          type: string
+        effectiveAt:
+          $ref: '#/components/schemas/Timestamp'
+        reason:
+          type: string
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    UserRightsRequestResponse:
+      type: object
+      additionalProperties: false
+      required: [requestId, status, receivedAt, policyVersion]
+      properties:
+        requestId:
+          type: string
+        status:
+          $ref: '#/components/schemas/RequestStatus'
+        receivedAt:
+          $ref: '#/components/schemas/Timestamp'
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    AuditHistoryEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, userId, eventType, actorType, occurredAt, summary, policyVersion]
+      properties:
+        eventId:
+          type: string
+        userId:
+          type: string
+        eventType:
+          type: string
+        actorType:
+          type: string
+          enum: [user, admin, system]
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        summary:
+          type: string
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    AuditHistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [events, policyVersion]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditHistoryEvent'
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
+    InsightExplanationResponse:
+      type: object
+      additionalProperties: false
+      required: [insightId, userId, summary, sourceFields, dataClasses, consentTiers, generatedAt, policyVersion]
+      properties:
+        insightId:
+          type: string
+        userId:
+          type: string
+        summary:
+          type: string
+        sourceFields:
+          type: array
+          items:
+            type: string
+        dataClasses:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataClass'
+        consentTiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsentTier'
+        generatedAt:
+          $ref: '#/components/schemas/Timestamp'
+        policyVersion:
+          $ref: '#/components/schemas/PolicyVersion'
