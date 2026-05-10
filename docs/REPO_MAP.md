@@ -4,31 +4,46 @@ Last audited: 2026-05-10
 
 ## Framework and runtime
 
-- Current app framework: none detected. This repository is a governance, policy, schema, legal-template, validation, and static website package.
-- Package manager: Python/pip via `requirements.txt`; no root `package.json` was detected during audit.
-- Required runtime: Python 3.11+.
-- Public website: static HTML under `website/` for `uraiprivacy.com`.
-- Current version: `0.1.0-draft`.
+- App framework: Next.js App Router scaffold under `app/`.
+- UI runtime: React 18 + TypeScript.
+- Package manager: npm via root `package.json`.
+- Governance runtime: Python 3.11+ via `requirements.txt` and `tools/run_validation.py`.
+- Public legacy website: static HTML under `website/` for `uraiprivacy.com`.
+- Governance version: `0.1.0-draft`.
+- Product scaffold version: `0.2.0-staging-scaffold`.
 
 ## Deploy target
 
 - Static website: GitHub Pages, configured through `website/`, `CNAME`, `website/CNAME`, `.github/workflows/pages.yml`, and `website/PUBLISHING.md`.
-- Firebase app hosting / Firebase Functions: not present in the current codebase.
-- Next.js app hosting: not present in the current codebase.
+- Next.js app: Firebase Hosting framework scaffold via `firebase.json`.
+- Firebase Functions: `functions/` codebase named `privacy`.
+- Firestore and Storage: rules and indexes are present.
 
 ## Firebase project assumptions
 
-No concrete Firebase project ID, `.firebaserc`, `firebase.json`, `firestore.rules`, `firestore.indexes.json`, `storage.rules`, or deployed Functions source was detected in the audited package. Firebase behavior is currently represented as contracts rather than executable Firebase infrastructure:
+No real Firebase project IDs are committed. `.firebaserc.example` documents local/staging/production placeholders. Real project IDs must be configured locally or in CI/CD secrets and reviewed before production.
 
-- Firestore contract: `schemas/firestore-privacy-schema.json`
-- API contract: `api/privacy-api.yaml`
-- Governance validation: `tools/run_validation.py`, `tools/validate_privacy_package.py`
+Firebase infrastructure files now present:
+
+- `firebase.json`
+- `.firebaserc.example`
+- `firestore.rules`
+- `storage.rules`
+- `firestore.indexes.json`
+- `functions/package.json`
+- `functions/tsconfig.json`
+- `functions/src/index.ts`
 
 ## Public routes
 
-Current static website routes are file-based HTML pages:
+Current Next.js product routes:
 
-- `/` -> `website/index.html`
+- `/` -> `app/page.tsx`
+- `/privacy` -> `app/privacy/page.tsx`
+
+Current legacy static website routes remain in `website/`:
+
+- `/` -> `website/index.html` for GitHub Pages legacy publishing
 - `/principles.html`
 - `/rights.html`
 - `/governance.html`
@@ -38,168 +53,162 @@ Current static website routes are file-based HTML pages:
 - `/status.html`
 - `/404.html`
 
-Requested product routes that do not currently exist as Next.js/Firebase pages:
+## Protected / user-facing routes
 
-- `/features`
-- `/security`
-- `/privacy`
-- `/terms`
-- `/docs`
-- `/compliance`
-- `/data-rights`
-- `/login`
-- `/admin/*`
-- `/privacy-center/*`
+Privacy center routes now exist as Next.js pages:
 
-## Protected routes
+- `/privacy-center`
+- `/privacy-center/export`
+- `/privacy-center/delete`
+- `/privacy-center/retention`
+- `/privacy-center/consent`
+- `/privacy-center/audit-log`
 
-No authenticated protected UI routes were detected. The requested admin console and user privacy center are not implemented as protected application routes yet.
+Current limitation: pages render workflow-backed previews and route contracts. Live client-side Firebase Auth and callable Function wiring remains required before staging signoff.
 
-## API routes
+## Admin routes
 
-No executable API routes or Cloud Functions were detected. API behavior is specified contractually in `api/privacy-api.yaml`, including consent state, consent recording, export request, deletion request, data-sharing opt-out, audit history, and insight explanation endpoints.
+Admin console routes now exist as Next.js pages:
 
-## Cloud Functions
+- `/admin`
+- `/admin/privacy-requests`
+- `/admin/audit-log`
+- `/admin/retention`
+- `/admin/policies`
 
-No executable Firebase Cloud Functions source tree was detected. The required functions remain implementation blockers:
+Current authorization model is implemented in shared workflow helpers, Firestore rules, and Functions. Route middleware/session enforcement is still required before production.
 
-- `health`
-- `getPrivacyStatus`
-- `recordConsent`
-- `revokeConsent`
-- `syncConsentToProduct`
-- `createDataExportRequest`
-- `processDataExportRequest`
+## API routes / Functions
+
+Executable Firebase callable Functions scaffold now exists in `functions/src/index.ts`:
+
+- `createExportRequest`
+- `processExportRequest`
 - `createDeletionRequest`
 - `processDeletionRequest`
-- `applyRetentionRules`
-- `cleanupExpiredData`
-- `createFeatureManifest`
-- `approveFeatureManifest`
-- `rejectFeatureManifest`
-- `publishPolicyVersion`
-- `recordVendorReview`
-- `recordPrivacyAuditEvent`
-- `createIncident`
-- `resolveIncident`
-- `generateComplianceEvidencePackage`
-- `privacySystemStatusCheck`
+- `updateConsent`
+- `writeAuditLog`
+- `recordAdminAction`
+- `getPrivacyHealthReport`
+
+OpenAPI contract remains in `api/privacy-api.yaml`.
 
 ## Firestore collections
 
-Current schema contract defines these top-level domains:
+Implementation scaffold uses these collections:
 
-- `userConsent`
-- `consentEvents`
+- `users`
 - `privacyRequests`
-- `deletionJobs`
 - `exportJobs`
-- `dataAccessLogs`
-- `dataProcessingRecords`
-- `anonymizationBatches`
-- `monetizationLedger`
-- `incidentReports`
+- `deletionRequests`
+- `consentRecords`
+- `retentionPolicies`
+- `auditLogs`
+- `adminActions`
+- `dataAccessEvents`
+- `policyVersions`
 
-Requested canonical production collections not yet represented one-for-one in the current schema contract:
+Existing schema contract remains at `schemas/firestore-privacy-schema.json` and still needs a follow-up alignment pass to fully reconcile legacy schema names with the new executable collection names.
 
-- `privacyUsers`
-- `privacyOrganizations`
-- `privacyConsents`
-- `privacyConsentVersions`
-- `privacyFeatureManifests`
-- `privacyRetentionRules`
-- `privacyDataRequests`
-- `privacyExportJobs`
-- `privacyDeletionJobs`
-- `privacyPolicyVersions`
-- `privacyVendors`
-- `privacyProcessors`
-- `privacySubprocessors`
-- `privacyAuditLogs`
-- `privacyIncidents`
-- `privacyLegalHolds`
-- `privacyIntegrations`
-- `privacySystemConfig`
-- `privacyReleaseEvidence`
-- `privacyRiskReviews`
-- `privacyAdminUsers`
-- `privacyAccessRoles`
-- `privacyNotifications`
-- `privacyWebhooks`
+## Storage buckets / paths
 
-## Storage buckets
+Storage rules define:
 
-No Firebase Storage buckets or `storage.rules` were detected. Private export packages and audit evidence vault storage are not yet executable infrastructure.
+- `exports/{uid}/...` user/admin readable and admin/function writable.
+- `evidence/...` admin-only.
+- deny-by-default fallback for all other paths.
+
+Actual export package writing and signed/expiring download behavior remain implementation blockers.
 
 ## Security rules
 
-No executable `firestore.rules` or `storage.rules` were detected. Security expectations are documented in governance standards but are not enforced by Firebase rules yet.
+Firestore rules now include:
+
+- deny-by-default fallback
+- owner-scoped reads
+- user-created pending export/deletion requests
+- admin-only status updates
+- admin-only export job writes
+- append-only audit logs
+- immutable delete behavior for policy/audit/admin evidence
+- public read for policy versions
+
+Storage rules now include:
+
+- private export paths
+- admin-only evidence vault
+- deny-by-default fallback
 
 ## Scripts and checks
 
-Primary validation entrypoint:
+Root npm scripts now include:
+
+- `lint`
+- `typecheck`
+- `test`
+- `test:unit`
+- `test:integration`
+- `test:e2e`
+- `test:rules`
+- `test:smoke`
+- `test:emulators`
+- `build`
+- `preflight`
+- `preflight:production`
+- `security:gate`
+- `deploy`
+- `verify:production`
+- `verify:release`
+
+Primary combined verifier:
+
+```bash
+bash scripts/verify-release.sh
+```
+
+Existing governance verifier remains:
 
 ```bash
 python tools/run_validation.py
 ```
 
-The validation runner executes:
-
-- Python unit and smoke tests
-- committed-secret scan
-- local Markdown link validation
-- static website validation
-- privacy health report
-- privacy package validation
-
 ## CI workflows
 
-The repository includes GitHub workflow expectations through `.github/workflows/` and validates the governance/static package rather than a Next.js/Firebase product.
+New workflows:
+
+- `.github/workflows/ci.yml`
+- `.github/workflows/release-verifier.yml`
+
+Existing governance/static website workflows are preserved.
 
 ## Tests
 
-Detected test categories in the validation package:
+Added:
 
-- adoption validator tests
-- privacy validator tests
-- static website E2E smoke tests
+- `tests/unit/privacy-workflows.test.ts`
+- `scripts/smoke-routes.mjs`
+- `scripts/validate-rules.mjs`
 
-Missing test categories for the requested production system:
+Existing Python tests remain preserved.
 
-- Firebase security rules tests
-- Cloud Functions unit and integration tests
-- protected route authorization tests
-- admin console tests
-- privacy center E2E tests
+Missing before production:
+
+- real Firebase emulator security rules tests
+- callable Functions integration tests against emulator
+- live Auth route middleware tests
 - export package integrity tests
-- deletion proof tests
-- retention dry-run and destructive-run tests
+- destructive deletion dry-run/destructive-run tests
+- storage signed URL expiry tests
 
 ## Environment variables
 
-No executable app environment contract was detected. Required future env examples:
+Still required before staging/production:
 
 - `.env.example`
 - `.env.production.example`
-- Firebase project IDs
-- Firebase service account handling through platform secrets only
-- app URL/domain values
-- evidence bucket names
-- webhook signing keys through secret manager only
-
-## Missing production files
-
-- `package.json`
-- `pnpm-lock.yaml`
-- `next.config.*`
-- `src/` or `app/` application tree
-- `functions/` or Firebase Functions source
-- `firebase.json`
-- `.firebaserc`
-- `firestore.rules`
-- `firestore.indexes.json`
-- `storage.rules`
-- production deploy verifier scripts
+- Firebase web app config variables
+- Firebase Admin/runtime secret handling
+- staging and production project IDs outside committed secrets
 
 ## Generated files that should not be committed
 
@@ -230,4 +239,4 @@ The repo has a secret scan tool. Additional hard-block patterns must remain excl
 
 Verdict: `NOT READY — BLOCKERS REMAIN`.
 
-The current repository is a strong operational draft governance package, not the standalone privacy/compliance/trust product requested in the release mission. The blockers are executable product infrastructure, Firebase enforcement, protected UI, Cloud Functions, production deploy path, and independent release verification.
+The repo now has a Firebase + Next.js staging scaffold and verifiable local command path. It is not production-ready until dependencies are installed, verifier output passes, Firebase emulator tests are expanded and recorded, live route auth is wired, UI forms call Functions, export package generation is implemented, destructive deletion safeguards are implemented, Firebase projects are configured, and deployment evidence is recorded.
