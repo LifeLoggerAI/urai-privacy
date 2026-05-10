@@ -20,7 +20,7 @@
     "build": "next build",
     "preflight": "npm run lint && npm run typecheck && npm run test && npm run test:rules && npm run test:e2e && npm run build",
     "preflight:production": "bash scripts/verify-release.sh",
-    "security:gate": "python tools/check_secrets.py",
+    "security:gate": "bash scripts/security-gate.sh",
     "deploy": "firebase deploy",
     "verify:production": "bash scripts/verify-release.sh",
     "verify:release": "bash scripts/verify-release.sh"
