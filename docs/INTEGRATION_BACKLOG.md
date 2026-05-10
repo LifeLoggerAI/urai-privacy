@@ -15,6 +15,28 @@ Status: execution backlog.
 9. Add audit events for consent changes, exports, deletions, admin access, and policy changes.
 10. Complete review and approval of public policy notices before final launch.
 
+## Product adoption template package
+
+Use `templates/product-privacy/` as the starting package for every URAI production repository.
+
+Required destination layout in product repos:
+
+```text
+privacy/PRIVACY_VERSION.md
+privacy/data-inventory.yaml
+privacy/feature-manifests/<feature-id>.yaml
+privacy/adoption-report.md
+```
+
+Template source files:
+
+```text
+templates/product-privacy/PRIVACY_VERSION.md
+templates/product-privacy/data-inventory.yaml
+templates/product-privacy/feature-manifest.yaml
+templates/product-privacy/ADOPTION_CHECKLIST.md
+```
+
 ## Definition of done
 
 URAI Privacy is complete only when the public site is live, users can exercise rights end to end, production repos pass privacy checks, admin workflows are audited, and release gates prevent non-compliant data features from shipping.
