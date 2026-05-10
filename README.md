@@ -18,6 +18,16 @@ The public-facing privacy governance landing page lives in [`website/`](./websit
 
 The website is a plain-language entry point for users, partners, reviewers, and contributors. It links back to the governance repo, governance index, and legal/privacy templates.
 
+## Launch and Integration Work
+
+URAI Privacy is not considered complete until it is live, legally reviewed, adopted by production repos, and wired into user-rights, consent, export, deletion, admin, support, audit, and monitoring workflows.
+
+Start here for launch execution:
+
+- [`LAUNCH_READINESS.md`](./LAUNCH_READINESS.md) - public launch checklist
+- [`docs/INTEGRATION_BACKLOG.md`](./docs/INTEGRATION_BACKLOG.md) - critical path to full URAI system integration
+- [`docs/USER_RIGHTS_INTAKE_SPEC.md`](./docs/USER_RIGHTS_INTAKE_SPEC.md) - required export, deletion, consent, biometric deletion, explanation, and privacy request intake model
+
 ## Scope
 
 This repository covers:
