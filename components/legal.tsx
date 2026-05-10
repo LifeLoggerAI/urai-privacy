@@ -1,5 +1,15 @@
 import type { ReactNode } from "react";
 
+export function SectionHeader({ title, subtitle, description }: { title: string; subtitle?: string; description?: string }) {
+  return (
+    <header className="hero">
+      {subtitle ? <div className="eyebrow">{subtitle}</div> : null}
+      <h1>{title}</h1>
+      {description ? <p className="lede">{description}</p> : null}
+    </header>
+  );
+}
+
 export function LegalPageShell({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <section className="hero">
