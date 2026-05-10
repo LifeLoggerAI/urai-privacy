@@ -19,12 +19,10 @@ npm run test:rules
 printf '\n[verify-release] route smoke validation\n'
 npm run test:e2e
 
+printf '\n[verify-release] security gate\n'
+npm run security:gate
+
 printf '\n[verify-release] next build\n'
 npm run build
 
-if [ -f tools/run_validation.py ]; then
-  printf '\n[verify-release] python governance validation\n'
-  python tools/run_validation.py
-fi
-
-printf '\n[verify-release] OK: local release verification commands passed\n'
+printf '\n[verify-release] OK: Bash/Node local release verification commands passed\n'
