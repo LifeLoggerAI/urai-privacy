@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "replace-with-your-firebase-project-id",
+    "staging": "replace-with-your-staging-project-id",
+    "production": "replace-with-your-production-project-id"
+  }
+}
