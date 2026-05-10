@@ -1,0 +1,58 @@
+feature:
+  id: REPLACE_WITH_FEATURE_ID
+  name: REPLACE_WITH_FEATURE_NAME
+  owner: REPLACE_WITH_OWNER
+  repository: REPLACE_WITH_REPO_NAME
+  status: planned | in_development | internal | public | deprecated
+  privacy_version: 0.1.0-draft
+
+processing:
+  summary: REPLACE_WITH_PROCESSING_SUMMARY
+  user_visible: true
+  automated_decisioning: false
+  sensitive_inference: false
+  biometric_or_identity_processing: false
+  location_processing: false
+  data_sharing: false
+  monetization: false
+
+inputs:
+  - field: REPLACE_WITH_INPUT_FIELD
+    data_class: REPLACE_WITH_DATA_CLASS
+    consent_tier: REPLACE_WITH_CONSENT_TIER
+    source: user_provided | system_collected | derived | inferred | imported | third_party
+
+outputs:
+  - field: REPLACE_WITH_OUTPUT_FIELD
+    data_class: REPLACE_WITH_DATA_CLASS
+    user_visible: true
+    explanation_required: false
+
+retention:
+  retention_class: REPLACE_WITH_RETENTION_CLASS
+  deletion_behavior: delete_immediately | delete_async | anonymize | retain_for_legal_hold | not_applicable
+  backup_behavior: REPLACE_WITH_BACKUP_BEHAVIOR
+
+user_rights:
+  exportable: true
+  deletable: true
+  consent_revocable: true
+  explanation_available: false
+  biometric_delete_supported: false
+
+access:
+  admin_access_allowed: false
+  support_access_allowed: false
+  least_privilege_role: REPLACE_WITH_ROLE_OR_NONE
+  audit_events:
+    - REPLACE_WITH_AUDIT_EVENT
+
+release_gate:
+  data_inventory_updated: false
+  consent_mapped: false
+  export_mapped: false
+  deletion_mapped: false
+  audit_mapped: false
+  privacy_review_complete: false
+  legal_review_required: false
+  legal_review_complete: false
