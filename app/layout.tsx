@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://uraiprivacy.com"),
   title: "URAI Privacy",
   description: "Standalone privacy, consent, audit, export, deletion, and governance console for AI-native products.",
   openGraph: {
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <nav className="nav" aria-label="Primary navigation">
             <a className="brand" href="/">URAI Privacy</a>
             <div className="links">
-              {nav.map(([label, href]) => <a key={href} href={href}>{label}</a>)}
+              {nav.map(([label, href]) => <a key={href}>{label}</a>)}
               <a href="/status.html">Legacy status</a>
             </div>
           </nav>
