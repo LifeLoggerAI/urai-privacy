@@ -22,6 +22,9 @@ npm run test:e2e
 printf '\n[verify-release] security gate\n'
 npm run security:gate
 
+printf '\n[verify-release] production readiness assertions\n'
+bash scripts/assert-production-ready.sh
+
 printf '\n[verify-release] next build\n'
 npm run build
 
