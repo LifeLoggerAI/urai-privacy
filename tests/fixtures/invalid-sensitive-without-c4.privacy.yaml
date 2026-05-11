@@ -1,0 +1,39 @@
+feature: invalid-sensitive-without-c4
+repo: UrAiProd
+owner: product-privacy
+privacyGovernanceVersion: 0.1.0-draft
+status: review
+lastReviewed: 2026-05-06
+
+dataProcessing:
+  collectedFields: []
+  derivedFields:
+    - name: crisis_signal
+      dataClass: L4
+      sourceFields: [app_interaction_rhythm]
+      purpose: generate crisis inference
+      consentTier: C2
+      retentionClass: R3
+      explainabilityRequired: true
+
+userRights:
+  exportSupported: true
+  deletionSupported: true
+  consentRevocationSupported: true
+  explanationSupported: true
+
+adminAccess:
+  allowed: false
+  roles: []
+  auditEventTypes: []
+
+monetization:
+  participatesInDataSharing: false
+  requiresC8Consent: false
+  anonymizationBatchRequired: false
+  minimumCohortSize: 100
+
+review:
+  reviewer: privacy-governance
+  decision: blocked
+  notes: Invalid because L4 requires C4.

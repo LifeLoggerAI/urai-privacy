@@ -1,0 +1,39 @@
+feature: invalid-data-sharing-without-c8
+repo: urai-analytics
+owner: product-privacy
+privacyGovernanceVersion: 0.1.0-draft
+status: review
+lastReviewed: 2026-05-06
+
+dataProcessing:
+  collectedFields: []
+  derivedFields:
+    - name: anonymized_behavioral_cohort
+      dataClass: L6
+      sourceFields: [app_interaction_rhythm]
+      purpose: create anonymized cohort data product
+      consentTier: C2
+      retentionClass: R5
+      explainabilityRequired: false
+
+userRights:
+  exportSupported: true
+  deletionSupported: true
+  consentRevocationSupported: true
+  explanationSupported: true
+
+adminAccess:
+  allowed: false
+  roles: []
+  auditEventTypes: []
+
+monetization:
+  participatesInDataSharing: true
+  requiresC8Consent: false
+  anonymizationBatchRequired: true
+  minimumCohortSize: 50
+
+review:
+  reviewer: privacy-governance
+  decision: blocked
+  notes: Invalid because L6 requires C8 and minimum cohort size of 100.
