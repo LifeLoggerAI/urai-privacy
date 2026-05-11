@@ -1,10 +1,18 @@
+
 {
   "hosting": {
-    "source": ".",
-    "frameworksBackend": {
-      "region": "us-central1"
-    },
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    "target": "urai-privacy-com",
+    "public": ".next",
+    "rewrites": [
+      {
+        "source": "**",
+        "function": "nextServer"
+      }
+    ]
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs20"
   },
   "firestore": {
     "rules": "firestore.rules",
@@ -12,20 +20,5 @@
   },
   "storage": {
     "rules": "storage.rules"
-  },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "privacy"
-    }
-  ],
-  "emulators": {
-    "auth": { "port": 9099 },
-    "functions": { "port": 5001 },
-    "firestore": { "port": 8080 },
-    "hosting": { "port": 5000 },
-    "storage": { "port": 9199 },
-    "ui": { "enabled": true, "port": 4000 },
-    "singleProjectMode": true
   }
 }

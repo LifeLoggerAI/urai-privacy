@@ -1,7 +1,0 @@
-{
-  "userId": "user_123",
-  "scope": "biometric_only",
-  "reason": "user_requested_deletion",
-  "requestedAt": "2026-05-07T20:10:00Z",
-  "policyVersion": "0.1.0-draft"
-}

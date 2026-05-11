@@ -1,0 +1,6 @@
+--- URai Privacy Finisher Initialized ---
+--- Timestamp: 20260127_075819
+--- Log file: urai_privacy_finish_20260127_075819.log
+-----------------------------------------
+--- (1/11) DETECTING ENVIRONMENT ---
+❌ CRITICAL: Command 'patch' could not be found. Please install it and ensure it's in your PATH.

@@ -1,15 +1,16 @@
 {
   "compilerOptions": {
-    "module": "CommonJS",
-    "target": "ES2022",
-    "lib": ["ES2022"],
-    "outDir": "lib",
-    "rootDir": "src",
+    "module": "commonjs",
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "outDir": "dist",
+    "sourceMap": true,
     "strict": true,
-    "esModuleInterop": true,
-    "moduleResolution": "node",
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "target": "es2020",
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts"]
+  "compileOnSave": true,
+  "include": [
+    "src"
+  ]
 }

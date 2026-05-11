@@ -1,14 +1,50 @@
-export default function PrivacyPage() {
+
+'use client';
+
+import ConsentManager from '@/components/ConsentManager';
+import ExportManager from '@/components/ExportManager';
+import DeletionManager from '@/components/DeletionManager';
+import AuditLogViewer from '@/components/AuditLogViewer';
+import { useAuth } from '@/firebase/AuthContext'; // Mocked auth context for now
+
+export default function PrivacyDashboard() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <div>Please sign in to view your privacy dashboard.</div>;
+  }
+
   return (
-    <section className="hero">
-      <div className="eyebrow">Public privacy promise</div>
-      <h1>Consent, export, deletion, retention, and explanation are product surfaces.</h1>
-      <p className="lede">This page translates the governance package into a user-facing privacy product: users can review consent status, create export/deletion requests, inspect retention behavior, and see auditable privacy activity.</p>
-      <div className="grid">
-        <article className="card"><h3>No silent escalation</h3><p className="muted">New processing purposes require manifest review, consent mapping, retention mapping, and audit coverage.</p></article>
-        <article className="card"><h3>User-owned workflows</h3><p className="muted">Export and deletion requests are created by authenticated users and scoped to their own UID.</p></article>
-        <article className="card"><h3>Admin accountability</h3><p className="muted">Admin review actions are recorded with actor, target, request, metadata, source, and timestamp.</p></article>
-      </div>
-    </section>
+    <div className="space-y-8">
+      <h1 className="text-3xl font-bold">Privacy Dashboard</h1>
+
+      <section>
+        <h2 className="text-2xl font-semibold">Consent Management</h2>
+        <p className="text-gray-600 mb-4">Control how your data is used across our services.</p>
+        <ConsentManager />
+      </section>
+
+      <section>
+        <h2 className="text-2xl font-semibold">Data Export</h2>
+        <p className="text-gray-600 mb-4">Download a copy of your data.</p>
+        <ExportManager />
+      </section>
+
+      <section>
+        <h2 className="text-2xl font-semibold">Data Deletion</h2>
+        <p className="text-gray-600 mb-4">Request to have your data permanently deleted.</p>
+        <DeletionManager />
+      </section>
+
+      <section>
+        <h2 className="text-2xl font-semibold">Audit Log</h2>
+        <p className="text-gray-600 mb-4">View a log of all privacy-related events.</p>
+        <AuditLogViewer />
+      </section>
+    </div>
   );
 }

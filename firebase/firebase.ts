@@ -13,7 +13,9 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "1:000000000000:web:demo"
 };
 
-export const firebaseApp: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+export const firebaseApp: FirebaseApp =
+  getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+
 export const app = firebaseApp;
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);

@@ -1,0 +1,118 @@
+{
+  "status": "success",
+  "result": [
+    {
+      "projectId": "geturai-landing-hub",
+      "projectNumber": "604038487441",
+      "displayName": "asset-factory",
+      "name": "projects/geturai-landing-hub",
+      "resources": {
+        "hostingSite": "geturai-landing-hub"
+      },
+      "state": "ACTIVE",
+      "etag": "1_2f159f31-132b-4ee1-8b79-65ed107c5f49"
+    },
+    {
+      "projectId": "lifelogger-cgth1",
+      "projectNumber": "189295958483",
+      "displayName": "LifeLogger",
+      "name": "projects/lifelogger-cgth1",
+      "resources": {
+        "hostingSite": "lifelogger-cgth1",
+        "realtimeDatabaseInstance": "lifelogger-cgth1-default-rtdb"
+      },
+      "state": "ACTIVE",
+      "etag": "1_8600b829-7a9f-4205-9846-389016390e7e"
+    },
+    {
+      "projectId": "lifelogger-clean",
+      "projectNumber": "360527756764",
+      "displayName": "UrAi",
+      "name": "projects/lifelogger-clean",
+      "resources": {
+        "hostingSite": "lifelogger-clean",
+        "realtimeDatabaseInstance": "lifelogger-clean-default-rtdb"
+      },
+      "state": "ACTIVE",
+      "etag": "1_ef5133b6-1a6a-4678-b489-f957e58e70c5"
+    },
+    {
+      "projectId": "ruai-87dda",
+      "projectNumber": "857293381296",
+      "displayName": "RuAi",
+      "name": "projects/ruai-87dda",
+      "resources": {
+        "hostingSite": "ruai-87dda"
+      },
+      "state": "ACTIVE",
+      "etag": "1_7bcdfc67-1367-4fb5-b5b1-dc7a92ae38aa"
+    },
+    {
+      "projectId": "test-a5bb0",
+      "projectNumber": "33207618489",
+      "displayName": "test",
+      "name": "projects/test-a5bb0",
+      "resources": {
+        "hostingSite": "test-a5bb0"
+      },
+      "state": "ACTIVE",
+      "etag": "1_de4398e0-2332-43c8-89e4-ede324a59111"
+    },
+    {
+      "projectId": "urai-4dc1d",
+      "projectNumber": "952723774155",
+      "displayName": "urai-web-prod",
+      "name": "projects/urai-4dc1d",
+      "resources": {
+        "hostingSite": "urai-4dc1d",
+        "realtimeDatabaseInstance": "urai-4dc1d-default-rtdb"
+      },
+      "state": "ACTIVE",
+      "etag": "1_908c8c3b-6022-490f-96d5-7ac230f2d1f5"
+    },
+    {
+      "projectId": "urai-landing",
+      "projectNumber": "331521920248",
+      "displayName": "UrAi Landing",
+      "name": "projects/urai-landing",
+      "resources": {
+        "hostingSite": "urai-landing"
+      },
+      "state": "ACTIVE",
+      "etag": "1_e8929bf7-d31b-4290-9102-67a016bcf7c7"
+    },
+    {
+      "projectId": "urai-marketing",
+      "projectNumber": "1011331985469",
+      "displayName": "urai-marketing",
+      "name": "projects/urai-marketing",
+      "resources": {
+        "hostingSite": "urai-marketing"
+      },
+      "state": "ACTIVE",
+      "etag": "1_8636f48d-8a74-4651-8995-1d337060d095"
+    },
+    {
+      "projectId": "urai-staging",
+      "projectNumber": "525778299248",
+      "displayName": "urai-staging",
+      "name": "projects/urai-staging",
+      "resources": {
+        "hostingSite": "urai-staging"
+      },
+      "state": "ACTIVE",
+      "etag": "1_afe284d4-53d6-4a33-93c6-877861d5580e"
+    },
+    {
+      "projectId": "urai-web-frontend",
+      "projectNumber": "1046292763777",
+      "displayName": "urai-web-frontend",
+      "name": "projects/urai-web-frontend",
+      "resources": {
+        "hostingSite": "urai-web-frontend"
+      },
+      "state": "ACTIVE",
+      "etag": "1_76e39659-f75c-4d99-becc-43374acad462"
+    }
+  ]
+}

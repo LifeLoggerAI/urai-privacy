@@ -12,7 +12,10 @@ const firebaseContextValue = {
   firestore,
   functions,
   storage,
-  user: null
+  user: null,
+  loading: false,
+  login: async () => {},
+  logout: async () => {}
 };
 
 const FirebaseContext = createContext(firebaseContextValue);
@@ -26,7 +29,11 @@ export function Providers({ children }: { children: ReactNode }) {
 }
 
 export function useFirebase() {
-  return useContext(FirebaseContext);
+  return useContext(FirebaseContext) ?? firebaseContextValue;
+}
+
+export function useAuth() {
+  return useFirebase();
 }
 
 export default Providers;

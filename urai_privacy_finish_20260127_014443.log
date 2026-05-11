@@ -1,0 +1,24 @@
+--- URai Privacy Finisher Initialized ---
+--- Timestamp: 20260127_014443
+--- Log file: urai_privacy_finish_20260127_014443.log
+-----------------------------------------
+--- (1/9) DETECTING ENVIRONMENT ---
+✅ Node version: v20.18.1
+--- URai Privacy Finisher Initialized ---
+--- Timestamp: 20260127_014443
+--- Log file: urai_privacy_finish_20260127_014443.log
+-----------------------------------------
+--- (1/9) DETECTING ENVIRONMENT ---
+✅ Node version: v20.18.1
+✅ PNPM version: 10.28.0
+✅ PNPM version: 10.28.0
+✅ Firebase CLI version: 13.10.0
+✅ Firebase project set to: urai-privacy
+✅ Firebase CLI version: 13.10.0
+✅ Firebase project set to: urai-privacy
+
+Error: Invalid project selection, please verify project urai-privacy exists and you have access.
+
+Error: Invalid project selection, please verify project urai-privacy exists and you have access.
+❌ CRITICAL: Failed to set Firebase project. Ensure you have access.
+❌ CRITICAL: Failed to set Firebase project. Ensure you have access.

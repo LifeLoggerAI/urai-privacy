@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+echo "[shim] pnpm call redirected to npm: $*"
+if [ "$1" = "install" ]; then
+  npm install
+else
+  npm run "$@"
+fi

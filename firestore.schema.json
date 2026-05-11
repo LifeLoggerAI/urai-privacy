@@ -1,0 +1,129 @@
+{
+  "users": {
+    "schema": {
+      "createdAt": "timestamp",
+      "status": "string",
+      "tier": "string"
+    }
+  },
+  "identity_vectors": {
+    "schema": {
+      "voiceprintHash": "string",
+      "faceEmbeddingHash": "string"
+    }
+  },
+  "consent_profiles": {
+    "schema": {
+      "categories": {
+        "type": "map",
+        "fields": {
+          "audio": {
+            "type": "map",
+            "fields": {
+              "enabled": "boolean",
+              "expiresAt": "timestamp",
+              "context": "string"
+            }
+          },
+          "location": {
+            "type": "map",
+            "fields": {
+              "enabled": "boolean",
+              "expiresAt": "timestamp",
+              "context": "string"
+            }
+          },
+          "facial": {
+            "type": "map",
+            "fields": {
+              "enabled": "boolean",
+              "expiresAt": "timestamp",
+              "context": "string"
+            }
+          },
+          "social": {
+            "type": "map",
+            "fields": {
+              "enabled": "boolean",
+              "expiresAt": "timestamp",
+              "context": "string"
+            }
+          },
+          "monetization": {
+            "type": "map",
+            "fields": {
+              "enabled": "boolean",
+              "expiresAt": "timestamp"
+            }
+          }
+        }
+      },
+      "lastUpdated": "timestamp"
+    }
+  },
+  "data_lineage": {
+    "schema": {
+      "userId": "string",
+      "sourceIds": {
+        "type": "array",
+        "items": "string"
+      },
+      "derivedIds": {
+        "type": "array",
+        "items": "string"
+      },
+      "transformationType": "string",
+      "timestamp": "timestamp"
+    }
+  },
+  "audit_logs": {
+    "schema": {
+      "userId": "string",
+      "action": "string",
+      "actor": "string",
+      "resource": "string",
+      "timestamp": "timestamp"
+    }
+  },
+  "access_logs": {
+    "schema": {
+      "userId": "string",
+      "requesterId": "string",
+      "resourceId": "string",
+      "accessType": "string",
+      "timestamp": "timestamp"
+    }
+  },
+  "anonymized_data_pool": {
+    "schema": {
+      "anonymizedPayload": "any",
+      "category": "string",
+      "riskScore": "number",
+      "createdAt": "timestamp"
+    }
+  },
+  "monetization_units": {
+    "schema": {
+      "userId": "string",
+      "dataRef": "string",
+      "anonymizedRef": "string",
+      "price": "number",
+      "accessPolicy": "string",
+      "soldCount": "number"
+    }
+  },
+  "data_requests": {
+    "schema": {
+      "userId": "string",
+      "type": "string",
+      "status": "string"
+    }
+  },
+  "deletion_requests": {
+    "schema": {
+      "userId": "string",
+      "scope": "string",
+      "status": "string"
+    }
+  }
+}

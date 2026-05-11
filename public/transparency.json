@@ -1,0 +1,41 @@
+{
+  "system": "URAI Privacy Center",
+  "version": "1.0.1",
+  "governance_lock": "active",
+  "principles": {
+    "no_sale_of_personal_data": true,
+    "user_data_portability": true,
+    "user_data_deletion": true,
+    "explicit_consent": true,
+    "consent_revocable": true,
+    "audit_logging": true
+  },
+  "dsar": {
+    "supported_requests": ["EXPORT", "DELETE"],
+    "authentication_required": true,
+    "rate_limited": true,
+    "sla_days": 30,
+    "delivery": {
+      "export": "expiring_signed_url",
+      "delete": "deletion_certificate"
+    }
+  },
+  "consent": {
+    "scoped": true,
+    "versioned": true,
+    "revocation_effect": "fail_closed"
+  },
+  "policies": {
+    "versioned": true,
+    "historical_access": true,
+    "user_acceptance_tracked": true
+  },
+  "audit": {
+    "immutable": true,
+    "fields": ["actor", "timestamp", "action", "target", "outcome"]
+  },
+  "contact": {
+    "privacy_email": "privacy@urai.app"
+  },
+  "last_updated": "2026-02-10"
+}

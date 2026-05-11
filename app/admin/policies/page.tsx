@@ -1,16 +1,42 @@
-import type { PolicyVersion } from "@/lib/privacy-types";
+'use client'
 
-const policies: PolicyVersion[] = [
-  { id: "policy-0-1-0", version: "0.1.0-draft", title: "Operational draft governance package", status: "draft", effectiveAt: "2026-05-10T00:00:00.000Z", createdAt: "2026-05-10T00:00:00.000Z" }
-];
+import { useEffect, useState } from 'react'
+import { useFirebase } from '../../../providers'
+import { collection, getDocs } from 'firebase/firestore'
+import Link from 'next/link'
 
-export default function AdminPoliciesPage() {
+export default function AdminPolicies() {
+  const { db, user } = useFirebase()
+  const [policies, setPolicies] = useState([])
+
+  useEffect(() => {
+    if (!db || !user) return
+    const fetchPolicies = async () => {
+      const querySnapshot = await getDocs(collection(db, 'policyDocs'))
+      const policiesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      setPolicies(policiesData)
+    }
+    fetchPolicies()
+  }, [db, user])
+
+  if (!user) return <div>Please sign in to manage policies.</div>
+
   return (
-    <section>
-      <div className="eyebrow">Policy publishing</div>
-      <h1>Policy versions</h1>
-      <p className="lede">Historical policy versions must be immutable after publication. Admin publishing actions require audit events and release evidence.</p>
-      <table className="table"><thead><tr><th>Version</th><th>Title</th><th>Status</th><th>Effective</th></tr></thead><tbody>{policies.map((policy) => <tr key={policy.id}><td>{policy.version}</td><td>{policy.title}</td><td>{policy.status}</td><td>{policy.effectiveAt}</td></tr>)}</tbody></table>
-    </section>
-  );
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Policies</h1>
+        {/* In a real app, this would open a modal or go to a new page */}
+        <button className="bg-brand text-white px-4 py-2 rounded">New Policy</button>
+      </div>
+      <div className="space-y-4">
+        {policies.map(policy => (
+          <Link href={`/admin/policies/${policy.id}`} key={policy.id} className="block p-4 border rounded hover:bg-surface">
+            <h2 className="font-bold">{policy.title}</h2>
+            <p className="text-text-secondary">{policy.summary}</p>
+            <span className="text-sm text-text-secondary">Status: {policy.status}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
 }

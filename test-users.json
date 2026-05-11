@@ -1,0 +1,15 @@
+[
+  {
+    "localId": "testuser01",
+    "email": "testuser01@uraiprivacy.org",
+    "password": "password123",
+    "emailVerified": true
+  },
+  {
+    "localId": "testadmin01",
+    "email": "testadmin01@uraiprivacy.org",
+    "password": "password123",
+    "emailVerified": true,
+    "customAttributes": "{\"admin\":true}"
+  }
+]

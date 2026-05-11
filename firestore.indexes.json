@@ -1,13 +1,8 @@
 {
   "indexes": [
-    {"collectionGroup":"privacyRequests","queryScope":"COLLECTION","fields":[{"fieldPath":"uid","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
-    {"collectionGroup":"exportJobs","queryScope":"COLLECTION","fields":[{"fieldPath":"uid","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
-    {"collectionGroup":"deletionRequests","queryScope":"COLLECTION","fields":[{"fieldPath":"uid","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
-    {"collectionGroup":"consentRecords","queryScope":"COLLECTION","fields":[{"fieldPath":"uid","order":"ASCENDING"},{"fieldPath":"purpose","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
-    {"collectionGroup":"auditLogs","queryScope":"COLLECTION","fields":[{"fieldPath":"targetUid","order":"ASCENDING"},{"fieldPath":"action","order":"ASCENDING"},{"fieldPath":"timestamp","order":"DESCENDING"}]},
-    {"collectionGroup":"adminActions","queryScope":"COLLECTION","fields":[{"fieldPath":"adminUid","order":"ASCENDING"},{"fieldPath":"action","order":"ASCENDING"},{"fieldPath":"timestamp","order":"DESCENDING"}]},
-    {"collectionGroup":"retentionPolicies","queryScope":"COLLECTION","fields":[{"fieldPath":"collection","order":"ASCENDING"},{"fieldPath":"retentionClass","order":"ASCENDING"}]},
-    {"collectionGroup":"policyVersions","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"effectiveAt","order":"DESCENDING"}]}
-  ],
-  "fieldOverrides": []
+    {"collectionGroup": "consentReceipts", "queryScope": "COLLECTION", "fields": [{"fieldPath": "userId", "order": "ASCENDING"}, {"fieldPath": "timestamp", "order": "DESCENDING"}]},
+    {"collectionGroup": "dsr", "queryScope": "COLLECTION", "fields": [{"fieldPath": "userId", "order": "ASCENDING"}, {"fieldPath": "createdAt", "order": "DESCENDING"}]},
+    {"collectionGroup": "audit_logs", "queryScope": "COLLECTION", "fields": [{"fieldPath": "timestamp", "order": "ASCENDING"}]},
+    {"collectionGroup": "data_exports", "queryScope": "COLLECTION", "fields": [{"fieldPath": "timestamp", "order": "ASCENDING"}]}
+  ]
 }

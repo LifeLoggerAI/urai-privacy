@@ -1,0 +1,195 @@
+--- URai Privacy Finisher Initialized ---
+--- Timestamp: 20260127_080325
+--- Log file: urai_privacy_finish_20260127_080325.log
+-----------------------------------------
+--- (1/11) DETECTING ENVIRONMENT ---
+✅ Node version: v20.18.1
+✅ PNPM version: 10.28.0
+✅ Firebase CLI version: 13.10.0
+--- (2/11) BACKING UP CRITICAL FILES ---
+✅ Backed up package.json to package.json.bak.20260127_080325
+✅ Backed up tsconfig.json to tsconfig.json.bak.20260127_080325
+✅ Backed up firebase.json to firebase.json.bak.20260127_080325
+✅ Backed up firestore.rules to firestore.rules.bak.20260127_080325
+✅ Backed up firestore.indexes.json to firestore.indexes.json.bak.20260127_080325
+✅ Backed up next.config.mjs to next.config.mjs.bak.20260127_080325
+✅ Backed up next.config.js to next.config.js.bak.20260127_080325
+ℹ️  File index.js not found, skipping backup.
+--- (3/11) ENSURING CORE FILES EXIST ---
+Creating default index.js for Next.js SSR...
+✅ Default index.js created.
+--- (4/11) STANDARDIZING NEXT.JS CONFIG ---
+✅ Removed conflicting next.config.js
+✅ Ensured next.config.mjs is standardized for SSR.
+--- (5/11) PATCHING FILES ---
+ℹ️  Patch for package.json already applied or not applicable. Skipping.
+ℹ️  Patch for tsconfig.json already applied or not applicable. Skipping.
+ℹ️  Patch for firebase.json already applied or not applicable. Skipping.
+--- (6/11) CLEANING UP ---
+Usage: pnpm cache <command>
+
+Inspect and manage the metadata cache
+
+Commands:
+      delete               Deletes metadata cache for the specified package(s).
+                           Supports patterns
+      list                 Lists the available packages metadata cache. Supports
+                           filtering by glob
+      list-registries      Lists all registries that have their metadata cache
+                           locally
+      view                 Views information from the specified package's cache
+
+Visit https://pnpm.io/10.x/cli/cache for documentation about this command.
+✅ Cleanup complete.
+--- (7/11) INSTALLING DEPENDENCIES ---
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +553
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 553, reused 26, downloaded 0, added 0
+Progress: resolved 553, reused 93, downloaded 0, added 0
+Progress: resolved 553, reused 208, downloaded 0, added 0
+Progress: resolved 553, reused 230, downloaded 0, added 0
+Progress: resolved 553, reused 373, downloaded 0, added 0
+Progress: resolved 553, reused 489, downloaded 0, added 0
+Progress: resolved 553, reused 553, downloaded 0, added 4
+Progress: resolved 553, reused 553, downloaded 0, added 200
+Progress: resolved 553, reused 553, downloaded 0, added 522
+Progress: resolved 553, reused 553, downloaded 0, added 553, done
+
+dependencies:
++ firebase 12.8.0
++ firebase-admin 13.6.0
++ framer-motion 12.29.0
++ geist 1.5.1
++ lucide-react 0.562.0
++ next 14.2.35
++ react 18.3.1
++ react-dom 18.3.1
++ zod 4.3.6
+
+devDependencies:
++ @tailwindcss/typography 0.5.19
++ @types/node 20.19.30
++ @types/react 18.3.27
++ @types/react-dom 18.3.7
++ eslint 8.57.1
++ eslint-config-next 14.2.35
++ eslint-config-prettier 10.1.8
++ eslint-plugin-prettier 5.5.5
++ postcss 8.5.6
++ prettier 3.8.1
++ tailwindcss 3.4.19
++ typescript 5.9.3
+
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: @firebase/util@1.13.0, protobufjs@7.5.4,            │
+│   unrs-resolver@1.11.1.                                                      │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 11.1s using pnpm v10.28.0
+--- (8/11) BUILDING PROJECT ---
+
+> urai-privacy-web@0.1.0 build /home/user/urai-privacy
+> next build
+
+  ▲ Next.js 14.2.35
+  - Environments: .env.local, .env.production, .env
+
+   Creating an optimized production build ...
+ ⚠ Compiled with warnings
+
+./app/cookies/page.tsx
+Attempted import error: 'PolicyHeader' is not exported from '@/app/components/PolicyHeader' (imported as 'PolicyHeader').
+
+Import trace for requested module:
+./app/cookies/page.tsx
+
+./app/cookies/page.tsx
+Attempted import error: 'TrustFooter' is not exported from '@/app/components/TrustFooter' (imported as 'TrustFooter').
+
+Import trace for requested module:
+./app/cookies/page.tsx
+
+./app/data-actions/page.tsx
+Attempted import error: 'PolicyHeader' is not exported from '@/app/components/PolicyHeader' (imported as 'PolicyHeader').
+
+Import trace for requested module:
+./app/data-actions/page.tsx
+
+./app/data-actions/page.tsx
+Attempted import error: 'TrustFooter' is not exported from '@/app/components/TrustFooter' (imported as 'TrustFooter').
+
+Import trace for requested module:
+./app/data-actions/page.tsx
+
+./app/data-requests/page.tsx
+Attempted import error: 'TrustFooter' is not exported from '../components/TrustFooter' (imported as 'TrustFooter').
+
+Import trace for requested module:
+./app/data-requests/page.tsx
+
+./app/ai-inferences/page.tsx
+Attempted import error: 'PolicyHeader' is not exported from '@/app/components/PolicyHeader' (imported as 'PolicyHeader').
+
+Import trace for requested module:
+./app/ai-inferences/page.tsx
+
+./app/data-requests/submitted/page.tsx
+Attempted import error: 'TrustFooter' is not exported from '../../components/TrustFooter' (imported as 'TrustFooter').
+
+Import trace for requested module:
+./app/data-requests/submitted/page.tsx
+
+./app/privacy-center/page.tsx
+Attempted import error: 'TrustFooter' is not exported from '../components/TrustFooter' (imported as 'TrustFooter').
+
+Import trace for requested module:
+./app/privacy-center/page.tsx
+
+ ⚠ Compiled with warnings
+
+./app/cookies/page.tsx
+Attempted import error: 'PolicyHeader' is not exported from '@/app/components/PolicyHeader' (imported as 'PolicyHeader').
+
+Import trace for requested module:
+./app/cookies/page.tsx
+
+./app/cookies/page.tsx
+Attempted import error: 'TrustFooter' is not exported from '@/app/components/TrustFooter' (imported as 'TrustFooter').
+
+Import trace for requested module:
+./app/cookies/page.tsx
+
+./app/data-actions/page.tsx
+Attempted import error: 'PolicyHeader' is not exported from '@/app/components/PolicyHeader' (imported as 'PolicyHeader').
+
+Import trace for requested module:
+./app/data-actions/page.tsx
+
+./app/data-actions/page.tsx
+Attempted import error: 'TrustFooter' is not exported from '@/app/components/TrustFooter' (imported as 'TrustFooter').
+
+Import trace for requested module:
+./app/data-actions/page.tsx
+
+./app/data-requests/page.tsx
+Attempted import error: 'TrustFooter' is not exported from '../components/TrustFooter' (imported as 'TrustFooter').
+
+Import trace for requested module:
+./app/data-requests/page.tsx
+
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+Failed to compile.
+
+./app/request-data/page.tsx
+25:30  Error: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+25:51  Error: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+ ELIFECYCLE  Command failed with exit code 1.
