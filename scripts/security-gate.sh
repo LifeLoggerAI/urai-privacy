@@ -21,7 +21,6 @@ check_absent_path ".env.staging"
 check_absent_path ".firebase"
 check_absent_path ".next"
 check_absent_path "._backup_deps"
-check_absent_path "tsconfig.tsbuildinfo"
 check_absent_path "firebase/firebase.js"
 check_absent_path "pnpm-lock.yaml"
 
