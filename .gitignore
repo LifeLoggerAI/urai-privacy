@@ -22,12 +22,27 @@ env/
 *.pfx
 *.crt
 *.cer
+serviceAccount*.json
+firebase-adminsdk*.json
 
-# Node/build artifacts, if website tooling is added later
+# Node/build artifacts
 node_modules/
 dist/
 build/
 .cache/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+tsconfig.tsbuildinfo
+._backup_deps/
+.firebase/
+
+# Package-manager artifacts not used by the npm app path
+pnpm-lock.yaml
+.yarn/
+.yarnrc.yml
 
 # OS/editor files
 .DS_Store
