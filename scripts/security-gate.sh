@@ -34,7 +34,10 @@ if grep -R "BEGIN PRIVATE KEY\|PRIVATE KEY-----\|firebase-adminsdk\|serviceAccou
   --exclude-dir=.git \
   --exclude-dir=.next \
   --exclude-dir=coverage \
-  --exclude='*.lock' >/dev/null 2>&1; then
+  --exclude='*.lock' \
+  --exclude='.gitignore' \
+  --exclude='scripts/security-gate.sh' \
+  --exclude='tools/check_secrets.py' >/dev/null 2>&1; then
   fail "potential private key or service-account reference found"
 fi
 
