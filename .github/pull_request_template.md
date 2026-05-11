@@ -1,82 +1,39 @@
-# URAI Privacy & Trust PR Checklist
+# Privacy Governance Change
 
-## Scope
-- [ ] This PR affects **privacy / trust / legal / UX**
-- [ ] This PR affects **copy only**
-- [ ] This PR affects **UI / layout**
-- [ ] This PR affects **forms / data flow**
-- [ ] This PR affects **security disclosures**
+## Summary
 
----
+Describe what changed and why.
 
-## Page Coverage
-- [ ] /privacy
-- [ ] /terms
-- [ ] /trust
-- [ ] /security
-- [ ] /data
-- [ ] /consent
-- [ ] /delete
-- [ ] /contact
-- [ ] /how-urai-works
-- [ ] /ai-boundaries
-- [ ] /ethics
-- [ ] /transparency
-- [ ] /law-enforcement
-- [ ] /children
-- [ ] /international
+## Change Type
 
----
+- [ ] Policy / governance documentation
+- [ ] Legal template
+- [ ] Schema contract
+- [ ] API contract
+- [ ] Adoption template
+- [ ] CI / validation
+- [ ] Incident / audit / compliance process
 
-## Legal & Policy Integrity
-- [ ] No misleading claims
-- [ ] No vague phrases (“industry standard”, “may”, “at our discretion”) unless legally required
-- [ ] Explicit opt-in vs opt-out clarified
-- [ ] Data retention periods stated numerically
-- [ ] Jurisdiction clearly stated
-- [ ] Not medical / not therapy disclaimer verified
-- [ ] AI limitations clearly disclosed
+## Privacy Impact
 
----
+- [ ] No user data impact
+- [ ] Changes collection boundaries
+- [ ] Changes consent requirements
+- [ ] Changes retention or deletion behavior
+- [ ] Changes export or portability behavior
+- [ ] Changes anonymization or data-sharing behavior
+- [ ] Changes biometric or sensitive inference handling
+- [ ] Changes audit or incident response behavior
 
-## Trust & Ethics
-- [ ] No dark patterns introduced
-- [ ] No hidden consent changes
-- [ ] No manipulative language
-- [ ] Monetization boundaries unchanged or explicitly disclosed
-- [ ] Founder responsibility preserved
+## Required Checks
 
----
+- [ ] Data classes are still defined for all relevant data.
+- [ ] Consent tiers remain granular and revocable.
+- [ ] No silent escalation of data use is introduced.
+- [ ] Retention/deletion guarantees are preserved or improved.
+- [ ] Legal/regulatory notes are marked for counsel review where needed.
+- [ ] Validator passes: `python tools/validate_privacy_package.py`.
 
-## UX / Accessibility
-- [ ] Mobile layout verified
-- [ ] Keyboard navigation works
-- [ ] Screen reader headings logical
-- [ ] Contrast WCAG AA+
-- [ ] Forms validate correctly
-- [ ] Confirmation states visible
+## Reviewer Notes
 
----
-
-## Links & Navigation
-- [ ] No dead links
-- [ ] Footer links consistent across pages
-- [ ] Privacy, Terms, Trust linked everywhere
-- [ ] Contact path always visible
-
----
-
-## Versioning
-- [ ] Version number updated
-- [ ] Effective date updated
-- [ ] Changelog entry added
-
----
-
-## Final Confidence Check
-- [ ] I would trust this with my own data
-- [ ] I would show this to a regulator
-- [ ] I would link this publicly without hesitation
-
-**Reviewer notes:**
-
+List any open questions, risks, or follow-up actions.

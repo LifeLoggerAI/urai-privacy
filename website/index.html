@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>URAI Privacy</title>
+  <meta name="description" content="URAI Privacy is the public governance layer for privacy, consent, data rights, and data-use enforcement across the URAI ecosystem." />
+  <meta property="og:title" content="URAI Privacy" />
+  <meta property="og:description" content="Privacy rules the whole URAI ecosystem must obey." />
+  <meta property="og:url" content="https://uraiprivacy.com/" />
+  <meta property="og:type" content="website" />
+  <link rel="canonical" href="https://uraiprivacy.com/" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <nav class="nav" aria-label="Primary navigation">
+      <a class="brand" href="./index.html"><span class="brand-mark" aria-hidden="true"></span><span>URAI Privacy</span></a>
+      <div class="nav-links">
+        <a href="./principles.html">Principles</a>
+        <a href="./rights.html">User rights</a>
+        <a href="./governance.html">Governance</a>
+        <a href="./legal.html">Legal</a>
+        <a href="./request.html">Request</a>
+        <a href="./contact.html">Contact</a>
+        <a href="./status.html">Status</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero">
+      <div class="eyebrow">URAI Privacy</div>
+      <h1>Privacy rules the whole URAI ecosystem must obey.</h1>
+      <p class="lede">URAI Privacy is the public governance layer for consent, data classification, retention, deletion, export, anonymization, audit logging, incident response, and data-sharing enforcement across URAI.</p>
+      <div class="actions">
+        <a class="button primary" href="./request.html">Start a privacy request</a>
+        <a class="button" href="https://github.com/LifeLoggerAI/urai-privacy">View governance repo</a>
+        <a class="button" href="./governance.html">How governance works</a>
+        <a class="button" href="./rights.html">User rights</a>
+      </div>
+    </section>
+    <section class="card-grid" aria-label="Privacy governance pillars">
+      <div class="card"><h3>Consent first</h3><p>Granular, revocable consent tiers for sensitive inference, biometrics, personalization, location, and anonymized data-sharing.</p></div>
+      <div class="card"><h3>User rights</h3><p>Export, deletion, revocation, explanation, and privacy-history controls are treated as product requirements.</p></div>
+      <div class="card"><h3>Enforceable policy</h3><p>Machine-readable registries, JSON Schemas, and CI checks define data classes, consent tiers, retention classes, audit events, and blocked uses.</p></div>
+      <div class="card"><h3>No silent escalation</h3><p>URAI features must not expand collection, inference, sharing, monetization, or retention without renewed review and consent.</p></div>
+    </section>
+    <section class="section">
+      <div class="kicker">What this repo contains</div>
+      <h2>A public operating layer for privacy.</h2>
+      <div class="card-grid">
+        <div class="card"><h3>Policy registries</h3><p>Canonical data classes, consent tiers, retention classes, audit events, and blocked data uses.</p></div>
+        <div class="card"><h3>Implementation contracts</h3><p>Firestore schema, API contract, adoption JSON Schemas, examples, and reusable validation scripts.</p></div>
+        <div class="card"><h3>Operating playbooks</h3><p>Lifecycle diagrams and SOPs for consent, deletion, export, incident response, admin access, and audits.</p></div>
+        <div class="card"><h3>Public notices</h3><p>Legal notice templates for privacy policy, biometrics, AI inference, data-sharing, minors, cookies, and user rights.</p></div>
+      </div>
+    </section>
+    <section class="section warning callout">
+      <h2>Operational draft status</h2>
+      <p>URAI Privacy is built as a governance and enforcement package. Public legal templates and regulatory mappings still require qualified legal review before production launch. The current request page is an intake placeholder until authenticated request tracking and audited backend workflows are live.</p>
+      <p><a class="button" href="./status.html">Review launch status</a></p>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>uraiprivacy.com · Repository: LifeLoggerAI/urai-privacy</span>
+      <a href="https://github.com/LifeLoggerAI/urai-privacy/blob/main/docs/GOVERNANCE_INDEX.md">Governance index</a>
+    </div>
+  </footer>
+</body>
+</html>

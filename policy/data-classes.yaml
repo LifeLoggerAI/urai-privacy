@@ -1,0 +1,51 @@
+version: 0.1.0-draft
+classes:
+  L0:
+    name: Public / non-user data
+    sensitivity: none
+    requiresConsent: false
+    examples: [public_docs, marketing_copy, app_static_content]
+  L1:
+    name: Account data
+    sensitivity: low
+    requiresConsent: true
+    defaultConsentTier: C0
+    examples: [email, display_name, auth_uid]
+  L2:
+    name: Behavioral metadata
+    sensitivity: medium
+    requiresConsent: true
+    defaultConsentTier: C2
+    examples: [app_usage, taps, notification_metadata, timestamps]
+  L3:
+    name: Personal content
+    sensitivity: high
+    requiresConsent: true
+    defaultConsentTier: C1
+    examples: [transcripts, memories, uploaded_content, journal_text]
+  L4:
+    name: Sensitive inference
+    sensitivity: very_high
+    requiresConsent: true
+    defaultConsentTier: C4
+    explainabilityRequired: true
+    examples: [mood_state, crisis_signal, trauma_thread, relationship_inference, deception_inference]
+  L5:
+    name: Biometric / identity signal
+    sensitivity: restricted
+    requiresConsent: true
+    defaultConsentTier: C5
+    separateConsentRequired: true
+    examples: [voiceprint, face_embedding, speaker_identity, gaze_vector]
+  L6:
+    name: Anonymized data product
+    sensitivity: governed_aggregate
+    requiresConsent: true
+    defaultConsentTier: C8
+    minimumCohortSize: 100
+    examples: [cohort_pattern, deidentified_aggregate, anonymized_research_feature]
+  L7:
+    name: Restricted / prohibited
+    sensitivity: prohibited
+    allowed: false
+    examples: [raw_sold_biometric, hidden_collection, unrevocable_consent, small_cohort_sensitive_sale]

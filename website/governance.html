@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Governance · URAI Privacy</title>
+  <meta name="description" content="How URAI Privacy governance works: policy registries, CI validation, adoption manifests, SOPs, lifecycle diagrams, and release gates." />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header"><nav class="nav"><a class="brand" href="./index.html"><span class="brand-mark"></span><span>URAI Privacy</span></a><div class="nav-links"><a href="./principles.html">Principles</a><a href="./rights.html">User rights</a><a href="./governance.html">Governance</a><a href="./legal.html">Legal</a><a href="./contact.html">Contact</a></div></nav></header>
+  <main id="main">
+    <section class="hero">
+      <div class="eyebrow">Governance</div>
+      <h1>The repo is built to be enforceable, not decorative.</h1>
+      <p class="lede">URAI Privacy combines policy docs, machine-readable registries, JSON Schemas, cross-repo CI tooling, lifecycle architecture, SOPs, and release gates.</p>
+    </section>
+    <section class="section">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Purpose</th><th>Repo location</th></tr></thead>
+          <tbody>
+            <tr><td>Policy registry</td><td>Canonical L0-L7, C0-C8, R0-R6 and blocked-use rules</td><td><code>policy/</code></td></tr>
+            <tr><td>Adoption contracts</td><td>Data inventory and feature manifest schemas</td><td><code>schemas/</code></td></tr>
+            <tr><td>Cross-repo CI</td><td>Reusable validation for URAI product repos</td><td><code>adoption/ci/</code></td></tr>
+            <tr><td>Lifecycles</td><td>Consent, deletion, export, audit, incident, and data-sharing flows</td><td><code>architecture/</code></td></tr>
+            <tr><td>SOPs</td><td>Admin access, break-glass, audits, access removal, escalation</td><td><code>sops/</code></td></tr>
+            <tr><td>Legal templates</td><td>Starting point for public notices pending legal review</td><td><code>legal/</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="section callout">
+      <h2>Release gate</h2>
+      <p>A URAI feature is not release-ready unless data classes, consent tiers, retention/deletion behavior, export/explainability behavior, audit logging, and privacy review are complete.</p>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="footer-inner"><span>uraiprivacy.com · Governance that can be tested</span><a href="https://github.com/LifeLoggerAI/urai-privacy/blob/main/docs/GOVERNANCE_INDEX.md">Governance index</a></div></footer>
+</body>
+</html>

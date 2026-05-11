@@ -1,0 +1,7 @@
+{
+  "userId": "user_123",
+  "requestType": "full_export",
+  "format": "json",
+  "requestedAt": "2026-05-07T20:05:00Z",
+  "policyVersion": "0.1.0-draft"
+}

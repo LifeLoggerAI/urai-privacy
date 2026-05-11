@@ -1,0 +1,19 @@
+{
+  "insightId": "insight_123",
+  "userId": "user_123",
+  "summary": "Mood trend was generated from user-entered journal sentiment and optional weather context.",
+  "sourceFields": [
+    "journal.sentiment",
+    "weather.daily_summary"
+  ],
+  "dataClasses": [
+    "L2",
+    "L4"
+  ],
+  "consentTiers": [
+    "C2",
+    "C4"
+  ],
+  "generatedAt": "2026-05-07T20:25:00Z",
+  "policyVersion": "0.1.0-draft"
+}

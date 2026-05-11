@@ -1,0 +1,36 @@
+version: 0.1.0-draft
+blockedUses:
+  raw_biometric_sale:
+    description: Selling, licensing, or sharing raw biometric templates, voiceprints, face embeddings, or identity vectors.
+    dataClasses: [L5]
+    allowed: false
+  hidden_collection:
+    description: Collecting passive signals without user-facing notice and required consent.
+    allowed: false
+  unrevocable_nonessential_consent:
+    description: Making non-essential consent impossible to revoke.
+    allowed: false
+  sensitive_inference_without_c4:
+    description: Generating L4 sensitive inference without C4 consent.
+    dataClasses: [L4]
+    requiredConsentTier: C4
+    allowed: false
+  biometric_without_c5:
+    description: Processing L5 biometric or identity signals without C5 consent.
+    dataClasses: [L5]
+    requiredConsentTier: C5
+    allowed: false
+  data_sharing_without_c8:
+    description: Including users in anonymized data-sharing or monetization without C8 consent.
+    dataClasses: [L6]
+    requiredConsentTier: C8
+    allowed: false
+  small_cohort_sensitive_export:
+    description: Releasing sensitive or location/biometric-derived aggregates below the minimum cohort size.
+    dataClasses: [L4, L5, L6]
+    minimumCohortSize: 100
+    allowed: false
+  raw_transcript_sale:
+    description: Selling raw transcripts or user-linked personal content.
+    dataClasses: [L3]
+    allowed: false

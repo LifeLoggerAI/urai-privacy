@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Status · URAI Privacy</title>
+  <meta name="description" content="Operational status and launch readiness notes for the URAI Privacy website and governance package." />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header"><nav class="nav"><a class="brand" href="./index.html"><span class="brand-mark"></span><span>URAI Privacy</span></a><div class="nav-links"><a href="./principles.html">Principles</a><a href="./rights.html">User rights</a><a href="./governance.html">Governance</a><a href="./legal.html">Legal</a><a href="./contact.html">Contact</a><a href="./status.html">Status</a></div></nav></header>
+  <main id="main">
+    <section class="hero">
+      <div class="eyebrow">Status</div>
+      <h1>Operational governance draft. Not final production launch.</h1>
+      <p class="lede">URAI Privacy is the public governance and enforcement package for the URAI ecosystem. The repository and static website are operational, but the full production privacy system is not complete until DNS, HTTPS, legal review, user-rights workflows, product-repo adoption, admin operations, and audit logging are verified end to end.</p>
+    </section>
+    <section class="card-grid">
+      <div class="card"><h3>Governance package</h3><p>Status: active draft. Policy registries, SOPs, architecture, schemas, validators, and adoption tooling are present.</p></div>
+      <div class="card"><h3>Website</h3><p>Status: publishing-ready. DNS, HTTPS, and custom-domain routing must be verified on the selected host before public launch is considered complete.</p></div>
+      <div class="card"><h3>Legal notices</h3><p>Status: templates only. Public production notices require qualified counsel review, approval date, effective date, and version lock.</p></div>
+      <div class="card"><h3>Cross-repo adoption</h3><p>Status: required before system launch. Product repos must add privacy folders, data inventories, feature manifests, and CI adoption checks.</p></div>
+      <div class="card"><h3>User rights workflows</h3><p>Status: required before user launch. Consent storage, export, deletion, biometric deletion, revocation, privacy history, request tracking, and explanations must be implemented and tested.</p></div>
+      <div class="card"><h3>Operations</h3><p>Status: required before production. Admin access, privacy request handling, incident response, support routing, monitoring, and audit events must be live and verified.</p></div>
+    </section>
+    <section class="section callout">
+      <h2>Launch blockers to clear</h2>
+      <ul>
+        <li>DNS points `uraiprivacy.com` and `www.uraiprivacy.com` to the selected host.</li>
+        <li>HTTPS is enabled and verified for apex and www domains.</li>
+        <li>Public legal notices are reviewed by qualified counsel and versioned.</li>
+        <li>Production URAI repos adopt the privacy manifest and CI toolkit.</li>
+        <li>Users can request export, deletion, consent revocation, biometric deletion, and explanations.</li>
+        <li>Admin and support teams can process privacy requests through least-privilege, audited workflows.</li>
+        <li>Audit events and monitoring are active for sensitive privacy operations.</li>
+      </ul>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="footer-inner"><span>uraiprivacy.com · Status and launch readiness</span><a href="https://github.com/LifeLoggerAI/urai-privacy/blob/main/LAUNCH_READINESS.md">Launch readiness</a></div></footer>
+</body>
+</html>
