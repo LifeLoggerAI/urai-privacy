@@ -33,7 +33,10 @@ require_file docs/RELEASE_CHECKLIST.md
 
 require_absent firebase/firebase.js
 require_absent ._backup_deps
-require_absent tsconfig.tsbuildinfo
+
+if git ls-files | grep -E '(^\._backup_deps/|tsconfig\.tsbuildinfo|firebase/firebase\.js)' >/dev/null; then
+  fail "generated or stale artifacts must not be tracked by git"
+fi
 
 if grep -R "packageManager.*pnpm\|pnpm " -n package.json app components lib middleware.ts next.config.mjs .github 2>/dev/null; then
   fail "active app/runtime files still reference pnpm"
