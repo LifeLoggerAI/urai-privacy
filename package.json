@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "clean:legacy": "bash scripts/clean-legacy.sh",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint app lib tests scripts --ext .ts,.tsx,.js,.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
