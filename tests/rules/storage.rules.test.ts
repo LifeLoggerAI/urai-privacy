@@ -8,7 +8,11 @@ import {
 } from "@firebase/rules-unit-testing";
 import { deleteObject, getBytes, ref, uploadString } from "firebase/storage";
 
-const PROJECT_ID = "urai-privacy-storage-rules-test";
+const PROJECT_ID = process.env.FIREBASE_TEST_PROJECT_ID ?? process.env.GCLOUD_PROJECT ?? "urai-privacy-integration-test";
+const STORAGE_EMULATOR_HOST = process.env.FIREBASE_STORAGE_EMULATOR_HOST ?? "127.0.0.1:9199";
+const [storageHost, storagePortRaw] = STORAGE_EMULATOR_HOST.replace(/^https?:\/\//, "").split(":");
+const storagePort = Number(storagePortRaw ?? 9199);
+
 let testEnv: RulesTestEnvironment;
 
 beforeAll(async () => {
@@ -16,8 +20,8 @@ beforeAll(async () => {
     projectId: PROJECT_ID,
     storage: {
       rules: readFileSync("storage.rules", "utf8"),
-      host: "localhost",
-      port: 9199
+      host: storageHost,
+      port: storagePort
     }
   });
 });
@@ -34,20 +38,22 @@ function anonStorage() {
   return testEnv.unauthenticatedContext().storage();
 }
 
+async function seedStorage(path: string, contents = "{}") {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await uploadString(ref(context.storage(), path), contents);
+  });
+}
+
 describe("Storage export and evidence rules", () => {
   it("allows owners and admins to read user export paths", async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await uploadString(ref(context.storage(), "exports/user-a/export-1/manifest.json"), "{}");
-    });
+    await seedStorage("exports/user-a/export-1/manifest.json");
 
     await assertSucceeds(getBytes(ref(storageFor("user-a"), "exports/user-a/export-1/manifest.json")));
     await assertSucceeds(getBytes(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-1/manifest.json")));
   });
 
   it("denies other users and anonymous users from reading export paths", async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await uploadString(ref(context.storage(), "exports/user-a/export-1/manifest.json"), "{}");
-    });
+    await seedStorage("exports/user-a/export-1/manifest.json");
 
     await assertFails(getBytes(ref(storageFor("user-b"), "exports/user-a/export-1/manifest.json")));
     await assertFails(getBytes(ref(anonStorage(), "exports/user-a/export-1/manifest.json")));
@@ -61,9 +67,7 @@ describe("Storage export and evidence rules", () => {
   });
 
   it("denies deletes and deny-default paths", async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await uploadString(ref(context.storage(), "exports/user-a/export-3/manifest.json"), "{}");
-    });
+    await seedStorage("exports/user-a/export-3/manifest.json");
 
     await assertFails(deleteObject(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-3/manifest.json")));
     await assertFails(uploadString(ref(storageFor("admin-a", { admin: true }), "public/open.txt"), "nope"));
