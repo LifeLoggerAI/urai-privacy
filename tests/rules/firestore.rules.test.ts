@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   assertFails,
@@ -6,15 +6,21 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
-const PROJECT_ID = "urai-privacy-rules-test";
+const PROJECT_ID = process.env.FIREBASE_TEST_PROJECT_ID ?? process.env.GCLOUD_PROJECT ?? "urai-privacy-integration-test";
+const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080";
+const [firestoreHost, firestorePortRaw] = FIRESTORE_EMULATOR_HOST.replace(/^https?:\/\//, "").split(":");
+const firestorePort = Number(firestorePortRaw ?? 8080);
+
 let testEnv: RulesTestEnvironment;
 
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
+      host: firestoreHost,
+      port: firestorePort,
       rules: readFileSync("firestore.rules", "utf8")
     }
   });
@@ -29,6 +35,7 @@ beforeEach(async () => {
     await setDoc(doc(context.firestore(), "privacyRequests/preq-a"), { uid: "user-a", type: "export", status: "pending" });
     await setDoc(doc(context.firestore(), "deletionRequests/del-a"), { uid: "user-a", status: "pending" });
     await setDoc(doc(context.firestore(), "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
+    await setDoc(doc(context.firestore(), "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
     await setDoc(doc(context.firestore(), "auditLogs/audit-a"), { actorUid: "admin-a", targetUid: "user-a", action: "admin_viewed_request" });
     await setDoc(doc(context.firestore(), "dataAccessEvents/data-a"), { uid: "user-a", actorUid: "admin-a", outcome: "allowed" });
     await setDoc(doc(context.firestore(), "retentionPolicies/r1"), { collection: "auditLogs", retentionClass: "R5" });
@@ -77,12 +84,14 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertSucceeds(updateDoc(doc(authed("admin-a"), "privacyRequests/preq-a"), { status: "approved" }));
   });
 
-  it("protects audit logs as append-only admin-created evidence", async () => {
+  it("protects audit logs and consent events as append-only evidence", async () => {
     await assertSucceeds(getDoc(doc(authed("user-a"), "auditLogs/audit-a")));
+    await assertSucceeds(getDoc(doc(authed("user-a"), "consentEvents/consent-event-a")));
     await assertFails(setDoc(doc(authed("user-a"), "auditLogs/audit-user-created"), { actorUid: "user-a", targetUid: "user-a" }));
     await assertSucceeds(setDoc(doc(authed("admin-a"), "auditLogs/audit-admin-created"), { actorUid: "admin-a", targetUid: "user-a" }));
     await assertFails(updateDoc(doc(authed("admin-a"), "auditLogs/audit-a"), { action: "tampered" }));
     await assertFails(deleteDoc(doc(authed("admin-a"), "auditLogs/audit-a")));
+    await assertFails(updateDoc(doc(authed("admin-a"), "consentEvents/consent-event-a"), { status: "tampered" }));
   });
 
   it("denies anonymous access and unknown collections", async () => {
