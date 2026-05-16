@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { initializeApp, deleteApp, type FirebaseApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, signInWithCustomToken, type Auth } from "firebase/auth";
 import { connectFunctionsEmulator, getFunctions, httpsCallable, type Functions } from "firebase/functions";
-import { initializeApp as initializeAdminApp, cert, getApps as getAdminApps, deleteApp as deleteAdminApp, type App as AdminApp } from "firebase-admin/app";
+import { initializeApp as initializeAdminApp, getApps as getAdminApps, deleteApp as deleteAdminApp, type App as AdminApp } from "firebase-admin/app";
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -91,10 +91,12 @@ describe("Firebase callable privacy functions", () => {
     expect(result).toHaveProperty("auditId");
   });
 
-  it("updates consent for authenticated users", async () => {
+  it("updates consent for authenticated users and returns a receipt", async () => {
     const result = await call(userFunctions, "updateConsent", { purpose: "ai_insights", consentTier: "C4", status: "revoked" });
     expect(result).toMatchObject({ status: "revoked" });
     expect(result).toHaveProperty("consentId");
+    expect(result).toHaveProperty("consentEventId");
+    expect(result).toHaveProperty("receiptHash");
     expect(result).toHaveProperty("auditId");
   });
 
@@ -117,15 +119,19 @@ describe("Firebase callable privacy functions", () => {
     expect(result).toHaveProperty("verdict");
   });
 
-  it("allows admins to process an existing export job", async () => {
+  it("allows admins to process an existing export job and create manifest paths", async () => {
     const created = await call<Record<string, string>>(userFunctions, "createExportRequest");
     const processed = await call(adminFunctions, "processExportRequest", { jobId: created.exportJobId });
     expect(processed).toMatchObject({ jobId: created.exportJobId, status: "completed" });
+    expect(processed).toHaveProperty("manifestPath");
+    expect(processed).toHaveProperty("exportPath");
+    expect(processed).toHaveProperty("recordCount");
   });
 
-  it("allows admins to process an existing deletion request", async () => {
+  it("allows admins to process an existing deletion request with a safe plan", async () => {
     const created = await call<Record<string, string>>(userFunctions, "createDeletionRequest", { reason: "Process me" });
     const processed = await call(adminFunctions, "processDeletionRequest", { requestId: created.requestId, status: "processing" });
     expect(processed).toMatchObject({ requestId: created.requestId, status: "processing" });
+    expect(processed).toHaveProperty("plan");
   });
 });
