@@ -4,6 +4,9 @@ set -euo pipefail
 printf '\n[verify-release] npm install\n'
 npm install
 
+printf '\n[verify-release] functions install\n'
+npm install --prefix functions
+
 printf '\n[verify-release] lint\n'
 npm run lint
 
@@ -19,11 +22,20 @@ npm run test:rules:static
 printf '\n[verify-release] route smoke validation\n'
 npm run test:e2e
 
-printf '\n[verify-release] emulator-backed Firestore/Storage rules tests\n'
-npm run test:rules
+printf '\n[verify-release] next build\n'
+npm run build
 
-printf '\n[verify-release] callable Functions integration tests\n'
-npm run test:integration
+printf '\n[verify-release] functions build\n'
+npm --prefix functions run build
+
+printf '\n[verify-release] functions typecheck\n'
+npm --prefix functions run typecheck
+
+printf '\n[verify-release] Java check for Firebase emulators\n'
+java -version
+
+printf '\n[verify-release] emulator-backed Firestore/Storage rules + callable integration tests\n'
+npm run test:emulators
 
 printf '\n[verify-release] security gate\n'
 npm run security:gate
@@ -31,7 +43,4 @@ npm run security:gate
 printf '\n[verify-release] production readiness assertions\n'
 bash scripts/assert-production-ready.sh
 
-printf '\n[verify-release] next build\n'
-npm run build
-
-printf '\n[verify-release] OK: Bash/Node local release verification commands passed\n'
+printf '\n[verify-release] OK\n'
