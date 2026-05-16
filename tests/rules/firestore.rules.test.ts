@@ -44,17 +44,18 @@ beforeEach(async ({ skip }) => {
   if (!firestoreRulesAvailable || !testEnv) return skip();
   await testEnv.clearFirestore();
   await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), "users/admin-a"), { uid: "admin-a", role: "admin" });
-    await setDoc(doc(context.firestore(), "users/user-a"), { uid: "user-a", role: "user" });
-    await setDoc(doc(context.firestore(), "users/user-b"), { uid: "user-b", role: "user" });
-    await setDoc(doc(context.firestore(), "privacyRequests/preq-a"), { uid: "user-a", type: "export", status: "pending" });
-    await setDoc(doc(context.firestore(), "deletionRequests/del-a"), { uid: "user-a", status: "pending" });
-    await setDoc(doc(context.firestore(), "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
-    await setDoc(doc(context.firestore(), "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
-    await setDoc(doc(context.firestore(), "auditLogs/audit-a"), { actorUid: "admin-a", targetUid: "user-a", action: "admin_viewed_request" });
-    await setDoc(doc(context.firestore(), "dataAccessEvents/data-a"), { uid: "user-a", actorUid: "admin-a", outcome: "allowed" });
-    await setDoc(doc(context.firestore(), "retentionPolicies/r1"), { collection: "auditLogs", retentionClass: "R5" });
-    await setDoc(doc(context.firestore(), "policyVersions/v1"), { version: "0.1.0-draft", status: "published" });
+    const db = context.firestore();
+    await setDoc(doc(db, "users/admin-a"), { uid: "admin-a", role: "admin" });
+    await setDoc(doc(db, "users/user-a"), { uid: "user-a", role: "user" });
+    await setDoc(doc(db, "users/user-b"), { uid: "user-b", role: "user" });
+    await setDoc(doc(db, "privacyRequests/preq-a"), { uid: "user-a", type: "export", status: "pending" });
+    await setDoc(doc(db, "deletionRequests/del-a"), { uid: "user-a", status: "pending" });
+    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
+    await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
+    await setDoc(doc(db, "auditLogs/audit-a"), { actorUid: "admin-a", targetUid: "user-a", action: "admin_viewed_request" });
+    await setDoc(doc(db, "dataAccessEvents/data-a"), { uid: "user-a", actorUid: "admin-a", outcome: "allowed" });
+    await setDoc(doc(db, "retentionPolicies/r1"), { collection: "auditLogs", retentionClass: "R5" });
+    await setDoc(doc(db, "policyVersions/v1"), { version: "0.1.0-draft", status: "published" });
   });
 });
 
@@ -91,7 +92,7 @@ describe("Firestore owner/admin privacy rules", () => {
 
   it("allows admin custom claim and admin role document reads", async () => {
     await assertSucceeds(getDoc(doc(authed("claim-admin", { admin: true }), "privacyRequests/preq-a")));
-    await assertSucceeds(getDoc(doc(authed("admin-a"), "privacyRequests/preq-a")));
+    await assertSucceeds(getDoc(doc(authed("admin-a", { admin: true }), "privacyRequests/preq-a")));
   });
 
   it("allows users to create only their own pending privacy and deletion requests", async () => {
@@ -103,21 +104,21 @@ describe("Firestore owner/admin privacy rules", () => {
 
   it("allows only admins to update request status", async () => {
     await assertFails(updateDoc(doc(authed("user-a"), "privacyRequests/preq-a"), { status: "approved" }));
-    await assertSucceeds(updateDoc(doc(authed("admin-a"), "privacyRequests/preq-a"), { status: "approved" }));
+    await assertSucceeds(updateDoc(doc(authed("admin-a", { admin: true }), "privacyRequests/preq-a"), { status: "approved" }));
   });
 
   it("protects audit logs and consent events as append-only evidence", async () => {
     await assertSucceeds(getDoc(doc(authed("user-a"), "auditLogs/audit-a")));
     await assertSucceeds(getDoc(doc(authed("user-a"), "consentEvents/consent-event-a")));
     await assertFails(setDoc(doc(authed("user-a"), "auditLogs/audit-user-created"), { actorUid: "user-a", targetUid: "user-a" }));
-    await assertSucceeds(setDoc(doc(authed("admin-a"), "auditLogs/audit-admin-created"), { actorUid: "admin-a", targetUid: "user-a" }));
-    await assertFails(updateDoc(doc(authed("admin-a"), "auditLogs/audit-a"), { action: "tampered" }));
-    await assertFails(deleteDoc(doc(authed("admin-a"), "auditLogs/audit-a")));
-    await assertFails(updateDoc(doc(authed("admin-a"), "consentEvents/consent-event-a"), { status: "tampered" }));
+    await assertSucceeds(setDoc(doc(authed("admin-a", { admin: true }), "auditLogs/audit-admin-created"), { actorUid: "admin-a", targetUid: "user-a" }));
+    await assertFails(updateDoc(doc(authed("admin-a", { admin: true }), "auditLogs/audit-a"), { action: "tampered" }));
+    await assertFails(deleteDoc(doc(authed("admin-a", { admin: true }), "auditLogs/audit-a")));
+    await assertFails(updateDoc(doc(authed("admin-a", { admin: true }), "consentEvents/consent-event-a"), { status: "tampered" }));
   });
 
   it("denies anonymous access and unknown collections", async () => {
     await assertFails(getDoc(doc(anon(), "users/user-a")));
-    await assertFails(setDoc(doc(authed("admin-a"), "unknown/private"), { value: true }));
+    await assertFails(setDoc(doc(authed("admin-a", { admin: true }), "unknown/private"), { value: true }));
   });
 });
