@@ -4,17 +4,16 @@ service firebase.storage {
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
     function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function isCreateOrUpdate() { return request.resource != null; }
 
     match /exports/{uid}/{allPaths=**} {
       allow read: if isOwner(uid) || isAdmin();
-      allow create, update: if isAdmin();
-      allow delete: if false;
+      allow write: if isAdmin() && isCreateOrUpdate();
     }
 
     match /evidence/{allPaths=**} {
       allow read: if isAdmin();
-      allow create, update: if isAdmin();
-      allow delete: if false;
+      allow write: if isAdmin() && isCreateOrUpdate();
     }
 
     match /{allPaths=**} {
