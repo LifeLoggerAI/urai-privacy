@@ -26,15 +26,20 @@ export function isFirebaseConfigured() {
   return Object.values(firebaseConfigStatus).every(Boolean);
 }
 
+function requiredValue(value: string | undefined, key: string) {
+  if (!value) throw new Error(`Missing Firebase configuration: ${key}`);
+  return value;
+}
+
 function createFirebaseApp(): FirebaseApp | null {
   if (!isFirebaseConfigured()) return null;
   return getApps().length ? getApps()[0] : initializeApp({
-    apiKey: requiredConfig.apiKey,
-    authDomain: requiredConfig.authDomain,
-    projectId: requiredConfig.projectId,
-    storageBucket: requiredConfig.storageBucket,
-    messagingSenderId: requiredConfig.messagingSenderId,
-    appId: requiredConfig.appId
+    apiKey: requiredValue(requiredConfig.apiKey, "NEXT_PUBLIC_FIREBASE_API_KEY"),
+    authDomain: requiredValue(requiredConfig.authDomain, "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
+    projectId: requiredValue(requiredConfig.projectId, "NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
+    storageBucket: requiredValue(requiredConfig.storageBucket, "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
+    messagingSenderId: requiredValue(requiredConfig.messagingSenderId, "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
+    appId: requiredValue(requiredConfig.appId, "NEXT_PUBLIC_FIREBASE_APP_ID")
   });
 }
 
