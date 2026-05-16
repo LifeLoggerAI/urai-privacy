@@ -1,24 +1,49 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getFunctions } from "firebase/functions";
-import { getStorage } from "firebase/storage";
+import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
+import { getFunctions, type Functions } from "firebase/functions";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "demo-api-key",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "demo.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "demo-project",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "demo.appspot.com",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "000000000000",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "1:000000000000:web:demo"
+const requiredConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-export const firebaseApp: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+export const firebaseConfigStatus = {
+  hasApiKey: Boolean(requiredConfig.apiKey),
+  hasAuthDomain: Boolean(requiredConfig.authDomain),
+  hasProjectId: Boolean(requiredConfig.projectId),
+  hasStorageBucket: Boolean(requiredConfig.storageBucket),
+  hasMessagingSenderId: Boolean(requiredConfig.messagingSenderId),
+  hasAppId: Boolean(requiredConfig.appId)
+};
+
+export function isFirebaseConfigured() {
+  return Object.values(firebaseConfigStatus).every(Boolean);
+}
+
+function createFirebaseApp(): FirebaseApp | null {
+  if (!isFirebaseConfigured()) return null;
+  return getApps().length ? getApps()[0] : initializeApp({
+    apiKey: requiredConfig.apiKey,
+    authDomain: requiredConfig.authDomain,
+    projectId: requiredConfig.projectId,
+    storageBucket: requiredConfig.storageBucket,
+    messagingSenderId: requiredConfig.messagingSenderId,
+    appId: requiredConfig.appId
+  });
+}
+
+export const firebaseApp: FirebaseApp | null = createFirebaseApp();
 export const app = firebaseApp;
-export const auth = getAuth(firebaseApp);
-export const db = getFirestore(firebaseApp);
+export const auth: Auth | null = firebaseApp ? getAuth(firebaseApp) : null;
+export const db: Firestore | null = firebaseApp ? getFirestore(firebaseApp) : null;
 export const firestore = db;
-export const functions = getFunctions(firebaseApp);
-export const storage = getStorage(firebaseApp);
+export const functions: Functions | null = firebaseApp ? getFunctions(firebaseApp) : null;
+export const storage: FirebaseStorage | null = firebaseApp ? getStorage(firebaseApp) : null;
 
 export default firebaseApp;
