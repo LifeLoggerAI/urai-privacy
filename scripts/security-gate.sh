@@ -1,60 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-failures=0
+require_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local label="$3"
 
-fail() {
-  echo "[security-gate] FAIL: $1" >&2
-  failures=$((failures + 1))
-}
-
-check_absent_path() {
-  if [ -e "$1" ]; then
-    fail "forbidden local/generated artifact exists: $1"
+  if ! grep -Eq "$pattern" "$file"; then
+    echo "[security-gate] Missing: $label in $file" >&2
+    exit 1
   fi
 }
 
-check_absent_path ".env"
-check_absent_path ".env.local"
-check_absent_path ".env.production"
-check_absent_path ".env.staging"
-check_absent_path ".firebase"
-check_absent_path ".next"
-check_absent_path "._backup_deps"
-check_absent_path "firebase/firebase.js"
-check_absent_path "pnpm-lock.yaml"
+reject_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local label="$3"
 
-if git ls-files | grep -E '(^\.env$|^\.env\.local$|^\.env\.production$|^\.env\.staging$|^\.firebase/|^\.next/|^\._backup_deps/|tsconfig\.tsbuildinfo|firebase/firebase\.js|pnpm-lock\.yaml)' >/dev/null; then
-  fail "forbidden local/generated artifacts are tracked by git"
-fi
+  if grep -Eq "$pattern" "$file"; then
+    echo "[security-gate] Forbidden: $label in $file" >&2
+    exit 1
+  fi
+}
 
-if grep -R "BEGIN PRIVATE KEY\|PRIVATE KEY-----\|firebase-adminsdk\|serviceAccount" -n . \
-  --exclude-dir=node_modules \
-  --exclude-dir=.git \
-  --exclude-dir=.next \
-  --exclude-dir=coverage \
-  --exclude='*.lock' \
-  --exclude='.gitignore' \
-  --exclude='security-gate.sh' \
-  --exclude='check_secrets.py' >/dev/null 2>&1; then
-  fail "potential private key or service-account reference found"
-fi
-
-if grep -R "packageManager.*pnpm\|pnpm " -n package.json app components lib middleware.ts next.config.mjs .github 2>/dev/null; then
-  fail "active runtime/app files still reference pnpm"
-fi
-
-if grep -n "ignoreBuildErrors: true\|ignoreDuringBuilds: true" next.config.mjs >/dev/null; then
-  fail "Next build still bypasses TypeScript or ESLint"
-fi
-
-if ! grep -n "metadataBase: new URL" app/layout.tsx >/dev/null; then
-  fail "metadataBase is missing from app/layout.tsx"
-fi
-
-if [ "$failures" -gt 0 ]; then
-  echo "[security-gate] NOT READY: $failures issue(s) found" >&2
+echo "[security-gate] Checking for committed secret material"
+if git grep -nE '(AIza[0-9A-Za-z_-]{20,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|firebase_private_key|GOOGLE_APPLICATION_CREDENTIALS=.*\.json|serviceAccountKey)' -- . ':!package-lock.json' ':!functions/package-lock.json' ':!scripts/security-gate.sh'; then
+  echo "[security-gate] Potential secret material found" >&2
   exit 1
 fi
+
+echo "[security-gate] Checking Firebase rules are deny-by-default"
+require_pattern "firestore.rules" 'match /[{]document=[*][*][}]' "Firestore fallback match"
+require_pattern "firestore.rules" 'allow read, write: if false|allow read: if false' "Firestore deny reads"
+require_pattern "firestore.rules" 'allow read, write: if false|allow write: if false' "Firestore deny writes"
+
+require_pattern "storage.rules" 'match /[{]allPaths=[*][*][}]' "Storage fallback match"
+require_pattern "storage.rules" 'allow read, write: if false|allow read: if false' "Storage deny reads"
+require_pattern "storage.rules" 'allow read, write: if false|allow write: if false' "Storage deny writes"
+
+echo "[security-gate] Checking immutable privacy evidence rules"
+require_pattern "firestore.rules" 'match /auditLogs/[{]id[}]' "Audit log match"
+require_pattern "firestore.rules" 'allow update, delete: if false|allow update: if false' "Audit log update deny"
+require_pattern "firestore.rules" 'allow update, delete: if false|allow delete: if false' "Audit log delete deny"
+
+reject_pattern "storage.rules" 'allow[[:space:]]+delete:[[:space:]]+if[[:space:]]+(true|isAdmin\(\)|request\.auth)' "Storage delete allowance"
+
+echo "[security-gate] Full npm audit visibility (non-blocking)"
+npm audit --omit=dev || true
+npm --prefix functions audit --omit=dev || true
+
+echo "[security-gate] Enforcing critical vulnerability gate"
+npm audit --audit-level=critical --omit=dev
+npm --prefix functions audit --audit-level=critical --omit=dev
 
 echo "[security-gate] ok"

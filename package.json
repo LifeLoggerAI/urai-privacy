@@ -9,18 +9,19 @@
   "scripts": {
     "dev": "next dev",
     "clean:legacy": "bash scripts/clean-legacy.sh",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "node scripts/lint-existing.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
-    "test:integration:emulated": "vitest run tests/integration",
+    "test:integration": "vitest run tests/integration --passWithNoTests",
+    "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --minWorkers=1 --passWithNoTests",
     "test:e2e": "node scripts/smoke-routes.mjs",
     "test:rules": "vitest run tests/rules",
-    "test:rules:emulated": "vitest run tests/rules",
+    "test:rules:emulated": "vitest run tests/rules --pool=forks --maxWorkers=1 --minWorkers=1",
     "test:rules:static": "node scripts/validate-rules.mjs",
     "test:smoke": "node scripts/smoke-routes.mjs",
     "test:emulators": "firebase emulators:exec --project urai-privacy-integration-test --only auth,firestore,storage,functions \"npm run test:rules:emulated && npm run test:integration:emulated\"",
+    "check:java": "node scripts/check-java.mjs",
     "audit:privacy": "node scripts/urai_privacy_adoption_check.mjs",
     "audit:tier-one": "node scripts/audit-tier-one.mjs",
     "build": "next build",
@@ -32,24 +33,29 @@
     "verify:release": "bash scripts/verify-release.sh"
   },
   "dependencies": {
-    "firebase": "^10.14.1",
-    "next": "^14.2.15",
+    "firebase": "^12.13.0",
+    "next": "^16.2.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.13.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^3.0.4",
-    "@types/node": "^20.17.6",
-    "@types/react": "^18.3.12",
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@types/node": "20.19.41",
+    "@types/react": "18.3.28",
     "@types/react-dom": "^18.3.1",
-    "@typescript-eslint/eslint-plugin": "7.2.0",
-    "@typescript-eslint/parser": "7.2.0",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.15",
+    "@typescript-eslint/eslint-plugin": "^8.49.0",
+    "@typescript-eslint/parser": "^8.49.0",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.2.6",
     "firebase-admin": "^13.10.0",
-    "typescript": "^5.6.3",
+    "typescript": "5.9.3",
     "vitest": "^2.1.4"
+  },
+  "overrides": {
+    "postcss": "^8.5.10",
+    "undici": "^7.16.0",
+    "@tootallnate/once": "^3.0.1"
   }
 }

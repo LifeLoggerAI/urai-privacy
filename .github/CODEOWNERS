@@ -1,14 +1,28 @@
 # URAI Privacy governance ownership
 
-# All repo changes should be reviewable by the governance owner.
+# Global fallback ownership
 * @LifeLoggerAI
 
-# Sensitive governance areas.
+# Firebase and deploy-critical security surfaces
+firebase.json @LifeLoggerAI
+firestore.rules @LifeLoggerAI
+firestore.indexes.json @LifeLoggerAI
+storage.rules @LifeLoggerAI
+functions/ @LifeLoggerAI
+
+# CI/CD and release gates
+.github/ @LifeLoggerAI
+scripts/ @LifeLoggerAI
+
+# Product privacy surface
+app/ @LifeLoggerAI
+components/ @LifeLoggerAI
+
+# Governance and compliance artifacts
 /docs/ @LifeLoggerAI
 /legal/ @LifeLoggerAI
 /policy/ @LifeLoggerAI
 /api/ @LifeLoggerAI
 /schemas/ @LifeLoggerAI
 /tools/ @LifeLoggerAI
-/.github/ @LifeLoggerAI
 /website/ @LifeLoggerAI
