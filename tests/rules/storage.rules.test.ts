@@ -12,6 +12,7 @@ const PROJECT_ID = process.env.FIREBASE_TEST_PROJECT_ID ?? process.env.GCLOUD_PR
 const STORAGE_EMULATOR_HOST = process.env.FIREBASE_STORAGE_EMULATOR_HOST ?? "127.0.0.1:9199";
 const [storageHost, storagePortRaw] = STORAGE_EMULATOR_HOST.replace(/^https?:\/\//, "").split(":");
 const storagePort = Number(storagePortRaw ?? 9199);
+const RELEASE_VERIFY = process.env.URAI_RELEASE_VERIFY === "1";
 
 let testEnv: RulesTestEnvironment | undefined;
 let storageRulesAvailable = false;
@@ -30,6 +31,11 @@ beforeAll(async () => {
   } catch (error) {
     storageRulesAvailable = false;
     const message = error instanceof Error ? error.message : String(error);
+
+    if (RELEASE_VERIFY) {
+      throw new Error(`[storage.rules.test] Release verification requires a running Storage emulator at ${STORAGE_EMULATOR_HOST}. Cause: ${message}`);
+    }
+
     console.warn(`[storage.rules.test] Storage emulator unavailable at ${STORAGE_EMULATOR_HOST}; skipping emulator-backed storage rules tests. Run npm run test:emulators for full rules coverage. Cause: ${message}`);
   }
 });

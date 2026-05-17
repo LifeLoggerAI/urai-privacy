@@ -6,7 +6,7 @@ Canonical domain: `uraiprivacy.com`
 
 ## Purpose
 
-The website explains URAI Privacy in plain language and links to the public governance repository, governance index, user-rights concepts, legal notice templates, request intake, and support/contact routing.
+The website explains URAI Privacy in plain language and links to the public governance repository, governance index, user-rights concepts, legal notice templates, and support/contact routing.
 
 ## Pages
 
@@ -15,9 +15,7 @@ The website explains URAI Privacy in plain language and links to the public gove
 - `rights.html` - user rights overview
 - `governance.html` - governance and enforcement model
 - `legal.html` - public legal notice template index
-- `request.html` - public privacy request intake placeholder and launch specification
 - `contact.html` - privacy, security, support, and GitHub contact routes
-- `status.html` - launch status and blockers
 - `404.html` - not found page
 
 ## Static Files
@@ -38,4 +36,4 @@ The website explains URAI Privacy in plain language and links to the public gove
 
 ## Production Status
 
-This site is an operational governance landing page. The request page is an intake placeholder until authenticated submission, request IDs, status tracking, internal queue routing, and audit logging are implemented. Public legal templates still require qualified legal review before production launch.
+This site is an operational governance landing page. Public legal templates still require qualified legal review before production launch.
