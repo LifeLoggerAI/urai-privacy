@@ -12,7 +12,14 @@ if (existing.length === 0) {
 const result = spawnSync(
   'npx',
   ['eslint', ...existing, '--ext', '.ts,.tsx,.js,.mjs'],
-  { stdio: 'inherit', shell: true }
+  {
+    stdio: 'inherit',
+    shell: true,
+    env: {
+      ...process.env,
+      ESLINT_USE_FLAT_CONFIG: 'false'
+    }
+  }
 );
 
 process.exit(result.status ?? 1);
