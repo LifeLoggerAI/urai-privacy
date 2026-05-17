@@ -21,26 +21,11 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install root dependencies
-        run: npm ci
+      - name: Setup Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-      - name: Install functions dependencies
-        run: npm --prefix functions ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Unit tests
-        run: npm run test:unit
-
-      - name: Static rules validation
-        run: npm run test:rules:static
-
-      - name: Build
-        run: npm run build
-
-      - name: Security gate
-        run: npm run security:gate
+      - name: Full release verification
+        run: npm run verify:release
