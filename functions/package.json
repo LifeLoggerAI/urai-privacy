@@ -11,11 +11,15 @@
     "test": "npm run typecheck"
   },
   "dependencies": {
-    "firebase-admin": "^12.7.0",
-    "firebase-functions": "^5.1.1",
+    "firebase-admin": "^13.10.0",
+    "firebase-functions": "^6.6.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@tootallnate/once": "^3.0.1",
+    "undici": "^7.16.0"
   }
 }
