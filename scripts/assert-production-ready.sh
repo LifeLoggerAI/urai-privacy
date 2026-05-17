@@ -27,9 +27,23 @@ for file in "${required_files[@]}"; do
 done
 
 echo "[assert-production-ready] Checking for uncommitted source changes"
-if git status --porcelain | grep -vE '^(\?\? | M |A  |AM |MM )?(\.idx/|\.next/|functions/lib/|firestore-debug\.log|ui-debug\.log|database-debug\.log|storage-debug\.log|pubsub-debug\.log|tsconfig\.tsbuildinfo$)' | grep -q .; then
+status_file="$(mktemp)"
+git status --porcelain > "$status_file"
+
+non_generated_changes="$(awk '
+  function is_generated(path) {
+    return path ~ /^(\.idx\/|\.next\/|functions\/lib\/|firestore-debug\.log$|firebase-debug\.log$|ui-debug\.log$|database-debug\.log$|storage-debug\.log$|pubsub-debug\.log$|.*\.debug\.log$|tsconfig\.tsbuildinfo$|functions\/tsconfig\.tsbuildinfo$)/
+  }
+  {
+    path = substr($0, 4)
+    if (!is_generated(path)) print $0
+  }
+' "$status_file")"
+rm -f "$status_file"
+
+if [[ -n "$non_generated_changes" ]]; then
   echo "[assert-production-ready] Working tree has non-generated changes" >&2
-  git status --short >&2
+  printf '%s\n' "$non_generated_changes" >&2
   exit 1
 fi
 
