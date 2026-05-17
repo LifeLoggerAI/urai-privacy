@@ -34,6 +34,9 @@ npm run test:rules:static
 printf '\n[verify-release] route smoke validation\n'
 npm run test:e2e
 
+printf '\n[verify-release] Tier-One privacy control-plane audit\n'
+npm run audit:tier-one
+
 printf '\n[verify-release] next build\n'
 npm run build
 
