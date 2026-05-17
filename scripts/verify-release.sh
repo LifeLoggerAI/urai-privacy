@@ -11,6 +11,20 @@ if [ ! -f functions/package-lock.json ]; then
   exit 1
 fi
 
+if ! command -v java >/dev/null 2>&1 && [ "${URAI_RELEASE_VERIFY_NIX_JAVA:-0}" != "1" ]; then
+  if command -v nix >/dev/null 2>&1; then
+    echo "[verify-release] Java not found; re-running release verifier inside a temporary Nix JDK 17 shell."
+    export URAI_RELEASE_VERIFY_NIX_JAVA=1
+    if nix shell nixpkgs#jdk17 --command java -version >/dev/null 2>&1; then
+      exec nix shell nixpkgs#jdk17 --command bash scripts/verify-release.sh
+    fi
+    if command -v nix-shell >/dev/null 2>&1; then
+      exec nix-shell -p jdk17 --run "bash scripts/verify-release.sh"
+    fi
+    echo "[verify-release] Nix is available, but could not start a JDK 17 shell." >&2
+  fi
+fi
+
 export URAI_RELEASE_VERIFY=1
 
 printf '\n[verify-release] npm ci\n'
