@@ -47,11 +47,7 @@ printf '\n[verify-release] functions typecheck\n'
 npm --prefix functions run typecheck
 
 printf '\n[verify-release] Java check for Firebase emulators\n'
-if ! command -v java >/dev/null 2>&1; then
-  echo "[verify-release] Java runtime not found. Firebase emulators require Java. Install a JDK such as Temurin/OpenJDK 17+ and retry." >&2
-  exit 1
-fi
-java -version
+npm run check:java
 
 printf '\n[verify-release] emulator-backed Firestore/Storage rules + callable integration tests\n'
 npm run test:emulators
