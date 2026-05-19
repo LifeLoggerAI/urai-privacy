@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
-import { callPrivacyFunction, subscribeAdminCollection } from "@/lib/firebase-privacy-client";
+import { callPrivacyFunction, executeDeletionRequest, subscribeAdminCollection } from "@/lib/firebase-privacy-client";
 
 const statuses = ["approved", "processing", "rejected", "failed"] as const;
 
@@ -33,9 +33,23 @@ function AdminRequestsTable() {
     setMessage("");
     try {
       const result = await callPrivacyFunction("processDeletionRequest", { requestId, status });
-      setMessage(`Deletion request updated: ${String(result.requestId ?? requestId)} -> ${String(result.status ?? status)}. Destructive completion remains gated until the production executor is verified.`);
+      setMessage(`Deletion request updated: ${String(result.requestId ?? requestId)} -> ${String(result.status ?? status)}. Use dry-run and execute controls for destructive completion.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Deletion status update failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function runDeletionExecutor(requestId: string, mode: "dryRun" | "execute", expectedPlanHash?: string) {
+    setBusyId(`${requestId}:${mode}`);
+    setMessage("");
+    try {
+      const result = await executeDeletionRequest({ requestId, mode, expectedPlanHash });
+      const suffix = mode === "dryRun" ? ` Plan hash: ${String(result.planHash ?? "missing")}` : "";
+      setMessage(`Deletion ${mode} completed for ${String(result.requestId ?? requestId)} -> ${String(result.status ?? "unknown")}.${suffix}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : `Deletion ${mode} failed`);
     } finally {
       setBusyId(null);
     }
@@ -64,15 +78,22 @@ function AdminRequestsTable() {
       </article>
       <article className="card">
         <h3>Deletion requests</h3>
-        <p className="muted">Completion is unavailable here until destructive deletion execution has legal-hold, retry, audit, and release evidence.</p>
-        {deletionRequests.length === 0 ? <p className="muted">No deletion requests found.</p> : deletionRequests.map((request) => (
-          <div key={String(request.id)} className="panel">
-            <strong>{String(request.id)}</strong>
-            <p className="muted">{String(request.uid)} · {String(request.status)}</p>
-            {request.destructiveDeletionBlocked ? <p><span className="status warn">destructive deletion gated</span></p> : null}
-            {statuses.map((status) => <button className="button" type="button" disabled={busyId !== null} key={status} onClick={() => processDeletion(String(request.id), status)}>{status}</button>)}
-          </div>
-        ))}
+        <p className="muted">Run dry-run first. Execute requires the latest plan hash and will delete supported user-scoped data while retaining audit/legal evidence.</p>
+        {deletionRequests.length === 0 ? <p className="muted">No deletion requests found.</p> : deletionRequests.map((request) => {
+          const requestId = String(request.id);
+          const planHash = typeof request.planHash === "string" ? request.planHash : undefined;
+          return (
+            <div key={requestId} className="panel">
+              <strong>{requestId}</strong>
+              <p className="muted">{String(request.uid)} · {String(request.status)}</p>
+              {request.destructiveDeletionBlocked ? <p><span className="status warn">destructive deletion gated</span></p> : null}
+              {planHash ? <p className="muted">Plan hash: <code>{planHash}</code></p> : null}
+              {statuses.map((status) => <button className="button" type="button" disabled={busyId !== null} key={status} onClick={() => processDeletion(requestId, status)}>{status}</button>)}
+              <button className="button primary" type="button" disabled={busyId !== null} onClick={() => runDeletionExecutor(requestId, "dryRun")}>Dry run</button>
+              <button className="button" type="button" disabled={busyId !== null || !planHash || String(request.status) === "completed"} onClick={() => runDeletionExecutor(requestId, "execute", planHash)}>Execute deletion</button>
+            </div>
+          );
+        })}
       </article>
       <ExportJobsPanel busyId={busyId} processExport={processExport} />
       {message ? <article className="card"><h3>Latest admin action</h3><p className="muted" aria-live="polite">{message}</p></article> : null}
