@@ -20,6 +20,21 @@ Use this file as the deploy-time release evidence ledger. Do not paste secrets.
 - Auth provider verified: yes/no
 - Admin custom claim seeded and verified: yes/no
 
+## Staging deployment evidence
+
+Generate the redacted staging evidence template after staging deploy and smoke validation:
+
+```bash
+URAI_PRIVACY_REQUIRE_LIVE=1 npm run release:evidence:staging
+```
+
+- Evidence file path:
+- Evidence generated: yes/no
+- Evidence reviewed: yes/no
+- Evidence contains no secrets: yes/no
+- Evidence owner:
+- Evidence timestamp:
+
 ## Live smoke
 
 Run:
@@ -40,6 +55,8 @@ Evidence:
 - Consent update passed: yes/no
 - Admin denied without claim: yes/no
 - Admin allowed with claim: yes/no
+- Anonymous access denied: yes/no
+- Cross-user data access denied: yes/no
 
 ## Legal and privacy approvals
 
