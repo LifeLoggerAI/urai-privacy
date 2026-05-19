@@ -42,6 +42,9 @@ echo "[security-gate] Checking immutable privacy evidence rules"
 require_pattern "firestore.rules" 'match /auditLogs/[{]id[}]' "Audit log match"
 require_pattern "firestore.rules" 'allow update, delete: if false|allow update: if false' "Audit log update deny"
 require_pattern "firestore.rules" 'allow update, delete: if false|allow delete: if false' "Audit log delete deny"
+require_pattern "firestore.rules" 'match /legalHoldRecords/[{]id[}]' "Legal hold records match"
+require_pattern "firestore.rules" 'match /legalHoldRecords/[{]id[}][^}]*allow create, update: if isAdmin\(\)' "Legal hold admin write guard"
+require_pattern "firestore.rules" 'match /legalHoldRecords/[{]id[}][^}]*allow delete: if false' "Legal hold delete deny"
 
 reject_pattern "storage.rules" 'allow[[:space:]]+delete:[[:space:]]+if[[:space:]]+(true|isAdmin\(\)|request\.auth)' "Storage delete allowance"
 
