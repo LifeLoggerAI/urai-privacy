@@ -31,9 +31,8 @@ Required public Firebase variables:
 Optional:
 
 - `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
-- `NEXT_PUBLIC_URAI_ADMIN_EMAIL`
 
-Admin UI gating is not a substitute for Firebase Auth custom claims or Firestore/Storage rules.
+Admin authorization is enforced by Firebase Auth custom claims and Firestore/Storage rules. Public environment variables are not accepted as admin proof.
 
 ## Verification command
 
@@ -74,6 +73,20 @@ After staging deploy, verify:
 9. `/admin/audit-log` requires admin access.
 10. Unknown routes fall back safely.
 
+## Destructive deletion smoke plan
+
+Before destructive deletion is enabled in production, verify in staging:
+
+1. Create a test user with scoped privacy data.
+2. Create a deletion request for that user.
+3. Run admin dry-run and capture the returned plan hash.
+4. Confirm legal-hold false path can execute only with the current plan hash.
+5. Confirm stale plan hash fails.
+6. Confirm active `legalHoldRecords` or `users/{uid}.legalHold=true` blocks execution.
+7. Confirm retained collections remain: `auditLogs`, `policyVersions`, `adminActions`, `retentionPolicies`, `deletionRequests`, `legalHoldRecords`.
+8. Confirm deleted collections are cleared for the user: `users`, `privacyRequests`, `exportJobs`, `consentRecords`, `dataAccessEvents`.
+9. Confirm audit events exist for dry-run, start, completion, failure, and legal-hold blocked cases.
+
 ## Security validation
 
 Required before production:
@@ -81,6 +94,7 @@ Required before production:
 - Firestore rules deny unknown collections.
 - Storage rules deny unknown paths.
 - Audit logs are append-only.
+- Legal-hold records are admin-managed retained evidence.
 - Storage export and evidence objects are not delete-open.
 - User paths are owner- or admin-scoped.
 - Admin authority is enforced by custom claims or verified role documents.
