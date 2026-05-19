@@ -1,0 +1,49 @@
+name: Release gates
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  repo-gates:
+    name: Repo verification gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+
+      - name: Setup Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install functions dependencies
+        run: npm ci --prefix functions
+
+      - name: Preflight
+        run: npm run preflight
+
+      - name: Emulator-backed rules and integration tests
+        run: npm run test:emulators
+
+      - name: Functions build
+        run: npm --prefix functions run build
+
+      - name: Functions typecheck
+        run: npm --prefix functions run typecheck
+
+      - name: Security gate
+        run: npm run security:gate
