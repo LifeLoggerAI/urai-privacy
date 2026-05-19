@@ -17,8 +17,10 @@ const consentStatuses = ["granted", "denied", "revoked"] as const;
 const consentTiers = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"] as const;
 const exportCollections = ["users", "privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "dataAccessEvents", "auditLogs", "adminActions"];
 const redactedFields = ["password", "token", "secret", "apiKey", "privateKey", "refreshToken", "idToken"];
+const EXPORT_SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
 const processExportSchema = z.object({ jobId: z.string().min(1) });
+const getExportDownloadSchema = z.object({ jobId: z.string().min(1), file: z.enum(["export", "manifest"]).default("export") });
 const createDeletionSchema = z.object({ reason: z.string().trim().min(8).max(1000).default("User requested deletion") });
 const processDeletionSchema = z.object({ requestId: z.string().min(1), status: z.enum(deletionStatuses).default("processing") });
 const updateConsentSchema = z.object({
@@ -45,7 +47,7 @@ function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknow
 }
 
 async function isAdmin(uid: string, token?: Record<string, unknown>) {
-  if (token?.admin === true) return true;
+  if (token?.admin === true || token?.role === "admin") return true;
   const snap = await db.collection("users").doc(uid).get();
   return snap.exists && snap.data()?.role === "admin";
 }
@@ -54,6 +56,14 @@ async function requireAdmin(request: { auth?: { uid?: string; token?: Record<str
   const uid = uidFrom(request);
   if (!(await isAdmin(uid, request.auth?.token))) {
     throw new HttpsError("permission-denied", "Admin access is required.");
+  }
+  return uid;
+}
+
+async function requireOwnerOrAdmin(request: { auth?: { uid?: string; token?: Record<string, unknown> } }, targetUid: string) {
+  const uid = uidFrom(request);
+  if (uid !== targetUid && !(await isAdmin(uid, request.auth?.token))) {
+    throw new HttpsError("permission-denied", "Owner or admin access is required.");
   }
   return uid;
 }
@@ -169,6 +179,42 @@ export const processExportRequest = onCall(async (request) => {
   return { jobId, status: "completed", auditId, manifestPath, exportPath, recordCount: exportData.recordCount };
 });
 
+export const getExportDownloadUrl = onCall(async (request) => {
+  const { jobId, file } = parseOrThrow(getExportDownloadSchema, request.data);
+  const jobRef = db.collection("exportJobs").doc(jobId);
+  const snap = await jobRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Export job not found.");
+
+  const job = snap.data() ?? {};
+  const uid = String(job.uid ?? "");
+  const requestId = String(job.requestId ?? "");
+  if (!uid || !requestId) throw new HttpsError("failed-precondition", "Export job is missing uid or requestId.");
+  await requireOwnerOrAdmin(request, uid);
+
+  if (job.status !== "completed") {
+    throw new HttpsError("failed-precondition", "Export job is not complete yet.");
+  }
+
+  const path = file === "manifest" ? String(job.exportManifestPath ?? "") : String(job.exportPackagePath ?? "");
+  if (!path || !path.startsWith(`exports/${uid}/${jobId}/`)) {
+    throw new HttpsError("failed-precondition", "Export file path is missing or invalid.");
+  }
+
+  const expiresAt = Date.now() + EXPORT_SIGNED_URL_TTL_MS;
+  const [url] = await bucket.file(path).getSignedUrl({ action: "read", expires: expiresAt });
+  const auditId = await writeAudit({
+    actorUid: request.auth?.uid ?? uid,
+    actorRole: request.auth?.uid === uid ? "user" : "admin",
+    action: "export_download_url_created",
+    targetUid: uid,
+    requestId,
+    source: "function",
+    metadata: { jobId, file, path, expiresAt }
+  });
+
+  return { jobId, requestId, file, url, expiresAt, expiresInSeconds: Math.floor(EXPORT_SIGNED_URL_TTL_MS / 1000), auditId };
+});
+
 export const createDeletionRequest = onCall(async (request) => {
   const uid = uidFrom(request);
   const { reason } = parseOrThrow(createDeletionSchema, request.data);
@@ -188,10 +234,18 @@ export const processDeletionRequest = onCall(async (request) => {
   const uid = String(deletion.uid ?? "");
   if (!uid) throw new HttpsError("failed-precondition", "Deletion request is missing uid.");
   const plan = await deletionPlan(uid);
-  await ref.update({ status, updatedAt: FieldValue.serverTimestamp(), deletionPlan: plan, planHash: sha256(plan) });
-  if (status === "processing" || status === "completed") await db.collection("users").doc(uid).set({ markedForDeletion: true, deletionMarkedAt: FieldValue.serverTimestamp() }, { merge: true });
-  const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_processed", targetUid: uid, requestId, source: "function", metadata: { status, planHash: sha256(plan) } });
-  return { requestId, status, auditId, plan };
+  const safeStatus = status === "completed" ? "processing" : status;
+  await ref.update({
+    status: safeStatus,
+    updatedAt: FieldValue.serverTimestamp(),
+    deletionPlan: plan,
+    planHash: sha256(plan),
+    destructiveDeletionBlocked: true,
+    destructiveDeletionReason: "Final destructive deletion requires the production executor, legal-hold verification, retry handling, and release evidence before a request can be marked completed."
+  });
+  if (safeStatus === "processing") await db.collection("users").doc(uid).set({ markedForDeletion: true, deletionMarkedAt: FieldValue.serverTimestamp() }, { merge: true });
+  const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_processed", targetUid: uid, requestId, source: "function", metadata: { requestedStatus: status, appliedStatus: safeStatus, planHash: sha256(plan), destructiveDeletionBlocked: true } });
+  return { requestId, status: safeStatus, requestedStatus: status, auditId, plan, destructiveDeletionBlocked: true };
 });
 
 export const updateConsent = onCall(async (request) => {
