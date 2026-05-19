@@ -43,6 +43,10 @@ export function updateConsentPreference(payload: { purpose: string; consentTier:
   return callPrivacyFunction("updateConsent", payload);
 }
 
+export function getExportDownloadUrl(payload: { jobId: string; file?: "export" | "manifest" }) {
+  return callPrivacyFunction("getExportDownloadUrl", payload);
+}
+
 export function subscribeUserCollection(collectionName: string, uid: string, callback: (rows: Array<DocumentData & { id: string }>) => void) {
   requireAllowedCollection(collectionName, USER_SCOPED_COLLECTIONS);
   const q = query(collection(requireDb(), collectionName), where("uid", "==", uid), limit(50));
