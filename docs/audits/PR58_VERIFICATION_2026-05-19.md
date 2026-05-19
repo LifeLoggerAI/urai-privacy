@@ -9,6 +9,17 @@ The operator ran verification commands on the PR #58 branch after earlier fixes.
 
 ### Passed
 
+- `npm run preflight`
+  - `clean:legacy` passed and removed generated legacy/build artifacts.
+  - `lint` passed, with an ESLintRC deprecation warning.
+  - `typecheck` passed.
+  - `test:unit` passed: 1 test file, 8 tests.
+  - `test:rules:static` passed.
+  - `test:e2e` route smoke passed.
+  - `audit:privacy` passed.
+  - `audit:tier-one` passed.
+  - `build` passed and prerendered all expected app routes.
+  - The earlier Next workspace-root warning did not appear in this preflight output after the explicit Turbopack root patch.
 - `npm run test:emulators`
   - Firestore rules suite passed: 7 tests.
   - Storage rules suite passed: 4 tests.
@@ -25,11 +36,17 @@ The operator ran verification commands on the PR #58 branch after earlier fixes.
 
 The Firestore `PERMISSION_DENIED` stderr output is expected for negative authorization tests. Those tests intentionally verify that blocked writes, blocked updates, blocked deletes, anonymous access, and unknown collections are denied. The suite result is the authority: all rule tests passed.
 
-### Still needed before merging PR #58
+### Remaining preview gate
 
-- Re-run root `npm run preflight` from `~/urai-privacy` on branch `hardening/preview-blockers-2026-05-19` after `scripts/clean-legacy.sh` was restored.
-- Confirm `npm run build` no longer emits the Next workspace-root warning after `next.config.mjs` received an explicit ESM-safe Turbopack root.
-- Attach the preflight output to the PR or audit ledger.
+- Deploy PR #58 to Firebase preview/staging.
+- Smoke the real hosted flows:
+  - export request,
+  - export signed URL retrieval,
+  - deletion request,
+  - consent update,
+  - admin denied,
+  - admin allowed.
+- Attach redacted Firebase staging environment evidence and custom-claim proof.
 
 ### Still needed before production
 
