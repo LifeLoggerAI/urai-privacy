@@ -6,14 +6,14 @@ Repo: `LifeLoggerAI/urai-privacy`
 ## Launch verdict
 
 - LAUNCH VERDICT: NO
-- CONFIDENCE: 84 percent repo-side confidence after uploaded verification evidence and follow-up PR fixes, pending PR #58 re-run, Firebase staging evidence, legal approval, monitoring/rollback evidence, and a verified destructive deletion executor.
-- MOST IMPORTANT BLOCKER: `npm run preflight` previously failed because `scripts/clean-legacy.sh` was referenced but missing. This branch restores that script, but preflight still needs to be re-run on the updated branch.
+- CONFIDENCE: 88 percent repo-side confidence after successful PR #58 preflight, emulator, integration, and functions verification, pending Firebase staging evidence, legal approval, monitoring/rollback evidence, and a verified destructive deletion executor.
+- MOST IMPORTANT BLOCKER: PR #58 is now repo-verification-ready for preview review, but production remains blocked by live Firebase staging proof, admin custom claim proof, legal approval, monitoring/rollback evidence, npm audit disposition, and a verified destructive deletion executor.
 
-This audit does not mark the repo production-ready. It does show that the repo is much closer to preview readiness: the uploaded verification log shows lint, typecheck, unit tests, static rules, route smoke, privacy audit, tier-one audit, Next build, Java check, emulator-backed rules/integration, and functions build/typecheck all passed before the preflight cleanup-script failure. Production still requires Firebase deploy/staging evidence, legal review, admin custom claim proof, monitoring, rollback, live smoke, and a verified destructive deletion executor.
+This audit does not mark the repo production-ready. It does show that the repo is much closer to preview readiness: the operator-supplied PR #58 branch evidence shows preflight, emulator-backed rules/integration, and functions build/typecheck/test passed. Production still requires Firebase deploy/staging evidence, legal review, admin custom claim proof, monitoring, rollback, live smoke, and a verified destructive deletion executor.
 
 ## Uploaded verification evidence from 2026-05-19
 
-Passing in the uploaded log:
+Passing in earlier uploaded logs:
 
 - `npm install` completed, with warnings.
 - `npm run lint` completed.
@@ -28,7 +28,7 @@ Passing in the uploaded log:
 - `npm run test:emulators` completed successfully: Firestore/Storage rules tests passed, and integration smoke tests passed.
 - `cd functions && npm install && npm run build && npm run typecheck && npm test` passed.
 
-Warnings / failures from the uploaded log:
+Warnings / failures from earlier logs:
 
 - Root install reported 5 moderate npm audit findings.
 - Root install warned that `eslint-visitor-keys@5.0.1` requires Node `^20.19.0 || ^22.13.0 || >=24`, while the run used Node `20.11.1`.
@@ -42,7 +42,22 @@ Branch response to that evidence:
 - Added `scripts/clean-legacy.sh` to restore the missing preflight dependency.
 - Added explicit Turbopack root config in `next.config.mjs` to address the Next workspace-root warning from multiple lockfiles.
 - Aligned the admin deletion UI with the backend destructive-deletion hard gate.
-- Preflight must be re-run on this branch after these changes.
+
+Latest PR #58 branch verification supplied by operator:
+
+- `npm run preflight` passed on branch `hardening/preview-blockers-2026-05-19`.
+- `clean:legacy` passed and removed generated legacy/build artifacts.
+- `lint` passed with the known ESLintRC deprecation warning.
+- `typecheck` passed.
+- `test:unit` passed: 1 file, 8 tests.
+- `test:rules:static` passed.
+- `test:e2e` route smoke passed.
+- `audit:privacy` passed.
+- `audit:tier-one` passed.
+- `build` passed and prerendered all expected app routes.
+- The earlier Next workspace-root warning did not appear in the latest preflight output.
+- `npm run test:emulators` passed on the branch: Firestore rules, Storage rules, and integration smoke all passed.
+- Functions package `build`, `typecheck`, and `test` passed on the branch.
 
 ## Verified current main state before this branch
 
@@ -157,29 +172,28 @@ New behavior:
 
 | Area | Exists | UX complete | Secure | Accessible | Tested | Production-ready | Notes/blockers |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Privacy dashboard | Partial | Partial | Partial | Improved | Partially verified | No | Routes/build verified; live preview evidence still missing. |
-| Consent | Yes | Partial | Partial | Partial | Partially verified | No | Unit/integration evidence exists; live Firebase proof still missing. |
-| Export | Improved | Improved | Improved | Partial | Partially verified | No | Signed URL retrieval added; needs branch re-run and live expiry/cross-user proof. |
-| Deletion | Improved | Improved | Improved | Partial | Partially verified | No | Request workflow exists; completion is hard-gated until destructive executor is verified. |
+| Privacy dashboard | Partial | Partial | Partial | Improved | Verified in repo | No | Routes/build verified; live preview evidence still missing. |
+| Consent | Yes | Partial | Partial | Partial | Verified in repo | No | Unit/integration evidence exists; live Firebase proof still missing. |
+| Export | Improved | Improved | Improved | Partial | Verified in repo | No | Signed URL retrieval added; needs live expiry/cross-user proof. |
+| Deletion | Improved | Improved | Improved | Partial | Verified in repo | No | Request workflow exists; completion is hard-gated until destructive executor is verified. |
 | Retention | Partial | Partial | Partial | N/A | Partially verified | No | Retention policies exist; enforcement/live evidence required. |
-| Settings | Partial | Partial | Partial | Partial | Partially verified | No | Consent settings exist; broader privacy settings remain incomplete. |
+| Settings | Partial | Partial | Partial | Partial | Verified in repo | No | Consent settings exist; broader privacy settings remain incomplete. |
 | Support/contact | Yes | Partial | N/A | Partial | Unverified | No | Static/support docs exist; production contact SLA and legal linkage need evidence. |
 | Legal/policy alignment | Partial | Partial | Partial | N/A | Unverified | No | Legal templates require counsel approval. |
-| Auth/security | Improved | Partial | Improved | Partial | Partially verified | No | Anonymous sessions removed; claims/rules need live proof. |
-| Admin/operator flows | Improved | Partial | Improved | Partial | Partially verified | No | Completion action removed; custom claim seeding and operator runbook evidence required. |
+| Auth/security | Improved | Partial | Improved | Partial | Verified in repo | No | Anonymous sessions removed; claims/rules need live proof. |
+| Admin/operator flows | Improved | Partial | Improved | Partial | Verified in repo | No | Completion action removed; custom claim seeding and operator runbook evidence required. |
 | Mobile | Partial | Partial | N/A | Unverified | Unverified | No | Responsive classes exist; device smoke and visual QA missing. |
 | Accessibility | Improved | Partial | N/A | Improved | Partially verified | No | Skip link/focus/reduced motion added; manual/automated a11y pass still required. |
 | Performance | Partial | Unknown | N/A | N/A | Partially verified | No | Build passed; Lighthouse/Core Web Vitals evidence missing. |
-| Tests | Improved | N/A | N/A | N/A | Partially verified | No | Most checks passed; preflight needs re-run after cleanup script restoration. |
+| Tests | Improved | N/A | N/A | N/A | Verified in repo | No | Preflight, emulator, integration, and functions checks passed on PR branch. |
 | Release/rollback/monitoring | Partial | N/A | Partial | N/A | Missing | No | No production deployment, monitoring, rollback, or signoff evidence attached. |
 
-## P0 must fix before preview
+## Remaining preview gates
 
-1. Re-run `npm run preflight` on this branch after `scripts/clean-legacy.sh` was restored.
-2. Attach Firebase staging env evidence without secrets.
-3. Prove Auth provider configuration and admin custom claim seed.
-4. Prove Firestore and Storage rules block unauthorized user/admin reads in the target staging environment, not only emulators.
-5. Add preview smoke evidence for export request, export download URL, deletion request, consent update, admin denied, and admin allowed flows.
+1. Attach Firebase staging env evidence without secrets.
+2. Prove Auth provider configuration and admin custom claim seed.
+3. Prove Firestore and Storage rules block unauthorized user/admin reads in the target staging environment, not only emulators.
+4. Add preview smoke evidence for export request, export download URL, deletion request, consent update, admin denied, and admin allowed flows.
 
 ## P1 must fix before production
 
@@ -209,33 +223,18 @@ New behavior:
 
 ## Required verification commands
 
-Run from a clean checkout before merging:
+Repo checks passed on this branch according to operator-supplied output:
 
 ```bash
-npm install
-npm run lint
-npm run typecheck
-npm run test:unit
-npm run test:rules:static
-npm run test:smoke
-npm run audit:privacy
-npm run audit:tier-one
-npm run build
 npm run preflight
-```
-
-Run with emulators when Java/Firebase tools are available:
-
-```bash
 npm run check:java
 npm run test:emulators
 ```
 
-Run function package checks:
+Function package checks passed on this branch according to operator-supplied output:
 
 ```bash
 cd functions
-npm install
 npm run build
 npm run typecheck
 npm test
@@ -243,4 +242,4 @@ npm test
 
 ## Release decision
 
-Do not deploy this repo as production from this branch alone. Merge only after preflight is re-run successfully on this branch and Firebase staging evidence is attached. Production remains blocked until legal, Firebase, monitoring, rollback, destructive deletion executor, live smoke, npm audit disposition, and signoff evidence are complete.
+PR #58 is repo-verification-ready for merge review. Do not deploy this repo as production from this branch alone. Production remains blocked until legal, Firebase staging/live smoke, monitoring, rollback, destructive deletion executor, npm audit disposition, and signoff evidence are complete.
