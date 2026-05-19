@@ -30,6 +30,7 @@
     "preflight:production": "bash scripts/verify-release.sh",
     "security:gate": "bash scripts/security-gate.sh",
     "deploy": "firebase deploy",
+    "release:evidence:staging": "node scripts/staging-evidence.mjs",
     "verify:production": "bash scripts/verify-release.sh",
     "verify:release": "bash scripts/verify-release.sh"
   },
