@@ -24,7 +24,9 @@ reject_pattern() {
 }
 
 echo "[security-gate] Checking for committed secret material"
-if git grep -nE '(AIza[0-9A-Za-z_-]{20,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|firebase_private_key|GOOGLE_APPLICATION_CREDENTIALS=.*\.json|serviceAccountKey)' -- . ':!package-lock.json' ':!functions/package-lock.json' ':!scripts/security-gate.sh'; then
+# Exclude lockfiles and known detector sources so the gate does not flag its own
+# secret-signature patterns as committed credentials.
+if git grep -nE '(AIza[0-9A-Za-z_-]{20,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|firebase_private_key|GOOGLE_APPLICATION_CREDENTIALS=.*\.json|serviceAccountKey)' -- . ':!package-lock.json' ':!functions/package-lock.json' ':!scripts/security-gate.sh' ':!scripts/smoke-live.mjs'; then
   echo "[security-gate] Potential secret material found" >&2
   exit 1
 fi
