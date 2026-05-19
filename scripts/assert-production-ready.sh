@@ -13,6 +13,8 @@ required_files=(
   "scripts/security-gate.sh"
   "scripts/validate-rules.mjs"
   "scripts/smoke-routes.mjs"
+  "scripts/smoke-live.mjs"
+  "scripts/staging-evidence.mjs"
   "app/page.tsx"
   "app/privacy-center/export/page.tsx"
   "app/privacy-center/delete/page.tsx"
@@ -32,7 +34,7 @@ git status --porcelain > "$status_file"
 
 non_generated_changes="$(awk '
   function is_generated(path) {
-    return path ~ /^(\.idx\/|\.next\/|functions\/lib\/|firestore-debug\.log$|firebase-debug\.log$|ui-debug\.log$|database-debug\.log$|storage-debug\.log$|pubsub-debug\.log$|.*\.debug\.log$|tsconfig\.tsbuildinfo$|functions\/tsconfig\.tsbuildinfo$)/
+    return path ~ /^(\.idx\/|\.next\/|functions\/lib\/|release-evidence\/|firestore-debug\.log$|firebase-debug\.log$|ui-debug\.log$|database-debug\.log$|storage-debug\.log$|pubsub-debug\.log$|.*\.debug\.log$|tsconfig\.tsbuildinfo$|functions\/tsconfig\.tsbuildinfo$)/
   }
   {
     path = substr($0, 4)
@@ -55,13 +57,22 @@ grep -q '"functions"' firebase.json
 
 echo "[assert-production-ready] Checking public env contract"
 if [[ ! -f ".env.example" ]]; then
-  echo "[assert-production-ready] .env.example is required so deploy operators can validate secrets without exposing values" >&2
+  echo "[assert-production-ready] .env.example is required so deploy operators can validate config without exposing values" >&2
   exit 1
 fi
 
 grep -q 'NEXT_PUBLIC_FIREBASE_API_KEY' .env.example
 grep -q 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' .env.example
 grep -q 'NEXT_PUBLIC_FIREBASE_APP_ID' .env.example
+grep -q 'Admin access is authorized by Firebase Auth custom claims only' .env.example
+if grep -q 'NEXT_PUBLIC_URAI_ADMIN_EMAIL' .env.example; then
+  echo "[assert-production-ready] Public admin email env gate must not be documented" >&2
+  exit 1
+fi
+
+echo "[assert-production-ready] Checking package release scripts"
+grep -q '"test:smoke:live"' package.json
+grep -q '"release:evidence:staging"' package.json
 
 echo "[assert-production-ready] Checking deployment docs"
 if [[ ! -f "docs/PRODUCTION_READINESS.md" ]]; then
