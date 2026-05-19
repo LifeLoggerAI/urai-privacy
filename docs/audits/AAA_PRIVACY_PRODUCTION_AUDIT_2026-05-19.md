@@ -6,7 +6,7 @@ Repo: `LifeLoggerAI/urai-privacy`
 ## Launch verdict
 
 - LAUNCH VERDICT: NO
-- CONFIDENCE: 82 percent repo-side confidence after uploaded verification evidence, pending PR #58 re-run after restoring `scripts/clean-legacy.sh`, Firebase staging evidence, legal approval, monitoring/rollback evidence, and a verified destructive deletion executor.
+- CONFIDENCE: 84 percent repo-side confidence after uploaded verification evidence and follow-up PR fixes, pending PR #58 re-run, Firebase staging evidence, legal approval, monitoring/rollback evidence, and a verified destructive deletion executor.
 - MOST IMPORTANT BLOCKER: `npm run preflight` previously failed because `scripts/clean-legacy.sh` was referenced but missing. This branch restores that script, but preflight still needs to be re-run on the updated branch.
 
 This audit does not mark the repo production-ready. It does show that the repo is much closer to preview readiness: the uploaded verification log shows lint, typecheck, unit tests, static rules, route smoke, privacy audit, tier-one audit, Next build, Java check, emulator-backed rules/integration, and functions build/typecheck all passed before the preflight cleanup-script failure. Production still requires Firebase deploy/staging evidence, legal review, admin custom claim proof, monitoring, rollback, live smoke, and a verified destructive deletion executor.
@@ -40,7 +40,9 @@ Warnings / failures from the uploaded log:
 Branch response to that evidence:
 
 - Added `scripts/clean-legacy.sh` to restore the missing preflight dependency.
-- Preflight must be re-run on this branch after the script addition.
+- Added explicit Turbopack root config in `next.config.mjs` to address the Next workspace-root warning from multiple lockfiles.
+- Aligned the admin deletion UI with the backend destructive-deletion hard gate.
+- Preflight must be re-run on this branch after these changes.
 
 ## Verified current main state before this branch
 
@@ -120,6 +122,8 @@ New behavior:
 
 `app/privacy-center/delete/page.tsx` now clearly states that the user creates an auditable deletion request and that destructive erasure remains hard-gated until the final executor, legal-hold safeguards, retry handling, and release evidence are verified.
 
+`app/admin/privacy-requests/page.tsx` no longer offers a `completed` deletion action and warns admins that completion is unavailable until destructive deletion execution has legal-hold, retry, audit, and release evidence.
+
 ### Restored preflight cleanup dependency
 
 `scripts/clean-legacy.sh` now exists and removes generated build/cache artifacts before preflight:
@@ -132,6 +136,10 @@ New behavior:
 - `.firebase`
 - Firebase/debug logs
 - `*.tsbuildinfo` outside `node_modules`
+
+### Reduced build warning risk
+
+`next.config.mjs` now sets an ESM-safe explicit Turbopack root using `fileURLToPath(import.meta.url)`, reducing the workspace-root inference warning caused by multiple lockfiles in the uploaded verification environment.
 
 ## Evidence reviewed
 
@@ -158,7 +166,7 @@ New behavior:
 | Support/contact | Yes | Partial | N/A | Partial | Unverified | No | Static/support docs exist; production contact SLA and legal linkage need evidence. |
 | Legal/policy alignment | Partial | Partial | Partial | N/A | Unverified | No | Legal templates require counsel approval. |
 | Auth/security | Improved | Partial | Improved | Partial | Partially verified | No | Anonymous sessions removed; claims/rules need live proof. |
-| Admin/operator flows | Partial | Partial | Partial | Partial | Partially verified | No | Admin pages exist; custom claim seeding and operator runbook evidence required. |
+| Admin/operator flows | Improved | Partial | Improved | Partial | Partially verified | No | Completion action removed; custom claim seeding and operator runbook evidence required. |
 | Mobile | Partial | Partial | N/A | Unverified | Unverified | No | Responsive classes exist; device smoke and visual QA missing. |
 | Accessibility | Improved | Partial | N/A | Improved | Partially verified | No | Skip link/focus/reduced motion added; manual/automated a11y pass still required. |
 | Performance | Partial | Unknown | N/A | N/A | Partially verified | No | Build passed; Lighthouse/Core Web Vitals evidence missing. |
@@ -172,7 +180,6 @@ New behavior:
 3. Prove Auth provider configuration and admin custom claim seed.
 4. Prove Firestore and Storage rules block unauthorized user/admin reads in the target staging environment, not only emulators.
 5. Add preview smoke evidence for export request, export download URL, deletion request, consent update, admin denied, and admin allowed flows.
-6. Confirm the admin deletion UI no longer implies destructive completion once this branch is reviewed; backend completion is already hard-gated.
 
 ## P1 must fix before production
 
@@ -182,7 +189,7 @@ New behavior:
 4. Add monitoring/error reporting and incident-response routing.
 5. Record rollback SHA/path and owner/legal/security signoffs.
 6. Address or explicitly accept the 5 moderate root npm audit findings.
-7. Resolve the Node engine mismatch and Next workspace-root warning before production release.
+7. Resolve the Node engine mismatch and Firebase emulator function-definition warning before production release.
 
 ## P2 AAA polish
 
