@@ -75,4 +75,7 @@ npm run security:gate
 printf '\n[verify-release] production readiness assertions\n'
 bash scripts/assert-production-ready.sh
 
+printf '\n[verify-release] optional live smoke\n'
+npm run test:smoke:live
+
 printf '\n[verify-release] OK\n'

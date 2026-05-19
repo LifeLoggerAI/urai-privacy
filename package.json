@@ -4,7 +4,7 @@
   "private": true,
   "description": "URAI Privacy standalone Firebase and Next.js privacy product scaffold.",
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=20.19.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -20,6 +20,7 @@
     "test:rules:emulated": "vitest run tests/rules --pool=forks --maxWorkers=1 --minWorkers=1",
     "test:rules:static": "node scripts/validate-rules.mjs",
     "test:smoke": "node scripts/smoke-routes.mjs",
+    "test:smoke:live": "node scripts/smoke-live.mjs",
     "test:emulators": "firebase emulators:exec --project urai-privacy-integration-test --only auth,firestore,storage,functions \"npm run test:rules:emulated && npm run test:integration:emulated\"",
     "check:java": "node scripts/check-java.mjs",
     "audit:privacy": "node scripts/urai_privacy_adoption_check.mjs",
