@@ -6,10 +6,41 @@ Repo: `LifeLoggerAI/urai-privacy`
 ## Launch verdict
 
 - LAUNCH VERDICT: NO
-- CONFIDENCE: 73 percent repo-side confidence, pending clean checkout verification and Firebase environment evidence
-- MOST IMPORTANT BLOCKER: Live Firebase staging evidence, clean command evidence, legal approval, monitoring/rollback evidence, and a verified destructive deletion executor are still missing.
+- CONFIDENCE: 82 percent repo-side confidence after uploaded verification evidence, pending PR #58 re-run after restoring `scripts/clean-legacy.sh`, Firebase staging evidence, legal approval, monitoring/rollback evidence, and a verified destructive deletion executor.
+- MOST IMPORTANT BLOCKER: `npm run preflight` previously failed because `scripts/clean-legacy.sh` was referenced but missing. This branch restores that script, but preflight still needs to be re-run on the updated branch.
 
-This audit does not mark the repo production-ready. The repository still identifies itself as a staging scaffold / operational draft governance package, and the runtime must prove clean install, lint, typecheck, tests, rules, build, Firebase deploy, legal review, admin custom claims, monitoring, rollback, and live smoke before production launch.
+This audit does not mark the repo production-ready. It does show that the repo is much closer to preview readiness: the uploaded verification log shows lint, typecheck, unit tests, static rules, route smoke, privacy audit, tier-one audit, Next build, Java check, emulator-backed rules/integration, and functions build/typecheck all passed before the preflight cleanup-script failure. Production still requires Firebase deploy/staging evidence, legal review, admin custom claim proof, monitoring, rollback, live smoke, and a verified destructive deletion executor.
+
+## Uploaded verification evidence from 2026-05-19
+
+Passing in the uploaded log:
+
+- `npm install` completed, with warnings.
+- `npm run lint` completed.
+- `npm run typecheck` completed.
+- `npm run test:unit` passed: 1 file, 8 tests.
+- `npm run test:rules:static` passed.
+- `npm run test:smoke` passed.
+- `npm run audit:privacy` passed.
+- `npm run audit:tier-one` passed.
+- `npm run build` completed and rendered all expected app routes.
+- `npm run check:java` passed with OpenJDK 17.
+- `npm run test:emulators` completed successfully: Firestore/Storage rules tests passed, and integration smoke tests passed.
+- `cd functions && npm install && npm run build && npm run typecheck && npm test` passed.
+
+Warnings / failures from the uploaded log:
+
+- Root install reported 5 moderate npm audit findings.
+- Root install warned that `eslint-visitor-keys@5.0.1` requires Node `^20.19.0 || ^22.13.0 || >=24`, while the run used Node `20.11.1`.
+- ESLint emitted an `.eslintrc` deprecation warning.
+- Next build warned that workspace root inference found multiple lockfiles and selected `/home/user/package-lock.json` rather than only `/home/user/urai-privacy/package-lock.json`.
+- `npm run preflight` failed because `scripts/clean-legacy.sh` did not exist.
+- Firebase emulator run succeeded, but warned about IPv6 `::1` port checks, functions emulator production-adjacent services not running, Admin SDK config fetch, firebase-functions package age, Node 20 requested while host used Node 18, and failed function definition parsing. The script still exited successfully because the rule/integration tests passed.
+
+Branch response to that evidence:
+
+- Added `scripts/clean-legacy.sh` to restore the missing preflight dependency.
+- Preflight must be re-run on this branch after the script addition.
 
 ## Verified current main state before this branch
 
@@ -89,6 +120,19 @@ New behavior:
 
 `app/privacy-center/delete/page.tsx` now clearly states that the user creates an auditable deletion request and that destructive erasure remains hard-gated until the final executor, legal-hold safeguards, retry handling, and release evidence are verified.
 
+### Restored preflight cleanup dependency
+
+`scripts/clean-legacy.sh` now exists and removes generated build/cache artifacts before preflight:
+
+- `.next`
+- `out`
+- `dist`
+- `coverage`
+- `.turbo`
+- `.firebase`
+- Firebase/debug logs
+- `*.tsbuildinfo` outside `node_modules`
+
 ## Evidence reviewed
 
 - `package.json` identifies the app as `0.2.0-staging-scaffold` and has a broad preflight command path.
@@ -99,34 +143,34 @@ New behavior:
 - `app/admin/privacy-requests/page.tsx` provides operator workflow surfaces, but production use depends on Firebase admin claims and rules evidence.
 - `firestore.rules` defines owner/admin read boundaries and append-only audit-style collections.
 - `storage.rules` keeps export packages readable by owner/admin and denies unknown Storage paths.
-- `tests/rules/firestore.rules.test.ts` has emulator-backed rule tests, but they still need clean-run evidence from a local or CI environment.
+- `tests/rules/firestore.rules.test.ts` has emulator-backed rule tests, and the uploaded log shows the emulator-backed rules test suite passed.
 
 ## Production-readiness matrix
 
 | Area | Exists | UX complete | Secure | Accessible | Tested | Production-ready | Notes/blockers |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Privacy dashboard | Partial | Partial | Partial | Improved | Unverified | No | Core pages exist, but production evidence and live smoke are missing. |
-| Consent | Yes | Partial | Partial | Partial | Unverified | No | Callable exists and UI exists; needs rules/emulator and end-to-end evidence. |
-| Export | Improved | Improved | Improved | Partial | Unverified | No | Signed URL retrieval added; needs emulator/live proof and expiry smoke. |
-| Deletion | Improved | Improved | Improved | Partial | Unverified | No | Request workflow exists; completion is hard-gated until destructive executor is verified. |
-| Retention | Partial | Partial | Partial | N/A | Unverified | No | Retention policies exist in code/docs; enforcement evidence required. |
-| Settings | Partial | Partial | Partial | Partial | Unverified | No | Consent settings exist; broader privacy settings remain incomplete. |
+| Privacy dashboard | Partial | Partial | Partial | Improved | Partially verified | No | Routes/build verified; live preview evidence still missing. |
+| Consent | Yes | Partial | Partial | Partial | Partially verified | No | Unit/integration evidence exists; live Firebase proof still missing. |
+| Export | Improved | Improved | Improved | Partial | Partially verified | No | Signed URL retrieval added; needs branch re-run and live expiry/cross-user proof. |
+| Deletion | Improved | Improved | Improved | Partial | Partially verified | No | Request workflow exists; completion is hard-gated until destructive executor is verified. |
+| Retention | Partial | Partial | Partial | N/A | Partially verified | No | Retention policies exist; enforcement/live evidence required. |
+| Settings | Partial | Partial | Partial | Partial | Partially verified | No | Consent settings exist; broader privacy settings remain incomplete. |
 | Support/contact | Yes | Partial | N/A | Partial | Unverified | No | Static/support docs exist; production contact SLA and legal linkage need evidence. |
 | Legal/policy alignment | Partial | Partial | Partial | N/A | Unverified | No | Legal templates require counsel approval. |
-| Auth/security | Improved | Partial | Improved | Partial | Unverified | No | Anonymous privacy sessions removed and claim-based admin check exists; claims/rules need live proof. |
-| Admin/operator flows | Partial | Partial | Partial | Partial | Unverified | No | Admin pages exist; custom claim seeding and operator runbook evidence required. |
+| Auth/security | Improved | Partial | Improved | Partial | Partially verified | No | Anonymous sessions removed; claims/rules need live proof. |
+| Admin/operator flows | Partial | Partial | Partial | Partial | Partially verified | No | Admin pages exist; custom claim seeding and operator runbook evidence required. |
 | Mobile | Partial | Partial | N/A | Unverified | Unverified | No | Responsive classes exist; device smoke and visual QA missing. |
-| Accessibility | Improved | Partial | N/A | Improved | Unverified | No | Skip link, focus, disabled states, and reduced-motion CSS added; manual/automated a11y pass still required. |
-| Performance | Unknown | Unknown | N/A | N/A | Unverified | No | Next build and Lighthouse evidence missing. |
-| Tests | Partial | N/A | N/A | N/A | Unverified | No | Scripts and rule tests exist; this branch needs clean-run evidence. |
-| Release/rollback/monitoring | Partial | N/A | Partial | N/A | Missing | No | Release scripts exist; no production deployment, monitoring, rollback, or signoff evidence attached. |
+| Accessibility | Improved | Partial | N/A | Improved | Partially verified | No | Skip link/focus/reduced motion added; manual/automated a11y pass still required. |
+| Performance | Partial | Unknown | N/A | N/A | Partially verified | No | Build passed; Lighthouse/Core Web Vitals evidence missing. |
+| Tests | Improved | N/A | N/A | N/A | Partially verified | No | Most checks passed; preflight needs re-run after cleanup script restoration. |
+| Release/rollback/monitoring | Partial | N/A | Partial | N/A | Missing | No | No production deployment, monitoring, rollback, or signoff evidence attached. |
 
 ## P0 must fix before preview
 
-1. Run clean checkout validation: install, lint, typecheck, unit tests, rules static/emulated tests, smoke routes, audits, build.
+1. Re-run `npm run preflight` on this branch after `scripts/clean-legacy.sh` was restored.
 2. Attach Firebase staging env evidence without secrets.
 3. Prove Auth provider configuration and admin custom claim seed.
-4. Prove Firestore and Storage rules block unauthorized user/admin reads.
+4. Prove Firestore and Storage rules block unauthorized user/admin reads in the target staging environment, not only emulators.
 5. Add preview smoke evidence for export request, export download URL, deletion request, consent update, admin denied, and admin allowed flows.
 6. Confirm the admin deletion UI no longer implies destructive completion once this branch is reviewed; backend completion is already hard-gated.
 
@@ -137,6 +181,8 @@ New behavior:
 3. Attach counsel-approved privacy policy, retention schedule, subprocessors, deletion workflow, and support/privacy contacts.
 4. Add monitoring/error reporting and incident-response routing.
 5. Record rollback SHA/path and owner/legal/security signoffs.
+6. Address or explicitly accept the 5 moderate root npm audit findings.
+7. Resolve the Node engine mismatch and Next workspace-root warning before production release.
 
 ## P2 AAA polish
 
@@ -190,4 +236,4 @@ npm test
 
 ## Release decision
 
-Do not deploy this repo as production from this branch alone. Merge only after clean command evidence is attached, then continue preview hardening. Production remains blocked until legal, Firebase, monitoring, rollback, destructive deletion executor, and smoke evidence are complete.
+Do not deploy this repo as production from this branch alone. Merge only after preflight is re-run successfully on this branch and Firebase staging evidence is attached. Production remains blocked until legal, Firebase, monitoring, rollback, destructive deletion executor, live smoke, npm audit disposition, and signoff evidence are complete.
