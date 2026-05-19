@@ -57,16 +57,27 @@ The release gate covers:
 - emulator-backed Firestore and Storage rules tests
 - security gate
 - production readiness assertions
+- optional live route smoke when `URAI_PRIVACY_BASE_URL` is set
 
 ## Live route smoke command
 
 After hosting deploy, run:
 
 ```bash
-URAI_PRIVACY_BASE_URL="https://<staging-or-production-host>" URAI_PRIVACY_REQUIRE_LIVE=1 node scripts/smoke-live.mjs
+URAI_PRIVACY_BASE_URL="https://staging-host.example" URAI_PRIVACY_REQUIRE_LIVE=1 npm run test:smoke:live
 ```
 
 This validates the public route surface returns rendered app HTML and does not expose secret-looking material.
+
+## Staging evidence command
+
+After staging deploy and live smoke, generate the redacted evidence template:
+
+```bash
+URAI_PRIVACY_REQUIRE_LIVE=1 npm run release:evidence:staging
+```
+
+Before running that command, set the required `URAI_PRIVACY_*` release identity and control-status variables described by `scripts/staging-evidence.mjs`. The script writes `release-evidence/staging/STAGING_DEPLOYMENT_EVIDENCE.md`, records redacted values plus SHA-256 proofs, and rejects secret-bearing `URAI_PRIVACY_*` variable names. Do not commit generated evidence if it includes private project, operator, approval, or hostname metadata.
 
 ## Smoke test plan
 
