@@ -6,6 +6,9 @@ import { db, functions } from "../../firebase/firebase";
 
 export type CallableResult = Record<string, unknown>;
 
+const USER_SCOPED_COLLECTIONS = new Set(["privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "dataAccessEvents"]);
+const ADMIN_COLLECTIONS = new Set(["privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "consentEvents", "auditLogs", "adminActions", "dataAccessEvents", "retentionPolicies", "policyVersions", "users"]);
+
 function requireFunctions() {
   if (!functions) throw new Error("FIREBASE_FUNCTIONS_NOT_CONFIGURED");
   return functions;
@@ -14,6 +17,12 @@ function requireFunctions() {
 function requireDb() {
   if (!db) throw new Error("FIRESTORE_NOT_CONFIGURED");
   return db;
+}
+
+function requireAllowedCollection(collectionName: string, allowed: Set<string>) {
+  if (!allowed.has(collectionName)) {
+    throw new Error(`UNSUPPORTED_PRIVACY_COLLECTION:${collectionName}`);
+  }
 }
 
 export async function callPrivacyFunction<T extends CallableResult = CallableResult>(name: string, payload?: Record<string, unknown>) {
@@ -34,7 +43,12 @@ export function updateConsentPreference(payload: { purpose: string; consentTier:
   return callPrivacyFunction("updateConsent", payload);
 }
 
+export function getExportDownloadUrl(payload: { jobId: string; file?: "export" | "manifest" }) {
+  return callPrivacyFunction("getExportDownloadUrl", payload);
+}
+
 export function subscribeUserCollection(collectionName: string, uid: string, callback: (rows: Array<DocumentData & { id: string }>) => void) {
+  requireAllowedCollection(collectionName, USER_SCOPED_COLLECTIONS);
   const q = query(collection(requireDb(), collectionName), where("uid", "==", uid), limit(50));
   return onSnapshot(q, (snapshot) => callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))));
 }
@@ -45,6 +59,7 @@ export function subscribeUserAuditLogs(uid: string, callback: (rows: Array<Docum
 }
 
 export function subscribeAdminCollection(collectionName: string, callback: (rows: Array<DocumentData & { id: string }>) => void) {
+  requireAllowedCollection(collectionName, ADMIN_COLLECTIONS);
   const q = query(collection(requireDb(), collectionName), limit(100));
   return onSnapshot(q, (snapshot) => callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))));
 }

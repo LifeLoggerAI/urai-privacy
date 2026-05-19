@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import { callPrivacyFunction, subscribeAdminCollection } from "@/lib/firebase-privacy-client";
 
-const statuses = ["approved", "processing", "completed", "rejected", "failed"] as const;
+const statuses = ["approved", "processing", "rejected", "failed"] as const;
 
 type AdminStatus = (typeof statuses)[number];
 
@@ -33,7 +33,7 @@ function AdminRequestsTable() {
     setMessage("");
     try {
       const result = await callPrivacyFunction("processDeletionRequest", { requestId, status });
-      setMessage(`Deletion request updated: ${String(result.requestId ?? requestId)} -> ${String(result.status ?? status)}`);
+      setMessage(`Deletion request updated: ${String(result.requestId ?? requestId)} -> ${String(result.status ?? status)}. Destructive completion remains gated until the production executor is verified.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Deletion status update failed");
     } finally {
@@ -64,16 +64,18 @@ function AdminRequestsTable() {
       </article>
       <article className="card">
         <h3>Deletion requests</h3>
+        <p className="muted">Completion is unavailable here until destructive deletion execution has legal-hold, retry, audit, and release evidence.</p>
         {deletionRequests.length === 0 ? <p className="muted">No deletion requests found.</p> : deletionRequests.map((request) => (
           <div key={String(request.id)} className="panel">
             <strong>{String(request.id)}</strong>
             <p className="muted">{String(request.uid)} · {String(request.status)}</p>
+            {request.destructiveDeletionBlocked ? <p><span className="status warn">destructive deletion gated</span></p> : null}
             {statuses.map((status) => <button className="button" type="button" disabled={busyId !== null} key={status} onClick={() => processDeletion(String(request.id), status)}>{status}</button>)}
           </div>
         ))}
       </article>
       <ExportJobsPanel busyId={busyId} processExport={processExport} />
-      {message ? <article className="card"><h3>Latest admin action</h3><p className="muted">{message}</p></article> : null}
+      {message ? <article className="card"><h3>Latest admin action</h3><p className="muted" aria-live="polite">{message}</p></article> : null}
     </div>
   );
 }

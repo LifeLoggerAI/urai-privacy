@@ -24,15 +24,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <a className="skip-link" href="#main-content">Skip to main content</a>
         <div className="shell">
           <nav className="nav" aria-label="Primary navigation">
-            <a className="brand" href="/">URAI Privacy</a>
+            <a className="brand" href="/" aria-label="URAI Privacy home">URAI Privacy</a>
             <div className="links">
               {nav.map(([label, href]) => <a key={href} href={href}>{label}</a>)}
               <a href="/status.html">Legacy status</a>
             </div>
           </nav>
-          <main>{children}</main>
+          <main id="main-content" tabIndex={-1}>{children}</main>
           <footer className="footer">URAI Privacy · Firebase/Next.js product scaffold · governance package preserved</footer>
         </div>
       </body>
