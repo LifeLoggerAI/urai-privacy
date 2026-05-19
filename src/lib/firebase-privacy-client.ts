@@ -7,7 +7,7 @@ import { db, functions } from "../../firebase/firebase";
 export type CallableResult = Record<string, unknown>;
 
 const USER_SCOPED_COLLECTIONS = new Set(["privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "dataAccessEvents"]);
-const ADMIN_COLLECTIONS = new Set(["privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "consentEvents", "auditLogs", "adminActions", "dataAccessEvents", "retentionPolicies", "policyVersions", "users"]);
+const ADMIN_COLLECTIONS = new Set(["privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "consentEvents", "auditLogs", "adminActions", "dataAccessEvents", "retentionPolicies", "policyVersions", "users", "legalHoldRecords"]);
 
 function requireFunctions() {
   if (!functions) throw new Error("FIREBASE_FUNCTIONS_NOT_CONFIGURED");
@@ -45,6 +45,10 @@ export function updateConsentPreference(payload: { purpose: string; consentTier:
 
 export function getExportDownloadUrl(payload: { jobId: string; file?: "export" | "manifest" }) {
   return callPrivacyFunction("getExportDownloadUrl", payload);
+}
+
+export function executeDeletionRequest(payload: { requestId: string; mode?: "dryRun" | "execute"; expectedPlanHash?: string }) {
+  return callPrivacyFunction("executeDeletionRequest", payload);
 }
 
 export function subscribeUserCollection(collectionName: string, uid: string, callback: (rows: Array<DocumentData & { id: string }>) => void) {

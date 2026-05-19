@@ -54,6 +54,7 @@ beforeEach(async ({ skip }) => {
     await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
     await setDoc(doc(db, "auditLogs/audit-a"), { actorUid: "admin-a", targetUid: "user-a", action: "admin_viewed_request" });
     await setDoc(doc(db, "dataAccessEvents/data-a"), { uid: "user-a", actorUid: "admin-a", outcome: "allowed" });
+    await setDoc(doc(db, "legalHoldRecords/hold-a"), { uid: "user-a", status: "active", reason: "litigation" });
     await setDoc(doc(db, "retentionPolicies/r1"), { collection: "auditLogs", retentionClass: "R5" });
     await setDoc(doc(db, "policyVersions/v1"), { version: "0.1.0-draft", status: "published" });
   });
@@ -105,6 +106,15 @@ describe("Firestore owner/admin privacy rules", () => {
   it("allows only admins to update request status", async () => {
     await assertFails(updateDoc(doc(authed("user-a"), "privacyRequests/preq-a"), { status: "approved" }));
     await assertSucceeds(updateDoc(doc(authed("admin-a", { admin: true }), "privacyRequests/preq-a"), { status: "approved" }));
+  });
+
+  it("protects legal hold records as admin-managed retained evidence", async () => {
+    await assertSucceeds(getDoc(doc(authed("user-a"), "legalHoldRecords/hold-a")));
+    await assertFails(getDoc(doc(authed("user-b"), "legalHoldRecords/hold-a")));
+    await assertSucceeds(setDoc(doc(authed("admin-a", { admin: true }), "legalHoldRecords/hold-b"), { uid: "user-b", status: "active" }));
+    await assertFails(setDoc(doc(authed("user-a"), "legalHoldRecords/hold-user-created"), { uid: "user-a", status: "active" }));
+    await assertSucceeds(updateDoc(doc(authed("admin-a", { admin: true }), "legalHoldRecords/hold-a"), { status: "released" }));
+    await assertFails(deleteDoc(doc(authed("admin-a", { admin: true }), "legalHoldRecords/hold-a")));
   });
 
   it("protects audit logs and consent events as append-only evidence", async () => {

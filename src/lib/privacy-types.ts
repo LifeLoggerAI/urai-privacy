@@ -5,8 +5,14 @@ export type PrivacyRequestStatus = "pending" | "approved" | "processing" | "comp
 export type AuditAction =
   | "export_request_created"
   | "export_processed"
+  | "export_download_url_created"
   | "deletion_request_created"
   | "deletion_processed"
+  | "deletion_execute_dry_run"
+  | "deletion_execute_started"
+  | "deletion_execute_completed"
+  | "deletion_execute_failed"
+  | "deletion_execute_blocked_legal_hold"
   | "consent_updated"
   | "admin_viewed_request"
   | "admin_changed_request_status"
@@ -19,6 +25,7 @@ export interface PrivacyUser {
   createdAt: string;
   markedForDeletion?: boolean;
   deletionMarkedAt?: string;
+  legalHold?: boolean;
 }
 
 export interface PrivacyRequest {
@@ -39,8 +46,19 @@ export interface ExportJob {
   createdAt: string;
   updatedAt: string;
   exportManifestPath?: string;
+  exportPackagePath?: string;
   recordCount?: number;
   error?: string;
+}
+
+export interface DeletionPlan {
+  uid: string;
+  counts: Record<string, number>;
+  retainedData: string[];
+  generatedAt: string;
+  mode: "safe-plan";
+  legalHold: boolean;
+  deletableCollections: string[];
 }
 
 export interface DeletionRequest {
@@ -53,6 +71,14 @@ export interface DeletionRequest {
   retainedData: string[];
   deletedData: string[];
   reason?: string;
+  deletionPlan?: DeletionPlan;
+  planHash?: string;
+  deletedCounts?: Record<string, number>;
+  destructiveDeletionReady?: boolean;
+  destructiveDeletionBlocked?: boolean;
+  destructiveDeletionReason?: string | null;
+  destructiveDeletionDryRunAt?: string;
+  destructiveDeletionCompletedAt?: string;
 }
 
 export interface ConsentRecord {
@@ -136,7 +162,8 @@ export const FIRESTORE_COLLECTIONS = [
   "auditLogs",
   "adminActions",
   "dataAccessEvents",
-  "policyVersions"
+  "policyVersions",
+  "legalHoldRecords"
 ] as const;
 
 export type FirestoreCollection = (typeof FIRESTORE_COLLECTIONS)[number];
