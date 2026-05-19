@@ -6,7 +6,7 @@ Repo: `LifeLoggerAI/urai-privacy`
 ## Launch verdict
 
 - LAUNCH VERDICT: NO
-- CONFIDENCE: 68 percent repo-side confidence, pending clean checkout verification and Firebase environment evidence
+- CONFIDENCE: 70 percent repo-side confidence, pending clean checkout verification and Firebase environment evidence
 - MOST IMPORTANT BLOCKER: Production identity, admin authorization, legal approval, live Firebase evidence, and destructive deletion execution are not fully proven.
 
 This audit does not mark the repo production-ready. The repository still identifies itself as a staging scaffold / operational draft governance package, and the runtime must prove clean install, lint, typecheck, tests, rules, build, Firebase deploy, legal review, admin custom claims, monitoring, rollback, and live smoke before production launch.
@@ -26,6 +26,28 @@ New behavior:
 - Loading, signed-out, forbidden, and error states are explicit.
 - Forbidden and error states include accessible alert semantics.
 
+### Constrained client Firestore subscriptions
+
+`src/lib/firebase-privacy-client.ts` now rejects unsupported user/admin collection names before constructing Firestore queries.
+
+New behavior:
+
+- User-scoped subscriptions are limited to supported user privacy collections.
+- Admin subscriptions are limited to known privacy/admin collections.
+- Misuse fails loudly with `UNSUPPORTED_PRIVACY_COLLECTION:<name>`.
+- Firestore rules remain the source of truth; this is a client-side guardrail, not a substitute for rules.
+
+### Improved global accessibility styles
+
+`app/globals.css` now includes:
+
+- visible `:focus-visible` outlines,
+- styling for a keyboard skip link,
+- disabled button affordance,
+- reduced-motion protections for users who request reduced motion.
+
+Note: the matching root-layout skip-link markup patch was blocked by the GitHub connector safety layer during this audit session. The CSS is ready, but `app/layout.tsx` still needs the skip-link anchor and `main` target in a follow-up commit.
+
 ## Evidence reviewed
 
 - `package.json` identifies the app as `0.2.0-staging-scaffold` and has a broad preflight command path.
@@ -35,6 +57,8 @@ New behavior:
 - `functions/src/index.ts` deletion processing creates a deletion plan and marks the user for deletion; it does not perform final destructive deletion.
 - `app/privacy-center/export/page.tsx`, `delete/page.tsx`, and `consent/page.tsx` provide live authenticated user-facing workflow surfaces.
 - `app/admin/privacy-requests/page.tsx` provides operator workflow surfaces, but production use depends on Firebase admin claims and rules evidence.
+- `firestore.rules` defines owner/admin read boundaries and append-only audit-style collections.
+- `tests/rules/firestore.rules.test.ts` has emulator-backed rule tests, but they still need clean-run evidence from a local or CI environment.
 
 ## Production-readiness matrix
 
@@ -51,9 +75,9 @@ New behavior:
 | Auth/security | Improved | Partial | Partial | Partial | Unverified | No | This branch removes anonymous privacy sessions and public email admin proof, but rules/claims must be verified. |
 | Admin/operator flows | Partial | Partial | Partial | Partial | Unverified | No | Admin pages exist; custom claim seeding and operator runbook evidence required. |
 | Mobile | Partial | Partial | N/A | Unverified | Unverified | No | Responsive classes exist; device smoke and visual QA missing. |
-| Accessibility | Partial | Partial | N/A | Partial | Unverified | No | Some labels/alerts exist; automated and manual a11y pass required. |
+| Accessibility | Improved | Partial | N/A | Partial | Unverified | No | Focus/reduced-motion CSS improved; root skip-link markup still needs to land. |
 | Performance | Unknown | Unknown | N/A | N/A | Unverified | No | Next build and Lighthouse evidence missing. |
-| Tests | Partial | N/A | N/A | N/A | Unverified | No | Scripts exist; this branch needs clean-run evidence. |
+| Tests | Partial | N/A | N/A | N/A | Unverified | No | Scripts and rule tests exist; this branch needs clean-run evidence. |
 | Release/rollback/monitoring | Partial | N/A | Partial | N/A | Missing | No | Release scripts exist; no production deployment, monitoring, rollback, or signoff evidence attached. |
 
 ## P0 must fix before preview
@@ -63,6 +87,7 @@ New behavior:
 3. Prove Auth provider configuration and admin custom claim seed.
 4. Prove Firestore and Storage rules block unauthorized user/admin reads.
 5. Add preview smoke evidence for export, deletion request, consent update, admin denied, and admin allowed flows.
+6. Add skip-link markup in `app/layout.tsx` to pair with the new `.skip-link` styles.
 
 ## P1 must fix before production
 
