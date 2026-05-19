@@ -1,0 +1,233 @@
+{
+  "schemaVersion": "2026-05-17.system-of-systems.v1",
+  "controlPlane": {
+    "repo": "LifeLoggerAI/urai-privacy",
+    "branch": "harden-release-verification",
+    "purpose": "Binding privacy control-plane contract for URAI product, admin, analytics, communications, media, spatial, foundation, B2B, and asset-generation systems.",
+    "canonicalCollections": [
+      "privacyRequests",
+      "exportJobs",
+      "deletionRequests",
+      "consentRecords",
+      "consentEvents",
+      "auditLogs",
+      "adminActions",
+      "privacyEvidence"
+    ],
+    "canonicalCallables": [
+      "createExportRequest",
+      "processExportRequest",
+      "createDeletionRequest",
+      "processDeletionRequest",
+      "updateConsent",
+      "recordAdminAction",
+      "getPrivacyHealthReport"
+    ],
+    "canonicalStoragePrefixes": [
+      "exports/{uid}/",
+      "evidence/{uid}/"
+    ]
+  },
+  "requiredControls": [
+    "consent",
+    "export",
+    "deletion",
+    "retention",
+    "audit",
+    "adminAccess",
+    "dataMinimization",
+    "incidentResponse"
+  ],
+  "systems": [
+    {
+      "id": "urai-core",
+      "repo": "LifeLoggerAI/UrAi",
+      "tier": "tier-one",
+      "role": "core user experience and primary user data collection surface",
+      "dataDomains": ["account", "profile", "activity", "preferences", "content interaction"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must read consentRecords before optional personalization, analytics, messaging, or data-sharing behavior",
+        "export": "must contribute user-owned account, profile, activity, and preference data to export manifests",
+        "deletion": "must register user-owned account/profile/activity deletion targets and retention exceptions",
+        "retention": "must respect active retention policy records and produce retention evidence",
+        "audit": "must write privacy-relevant user/admin access events to auditLogs or privacyEvidence",
+        "adminAccess": "must rely on custom claims or verified admin role documents, never client-only admin UI checks",
+        "dataMinimization": "must avoid storing optional personalization data when consent is absent",
+        "incidentResponse": "must surface privacy-impacting incidents to the shared evidence log"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "urai-production-app",
+      "repo": "LifeLoggerAI/UrAiProd",
+      "tier": "tier-one",
+      "role": "production user-facing deployment and live app runtime",
+      "dataDomains": ["account", "runtime events", "session metadata", "privacy center access"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must gate live runtime tracking and optional personalization on consentRecords",
+        "export": "must expose live production user data to export job assembly",
+        "deletion": "must honor deletionRequests with auditable destructive/non-destructive modes",
+        "retention": "must enforce production retention policy and record exceptions",
+        "audit": "must write live privacy events to auditLogs",
+        "adminAccess": "must require verified admin authority for production privacy/admin actions",
+        "dataMinimization": "must not emit optional telemetry without consent",
+        "incidentResponse": "must record production privacy incidents and rollback evidence"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "urai-admin",
+      "repo": "LifeLoggerAI/urai-admin",
+      "tier": "tier-one",
+      "role": "admin operations, privacy request queues, and privileged access workflows",
+      "dataDomains": ["admin actions", "privacy requests", "audit evidence", "support notes"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must not override user consent without auditable legal/admin basis",
+        "export": "must expose request status and export job review without leaking private export objects",
+        "deletion": "must require explicit admin authorization and notes for destructive operations",
+        "retention": "must display retention exceptions and legal hold state",
+        "audit": "must write adminActions and auditLogs for every sensitive operation",
+        "adminAccess": "must enforce verified admin custom claims/role documents server-side",
+        "dataMinimization": "must avoid unnecessary replication of sensitive user data into admin views",
+        "incidentResponse": "must record incident owner, timeline, and corrective actions"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "urai-analytics",
+      "repo": "LifeLoggerAI/urai-analytics",
+      "tier": "tier-one",
+      "role": "analytics aggregation, reporting, and measurement",
+      "dataDomains": ["events", "aggregates", "segments", "attribution"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must filter analytics ingestion and segmentation by consentRecords",
+        "export": "must contribute user-level analytics events when retained and permitted",
+        "deletion": "must delete or anonymize user-level analytics records on deletionRequests",
+        "retention": "must enforce aggregate/user-level retention boundaries",
+        "audit": "must record analytics access, export, deletion, and anonymization evidence",
+        "adminAccess": "must restrict segment/user drilldown to verified roles",
+        "dataMinimization": "must prefer aggregates and anonymized records over raw user events",
+        "incidentResponse": "must record analytics data exposure or re-identification risks"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "urai-communications",
+      "repo": "LifeLoggerAI/urai-communications",
+      "tier": "tier-one",
+      "role": "notification, email, SMS, and outbound communication workflows",
+      "dataDomains": ["email", "phone", "notification preferences", "message logs"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must gate marketing, notification, SMS, and email categories on consentRecords",
+        "export": "must include retained communication preferences and message logs in exports",
+        "deletion": "must delete or suppress user communication records according to deletionRequests",
+        "retention": "must retain only required transactional evidence and documented exceptions",
+        "audit": "must record consent changes, message category changes, and suppression actions",
+        "adminAccess": "must restrict manual outreach and override actions to verified admins",
+        "dataMinimization": "must avoid unnecessary copies of email/phone/contact metadata",
+        "incidentResponse": "must log mis-send, suppression failure, or contact-data incident evidence"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "urai-studio",
+      "repo": "LifeLoggerAI/urai-studio",
+      "tier": "tier-one",
+      "role": "creative studio, media/story asset workflows, and user-generated content surfaces",
+      "dataDomains": ["media", "story metadata", "creator profile", "generated content"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must gate reuse/training/sharing of media and story assets on consentRecords",
+        "export": "must contribute user-owned media/story metadata and retained generated assets",
+        "deletion": "must delete or de-reference user-owned media/story assets when authorized",
+        "retention": "must document retention exceptions for published, licensed, or legally retained assets",
+        "audit": "must record generation, publication, export, deletion, and admin access evidence",
+        "adminAccess": "must restrict moderation and asset recovery to verified roles",
+        "dataMinimization": "must avoid embedding unnecessary personal data in generated metadata",
+        "incidentResponse": "must record media leakage, rights conflict, or deletion failure evidence"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "urai-spatial",
+      "repo": "LifeLoggerAI/urai-spatial",
+      "tier": "tier-one",
+      "role": "spatial, AR/VR, location-adjacent, and immersive environment workflows",
+      "dataDomains": ["spatial interactions", "device capability", "scene state", "location-adjacent metadata"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must gate spatial telemetry, personalization, and location-adjacent capture on consentRecords",
+        "export": "must contribute retained user spatial session data and preferences",
+        "deletion": "must delete or anonymize user spatial traces and scene-linked user records",
+        "retention": "must enforce shorter retention for sensitive spatial/location-adjacent data",
+        "audit": "must record spatial data access, export, deletion, and admin actions",
+        "adminAccess": "must restrict scene/user inspection to verified roles",
+        "dataMinimization": "must store derived/minimized spatial data whenever possible",
+        "incidentResponse": "must record exposure of spatial/location-adjacent signals"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "urai-foundation",
+      "repo": "LifeLoggerAI/urai-foundation",
+      "tier": "tier-one",
+      "role": "research, public-good, governance, and foundation programs",
+      "dataDomains": ["research participation", "public-good programs", "governance evidence", "reports"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must separate research/public-good consent from product consent",
+        "export": "must include user-linked research participation records when retained",
+        "deletion": "must honor deletion or de-identification requests subject to approved exceptions",
+        "retention": "must document research/legal retention exceptions and approvals",
+        "audit": "must record governance, research data access, export, and deletion evidence",
+        "adminAccess": "must restrict research/admin records to verified authorized roles",
+        "dataMinimization": "must prefer de-identified or aggregate research records",
+        "incidentResponse": "must record research or governance privacy incidents"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "b2b-portal",
+      "repo": "LifeLoggerAI/B2Bportal",
+      "tier": "tier-one",
+      "role": "tenant, business customer, and organization-facing workflows",
+      "dataDomains": ["tenant profile", "business users", "organization records", "support evidence"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must distinguish individual user privacy choices from tenant/business processing basis",
+        "export": "must support user and tenant-scoped export evidence without cross-tenant leakage",
+        "deletion": "must enforce user deletion and tenant retention/legal exceptions",
+        "retention": "must document tenant contractual retention and legal hold rules",
+        "audit": "must record tenant admin access, privacy request handling, and cross-tenant boundaries",
+        "adminAccess": "must enforce tenant admin and URAI admin roles server-side",
+        "dataMinimization": "must avoid duplicating personal data across tenant/support systems",
+        "incidentResponse": "must record tenant-impacting privacy/security incidents"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    },
+    {
+      "id": "asset-factory",
+      "repo": "LifeLoggerAI/asset-factory",
+      "tier": "tier-one",
+      "role": "generated asset pipeline and asset production workflows",
+      "dataDomains": ["prompts", "generated assets", "asset metadata", "creator attribution"],
+      "integrationStatus": "control-plane-contract-mapped",
+      "requiredAdoption": {
+        "consent": "must gate use of user-linked prompts/assets for reuse, training, sharing, or promotion",
+        "export": "must contribute retained user-linked prompts, generated assets, and metadata",
+        "deletion": "must delete or de-reference user-linked generated assets when authorized",
+        "retention": "must document licensed/published asset retention exceptions",
+        "audit": "must record generation, publication, export, deletion, and admin access events",
+        "adminAccess": "must restrict asset recovery/moderation to verified roles",
+        "dataMinimization": "must strip unnecessary personal data from prompts and asset metadata",
+        "incidentResponse": "must record prompt leakage, asset rights conflict, or deletion failure evidence"
+      },
+      "releaseEvidence": ["registry entry", "docs/LOCK.md cross-repo adoption table", "audit:privacy gate"]
+    }
+  ]
+}

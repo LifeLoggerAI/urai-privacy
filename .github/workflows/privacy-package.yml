@@ -16,10 +16,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Install validator dependencies
         run: pip install -r requirements.txt
-      - name: Run full validation suite
-        run: python tools/run_validation.py
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Scan for committed secrets
+        run: python tools/check_secrets.py
+      - name: Validate website
+        run: python tools/check_website.py
+      - name: Validate privacy package
+        run: python tools/validate_privacy_package.py

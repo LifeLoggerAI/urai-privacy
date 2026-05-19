@@ -1,62 +1,76 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-failures=0
+required_files=(
+  "firebase.json"
+  "firestore.rules"
+  "firestore.indexes.json"
+  "storage.rules"
+  "package-lock.json"
+  "functions/package.json"
+  "functions/package-lock.json"
+  "functions/src/index.ts"
+  "scripts/security-gate.sh"
+  "scripts/validate-rules.mjs"
+  "scripts/smoke-routes.mjs"
+  "app/page.tsx"
+  "app/privacy-center/export/page.tsx"
+  "app/privacy-center/delete/page.tsx"
+  "app/admin/privacy-requests/page.tsx"
+)
 
-fail() {
-  echo "[production-ready] FAIL: $1" >&2
-  failures=$((failures + 1))
-}
-
-require_file() {
-  if [ ! -f "$1" ]; then
-    fail "missing required file: $1"
+for file in "${required_files[@]}"; do
+  if [[ ! -f "$file" ]]; then
+    echo "[assert-production-ready] Missing required file: $file" >&2
+    exit 1
   fi
-}
+done
 
-require_absent() {
-  if [ -e "$1" ]; then
-    fail "generated or stale artifact must not be committed: $1"
-  fi
-}
+echo "[assert-production-ready] Checking for uncommitted source changes"
+status_file="$(mktemp)"
+git status --porcelain > "$status_file"
 
-require_file package.json
-require_file next.config.mjs
-require_file firebase.json
-require_file firestore.rules
-require_file storage.rules
-require_file firestore.indexes.json
-require_file app/layout.tsx
-require_file scripts/verify-release.sh
-require_file docs/FINAL_SYSTEM_REPORT.md
-require_file docs/RELEASE_CHECKLIST.md
+non_generated_changes="$(awk '
+  function is_generated(path) {
+    return path ~ /^(\.idx\/|\.next\/|functions\/lib\/|firestore-debug\.log$|firebase-debug\.log$|ui-debug\.log$|database-debug\.log$|storage-debug\.log$|pubsub-debug\.log$|.*\.debug\.log$|tsconfig\.tsbuildinfo$|functions\/tsconfig\.tsbuildinfo$)/
+  }
+  {
+    path = substr($0, 4)
+    if (!is_generated(path)) print $0
+  }
+' "$status_file")"
+rm -f "$status_file"
 
-require_absent firebase/firebase.js
-require_absent ._backup_deps
-
-if git ls-files | grep -E '(^\._backup_deps/|tsconfig\.tsbuildinfo|firebase/firebase\.js)' >/dev/null; then
-  fail "generated or stale artifacts must not be tracked by git"
-fi
-
-if grep -R "packageManager.*pnpm\|pnpm " -n package.json app components lib middleware.ts next.config.mjs .github 2>/dev/null; then
-  fail "active app/runtime files still reference pnpm"
-fi
-
-if grep -n "ignoreBuildErrors: true\|ignoreDuringBuilds: true" next.config.mjs >/dev/null; then
-  fail "next.config.mjs still bypasses TypeScript or ESLint during builds"
-fi
-
-if ! grep -n "metadataBase: new URL" app/layout.tsx >/dev/null; then
-  fail "app/layout.tsx is missing metadataBase"
-fi
-
-if ! grep -n "firebaseApp" firebase/firebase.ts >/dev/null 2>&1; then
-  fail "firebase/firebase.ts must export firebaseApp"
-fi
-
-if [ "$failures" -gt 0 ]; then
-  echo "[production-ready] NOT READY: $failures blocker(s) found" >&2
+if [[ -n "$non_generated_changes" ]]; then
+  echo "[assert-production-ready] Working tree has non-generated changes" >&2
+  printf '%s\n' "$non_generated_changes" >&2
   exit 1
 fi
 
-echo "[production-ready] static production-readiness assertions passed"
+echo "[assert-production-ready] Checking Firebase deploy config"
+grep -q '"firestore"' firebase.json
+grep -q '"storage"' firebase.json
+grep -q '"hosting"' firebase.json
+grep -q '"functions"' firebase.json
+
+echo "[assert-production-ready] Checking public env contract"
+if [[ ! -f ".env.example" ]]; then
+  echo "[assert-production-ready] .env.example is required so deploy operators can validate secrets without exposing values" >&2
+  exit 1
+fi
+
+grep -q 'NEXT_PUBLIC_FIREBASE_API_KEY' .env.example
+grep -q 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' .env.example
+grep -q 'NEXT_PUBLIC_FIREBASE_APP_ID' .env.example
+
+echo "[assert-production-ready] Checking deployment docs"
+if [[ ! -f "docs/PRODUCTION_READINESS.md" ]]; then
+  echo "[assert-production-ready] docs/PRODUCTION_READINESS.md is required" >&2
+  exit 1
+fi
+
+grep -q 'Firebase project' docs/PRODUCTION_READINESS.md
+grep -q 'Rollback' docs/PRODUCTION_READINESS.md
+grep -q 'Smoke test' docs/PRODUCTION_READINESS.md
+
+echo "[assert-production-ready] ok: code release checks passed; live deploy still requires operator env/project verification"

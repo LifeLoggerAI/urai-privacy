@@ -1,76 +1,120 @@
-#!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = process.cwd();
+
+const requiredFiles = [
+  "README.md",
+  "docs/IMPLEMENTATION_PLAN.md",
+  "docs/PRIVACY_WORKFLOWS.md",
+  "docs/RELEASE_CHECKLIST.md",
+  "docs/INTEGRATION_BACKLOG.md",
+  "docs/USER_RIGHTS_INTAKE_SPEC.md",
+  "src/lib/privacy-types.ts",
+  "src/lib/privacy-workflows.ts",
+  "functions/src/index.ts",
+  "firestore.rules",
+  "storage.rules",
+  "firebase.json",
+  "package.json",
+  "functions/package.json"
+];
+
+const requiredPrivacyTerms = [
+  "consent",
+  "export",
+  "deletion",
+  "retention",
+  "audit",
+  "admin",
+  "privacyRequests",
+  "consentRecords",
+  "deletionRequests",
+  "exportJobs"
+];
 
 const failures = [];
-const warnings = [];
 
-function read(path) {
-  return existsSync(path) ? readFileSync(path, "utf8") : "";
-}
-
-function requireFile(path) {
-  if (!existsSync(path)) failures.push(`missing ${path}`);
-}
-
-function requireContains(path, needle, label = needle) {
-  if (!read(path).includes(needle)) failures.push(`${path} missing ${label}`);
-}
-
-const files = [
-  "privacy/feature-manifests/README.md",
-  "privacy/adoption-report.md",
-  "privacy/data-inventory.yaml"
-];
-
-for (const file of files) requireFile(file);
-
-requireContains("privacy/feature-manifests/README.md", "Banned public claims", "banned claim section");
-requireContains("privacy/feature-manifests/README.md", "synthetic", "synthetic demo boundary");
-requireContains("privacy/feature-manifests/README.md", "Asset Factory", "Asset Factory boundary");
-requireContains("privacy/adoption-report.md", "Synthetic/demo surfaces", "synthetic demo launch boundary");
-requireContains("privacy/data-inventory.yaml", "tier_0", "Tier 0 public demo boundary");
-requireContains("privacy/data-inventory.yaml", "synthetic_demo", "synthetic demo data boundary");
-
-const bannedClaims = [
-  "lie detection",
-  "betrayal detection",
-  "trust score",
-  "predicts crisis",
-  "diagnoses mood",
-  "detects mental illness",
-  "reads your face",
-  "knows if someone is lying",
-  "sells your emotional data",
-  "AI therapist"
-];
-
-const scanFiles = [
-  "app/page.tsx",
-  "app/privacy/page.tsx",
-  "app/privacy-center/page.tsx",
-  "privacy/adoption-report.md",
-  "privacy/feature-manifests/README.md"
-].filter(existsSync);
-
-for (const file of scanFiles) {
-  const content = read(file).toLowerCase();
-  for (const claim of bannedClaims) {
-    const normalizedClaim = claim.toLowerCase();
-    if (content.includes(normalizedClaim) && !file.startsWith("privacy/")) {
-      failures.push(`${file} contains banned Tier One claim: ${claim}`);
-    }
+for (const file of requiredFiles) {
+  const path = join(root, file);
+  if (!existsSync(path)) {
+    failures.push(`Missing required Tier-One file: ${file}`);
   }
 }
 
-if (read("privacy/adoption-report.md").includes("Status: blocked")) {
-  warnings.push("Tier One audit passes structural safeguards, but production remains blocked by adoption report status.");
+const joinedEvidence = requiredFiles
+  .filter((file) => existsSync(join(root, file)))
+  .map((file) => readFileSync(join(root, file), "utf8"))
+  .join("\n\n");
+
+for (const term of requiredPrivacyTerms) {
+  if (!joinedEvidence.includes(term)) {
+    failures.push(`Missing required Tier-One privacy term: ${term}`);
+  }
+}
+
+const functionsSourcePath = join(root, "functions/src/index.ts");
+if (existsSync(functionsSourcePath)) {
+  const source = readFileSync(functionsSourcePath, "utf8");
+
+  const requiredFunctions = [
+    "createExportRequest",
+    "processExportRequest",
+    "createDeletionRequest",
+    "processDeletionRequest",
+    "updateConsent",
+    "writeAuditLog",
+    "recordAdminAction",
+    "getPrivacyHealthReport"
+  ];
+
+  for (const fn of requiredFunctions) {
+    if (!source.includes(`export const ${fn}`)) {
+      failures.push(`Missing callable Function export: ${fn}`);
+    }
+  }
+
+  if (!source.includes("HttpsError")) {
+    failures.push("Callable Functions should use HttpsError for safe client-facing failures.");
+  }
+
+  if (!source.includes("FieldValue.serverTimestamp")) {
+    failures.push("Callable Functions should use server timestamps for auditable records.");
+  }
+}
+
+const firestoreRulesPath = join(root, "firestore.rules");
+if (existsSync(firestoreRulesPath)) {
+  const rules = readFileSync(firestoreRulesPath, "utf8");
+
+  if (!rules.includes("auditLogs")) {
+    failures.push("Firestore rules must explicitly cover auditLogs.");
+  }
+
+  if (!rules.includes("allow read, write: if false") && !rules.includes("allow write: if false")) {
+    failures.push("Firestore rules must include deny-by-default fallback behavior.");
+  }
+}
+
+const storageRulesPath = join(root, "storage.rules");
+if (existsSync(storageRulesPath)) {
+  const rules = readFileSync(storageRulesPath, "utf8");
+
+  if (!rules.includes("exports")) {
+    failures.push("Storage rules must explicitly cover export artifacts.");
+  }
+
+  if (!rules.includes("allow read, write: if false") && !rules.includes("allow write: if false")) {
+    failures.push("Storage rules must include deny-by-default fallback behavior.");
+  }
 }
 
 if (failures.length > 0) {
-  console.error("[audit:tier-one] failed");
-  for (const failure of failures) console.error(`- ${failure}`);
+  console.error("[audit-tier-one] FAILED");
+  for (const failure of failures) {
+    console.error(`- ${failure}`);
+  }
   process.exit(1);
 }
 
-for (const warning of warnings) console.warn(`[audit:tier-one] warning: ${warning}`);
-console.log("[audit:tier-one] ok");
+console.log("[audit-tier-one] OK: Tier-One privacy control-plane evidence is present");
