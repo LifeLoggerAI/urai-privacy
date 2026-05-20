@@ -2,6 +2,12 @@
 
 This document is the release operator checklist for `LifeLoggerAI/urai-privacy`.
 
+## Completion lock
+
+The binding system-of-systems completion criteria live in [`FINAL_SYSTEM_OF_SYSTEMS_COMPLETION_LOCK.md`](./FINAL_SYSTEM_OF_SYSTEMS_COMPLETION_LOCK.md).
+
+Do not mark this repo production-approved until that lock is satisfied.
+
 ## Firebase project
 
 The code release gate verifies Firebase configuration files are present and internally consistent:
@@ -59,6 +65,20 @@ The release gate covers:
 - production readiness assertions
 - optional live route smoke when `URAI_PRIVACY_BASE_URL` is set
 
+## One-shot final command
+
+Use this from a clean local clone when you want the final all-in release proof:
+
+```bash
+npm ci && npm ci --prefix functions && npm run preflight && npm run test:emulators && npm run verify:release
+```
+
+If that passes, deploy staging and then run:
+
+```bash
+URAI_PRIVACY_BASE_URL="https://<deployed-host>" URAI_PRIVACY_REQUIRE_LIVE=1 npm run test:smoke:live
+```
+
 ## Live route smoke command
 
 After hosting deploy, run:
@@ -108,6 +128,19 @@ Before destructive deletion is enabled in production, verify in staging:
 8. Confirm deleted collections are cleared for the user: `users`, `privacyRequests`, `exportJobs`, `consentRecords`, `dataAccessEvents`.
 9. Confirm audit events exist for dry-run, start, completion, failure, and legal-hold blocked cases.
 
+## Cross-repo adoption smoke plan
+
+Before any Tier-One URAI repo is treated as integrated, verify the dependent repo has:
+
+1. copied or imported the adoption CI workflow from `adoption/ci/privacy-adoption-workflow.yml`;
+2. a `privacy/PRIVACY_VERSION.md` or equivalent adoption marker;
+3. a current data inventory;
+4. feature privacy manifests for new user-linked collection, inference, export, deletion, sharing, monetization, or admin behavior;
+5. CI evidence that the adoption validator passes;
+6. runtime behavior that fails closed when consent is absent or revoked;
+7. export/delete contribution evidence where the repo stores user-linked data;
+8. public-copy scan evidence showing banned claims are absent.
+
 ## Security validation
 
 Required before production:
@@ -142,3 +175,6 @@ This repository-level gate can verify code readiness, but it does not prove live
 - staging smoke test evidence
 - rollback target
 - production deploy authorization
+- legal/counsel approval
+- privacy reviewer signoff
+- Tier-One adoption evidence for dependent repos
