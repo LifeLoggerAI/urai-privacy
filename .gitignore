@@ -33,6 +33,7 @@ out/
 dist/
 build/
 .cache/
+.firebase/
 functions/lib/
 coverage/
 
