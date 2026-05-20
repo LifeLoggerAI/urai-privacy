@@ -2,10 +2,12 @@
 
 Use this file as the deploy-time release evidence ledger. Do not paste secrets.
 
+This ledger is bound to [`FINAL_SYSTEM_OF_SYSTEMS_COMPLETION_LOCK.md`](./FINAL_SYSTEM_OF_SYSTEMS_COMPLETION_LOCK.md). A release cannot be marked `Ship` unless the completion lock, local verification, live smoke evidence, legal/privacy approval, and Tier-One adoption evidence are complete.
+
 ## Code verification
 
 - Release SHA:
-- Verification command: `npm run verify:release`
+- Verification command: `npm ci && npm ci --prefix functions && npm run preflight && npm run test:emulators && npm run verify:release`
 - Verification result:
 - Verification operator:
 - Verification timestamp:
@@ -58,6 +60,23 @@ Evidence:
 - Anonymous access denied: yes/no
 - Cross-user data access denied: yes/no
 
+## Tier-One system-of-systems adoption evidence
+
+For each Tier-One repo in `privacy/system-of-systems/registry.json`, record the adoption proof before production approval.
+
+| Repo | Adoption CI present | Data inventory current | Manifests current | Export/delete contribution tested | Consent enforcement tested | Banned-copy scan passed | Evidence link / SHA |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `LifeLoggerAI/UrAi` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/UrAiProd` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/urai-admin` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/urai-analytics` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/urai-communications` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/urai-studio` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/urai-spatial` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/urai-foundation` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/B2Bportal` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+| `LifeLoggerAI/asset-factory` | yes/no | yes/no | yes/no | yes/no | yes/no | yes/no | |
+
 ## Legal and privacy approvals
 
 - Privacy policy approved: yes/no
@@ -66,20 +85,26 @@ Evidence:
 - Deletion scope approved: yes/no
 - Legal-hold behavior approved: yes/no
 - Support/privacy contact approved: yes/no
-- Approver:
+- Public banned-claim scan approved: yes/no
+- Privacy reviewer:
+- Legal/counsel approver:
 - Approval timestamp:
 
 ## Monitoring and rollback
 
 - Error monitoring configured: yes/no
 - Incident route configured: yes/no
+- Incident owner:
 - Rollback SHA:
 - Rollback command/path:
 - Rollback smoke plan confirmed: yes/no
 
 ## Final release decision
 
+- Completion lock satisfied: yes/no
 - Ship / No ship:
 - Release owner:
 - Timestamp:
 - Notes:
+
+If any row above remains `no` or blank for a production dependency, the final release decision must be `No ship` unless the release owner documents a narrow, time-bound exception approved by privacy and legal reviewers.
