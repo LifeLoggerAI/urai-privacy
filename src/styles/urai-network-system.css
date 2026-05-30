@@ -1,0 +1,46 @@
+/* URAI shared foundation. Canonical source: LifeLoggerAI/urai-labs-llc */
+:root {
+  color-scheme: dark;
+  --urai-void: #050509;
+  --urai-midnight: #101326;
+  --urai-violet: #2a174a;
+  --urai-gold: #f6c95c;
+  --urai-soft-gold: #d8b35f;
+  --urai-moon: #f4f0e8;
+  --urai-mist: #afa8b8;
+  --urai-cyan: #7de8ff;
+  --urai-error: #ff6b8a;
+  --urai-success: #8cffce;
+  --urai-glass: rgba(255, 255, 255, 0.07);
+  --urai-glass-border: rgba(246, 201, 92, 0.24);
+  --urai-radius-lg: 28px;
+  --urai-radius-full: 999px;
+  --urai-max-width: 1180px;
+  --urai-page-pad: clamp(1rem, 4vw, 2.5rem);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--urai-void); color: var(--urai-moon); font-family: Inter, system-ui, sans-serif; }
+body { min-height: 100vh; background: radial-gradient(circle at top, rgba(246,201,92,.16), transparent 34rem), linear-gradient(180deg, #050509, #080813 48%, #050509); }
+.urai-page-shell { min-height: 100vh; overflow-x: hidden; }
+.urai-section, .urai-hero, .urai-footer { width: min(100% - calc(var(--urai-page-pad) * 2), var(--urai-max-width)); margin: 0 auto; }
+.urai-section { padding: 4rem 0; }
+.urai-hero { padding: clamp(5rem, 12vh, 9rem) 0 4rem; display: grid; gap: 2rem; align-items: center; }
+.urai-hero--split { grid-template-columns: 1fr; }
+.urai-eyebrow { color: var(--urai-soft-gold); font-size: .875rem; letter-spacing: .14em; text-transform: uppercase; }
+.urai-hero-title { margin: 0; font-size: clamp(2.5rem, 7vw, 5.7rem); line-height: 1.05; letter-spacing: -.05em; }
+.urai-hero-copy, .urai-body-copy { max-width: 66ch; color: var(--urai-mist); font-size: 1.125rem; line-height: 1.65; }
+.urai-glass-card { border: 1px solid var(--urai-glass-border); border-radius: var(--urai-radius-lg); background: var(--urai-glass); box-shadow: 0 20px 80px rgba(0,0,0,.34); padding: clamp(1rem, 3vw, 2rem); }
+.urai-button-row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.urai-button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border-radius: var(--urai-radius-full); border: 1px solid transparent; padding: .8rem 1.2rem; font-weight: 700; text-decoration: none; }
+.urai-button:focus-visible, .urai-focus:focus-visible { outline: 3px solid rgba(246,201,92,.78); outline-offset: 4px; }
+.urai-button--primary { background: linear-gradient(135deg, var(--urai-gold), #ffe39a); color: #171006; }
+.urai-button--secondary { border-color: var(--urai-glass-border); background: rgba(255,255,255,.04); color: var(--urai-moon); }
+.urai-chip { display: inline-flex; border: 1px solid var(--urai-glass-border); border-radius: var(--urai-radius-full); padding: .35rem .7rem; color: var(--urai-soft-gold); background: rgba(255,255,255,.04); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+.urai-form-field { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.urai-label { color: var(--urai-moon); font-size: .875rem; font-weight: 700; }
+.urai-input, .urai-textarea, .urai-select { width: 100%; min-height: 44px; border: 1px solid var(--urai-glass-border); border-radius: .75rem; background: rgba(255,255,255,.06); color: var(--urai-moon); padding: .8rem .95rem; font: inherit; }
+.urai-form-note { color: var(--urai-mist); font-size: .875rem; line-height: 1.55; }
+.urai-footer { padding: 3rem 0; color: var(--urai-mist); border-top: 1px solid var(--urai-glass-border); }
+.urai-footer a { color: var(--urai-moon); }
+@media (min-width: 860px) { .urai-hero--split { grid-template-columns: minmax(0, 1.1fr) minmax(16rem, .9fr); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
