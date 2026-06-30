@@ -6,6 +6,20 @@ This repository is the URAI privacy control plane: a deployable Next.js/Firebase
 
 URAI is designed with **privacy-by-architecture**, **user sovereignty**, **minimal data exposure**, and **no silent escalation** as first-class system constraints.
 
+## Production lock status
+
+Current machine-readable status: [`PRODUCTION_LOCK_STATUS.json`](./PRODUCTION_LOCK_STATUS.json)
+
+Strict final production lock command:
+
+```bash
+URAI_PRIVACY_BASE_URL="https://uraiprivacy.com" npm run final:production-lock
+```
+
+The strict final command fails closed unless live route smoke is required, authenticated live workflow proof is required, and the redacted proof artifact passes the verifier.
+
+Full authenticated privacy operations are not READY unless `npm run final:production-lock` passes against the intended deployment host and the real proof artifact at `release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.json` has been attached.
+
 ## Repository role
 
 `urai-privacy` is no longer docs-only. It is now a hybrid operational package:
@@ -13,7 +27,7 @@ URAI is designed with **privacy-by-architecture**, **user sovereignty**, **minim
 1. **Deployable privacy app** — Next.js app routes for public privacy pages, user privacy center, export/deletion/consent/audit surfaces, and admin privacy operations.
 2. **Firebase privacy backend** — callable functions, Firestore rules, Storage rules, export processing, signed export retrieval, destructive deletion executor, legal-hold safeguards, and audit evidence.
 3. **Governance and release-gate package** — privacy standards, V1 release gates, user data rights lifecycle, cross-repo system-of-systems privacy matrix, legal/policy templates, and signoff evidence.
-4. **Verification package** — unit/integration/rules tests, static rule validation, release verification, live smoke script, security gate, and production readiness assertions.
+4. **Verification package** — unit/integration/rules tests, static rule validation, release verification, live smoke script, authenticated live workflow proof verifier, security gate, CI workflow, and production readiness assertions.
 
 ## Governance Version
 
@@ -47,12 +61,13 @@ Admin routes:
 - Firebase Auth-gated privacy center.
 - Firebase custom-claim/role-gated admin surfaces.
 - Consent records and consent events.
-- Export requests, export jobs, private export packages, and owner/admin-authorized signed export URLs.
+- Export requests, export jobs, private export packages, and owner/admin-authorized export download links.
 - Deletion requests, dry-run deletion plan, current-plan-hash guarded destructive execution, legal-hold blocking, retained evidence, and audit events.
 - Firestore owner/admin rules and Storage export/evidence rules.
 - Append-only audit evidence and admin action records.
 - Retention policy surfaces and lifecycle guidance.
 - Live route smoke verification script.
+- Authenticated live workflow proof verifier.
 - Release signoff ledger.
 
 ## Operational package
@@ -62,6 +77,7 @@ Start here:
 - [`docs/GOVERNANCE_INDEX.md`](./docs/GOVERNANCE_INDEX.md)
 - [`docs/PRODUCTION_READINESS.md`](./docs/PRODUCTION_READINESS.md)
 - [`docs/RELEASE_SIGNOFF.md`](./docs/RELEASE_SIGNOFF.md)
+- [`docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md`](./docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md)
 - [`docs/system-of-systems/URAI_PRIVACY_MATRIX.md`](./docs/system-of-systems/URAI_PRIVACY_MATRIX.md)
 - [`docs/release-gates/V1_PRIVACY_RELEASE_GATE.md`](./docs/release-gates/V1_PRIVACY_RELEASE_GATE.md)
 - [`docs/release-gates/USER_DATA_RIGHTS_AND_LIFECYCLE.md`](./docs/release-gates/USER_DATA_RIGHTS_AND_LIFECYCLE.md)
@@ -119,8 +135,6 @@ Implementation contracts:
 
 Nothing ships if it violates this repo.
 
-## Release gate
-
 A URAI feature is not release-ready unless it has:
 
 1. Data classes for every collected or derived field.
@@ -131,6 +145,7 @@ A URAI feature is not release-ready unless it has:
 6. Privacy review approval.
 7. Live smoke evidence where the feature touches production or staging infrastructure.
 8. Rollback and incident response path.
+9. Authenticated live workflow proof for export, deletion, consent, admin authorization, storage scope, Firestore scope, and cross-user denial.
 
 ## Local setup
 
@@ -171,6 +186,12 @@ Full release verification:
 npm run verify:release
 ```
 
+Strict final production lock:
+
+```bash
+URAI_PRIVACY_BASE_URL="https://uraiprivacy.com" npm run final:production-lock
+```
+
 Emulator-backed rules and integration tests:
 
 ```bash
@@ -192,6 +213,12 @@ Live route smoke after staging/prod deploy:
 URAI_PRIVACY_BASE_URL="https://<host>" URAI_PRIVACY_REQUIRE_LIVE=1 npm run test:smoke:live
 ```
 
+Authenticated live workflow proof verifier:
+
+```bash
+URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 npm run test:live-auth-proof
+```
+
 Legacy governance checks:
 
 ```bash
@@ -209,15 +236,12 @@ Public Firebase client env keys are documented in [`.env.example`](./.env.exampl
 
 ## Deployment status
 
-Repo-side implementation is substantially complete, but production deployment still requires external evidence:
+Repo-side implementation and release gates are substantially complete, but full authenticated production readiness still requires external evidence:
 
 - Firebase staging/prod credentials and deployment proof.
 - Admin custom-claim proof in live Firebase.
 - Live smoke evidence.
+- Authenticated live workflow proof artifact.
 - Legal/counsel approval.
 - Monitoring/error routing and rollback proof.
 - npm audit disposition.
-
-## Status
-
-This repository is an operational privacy control plane and governance package. All changes are versioned and auditable. Legal templates and regulatory mappings require qualified legal review before public production launch.
