@@ -14,7 +14,9 @@ required_files=(
   "scripts/validate-rules.mjs"
   "scripts/smoke-routes.mjs"
   "scripts/smoke-live.mjs"
+  "scripts/verify-authenticated-live-proof.mjs"
   "scripts/staging-evidence.mjs"
+  "docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md"
   "app/page.tsx"
   "app/privacy-center/export/page.tsx"
   "app/privacy-center/delete/page.tsx"
@@ -72,6 +74,7 @@ fi
 
 echo "[assert-production-ready] Checking package release scripts"
 grep -q '"test:smoke:live"' package.json
+grep -q '"test:live-auth-proof"' package.json
 grep -q '"release:evidence:staging"' package.json
 
 echo "[assert-production-ready] Checking deployment docs"
@@ -83,5 +86,7 @@ fi
 grep -q 'Firebase project' docs/PRODUCTION_READINESS.md
 grep -q 'Rollback' docs/PRODUCTION_READINESS.md
 grep -q 'Smoke test' docs/PRODUCTION_READINESS.md
+grep -q 'AUTHENTICATED_LIVE_WORKFLOW_PROOF' docs/RELEASE_SIGNOFF.md
+grep -q 'URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF' docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md
 
-echo "[assert-production-ready] ok: code release checks passed; live deploy still requires operator env/project verification"
+echo "[assert-production-ready] ok: code release checks passed; live deploy still requires operator env/project verification and authenticated live proof in strict mode"
