@@ -34,7 +34,8 @@
     "deploy": "firebase deploy",
     "release:evidence:staging": "node scripts/staging-evidence.mjs",
     "verify:production": "bash scripts/verify-release.sh",
-    "verify:release": "bash scripts/verify-release.sh"
+    "verify:release": "bash scripts/verify-release.sh",
+    "final:production-lock": "bash scripts/final-production-lock.sh"
   },
   "dependencies": {
     "firebase": "^12.13.0",
