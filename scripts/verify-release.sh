@@ -78,4 +78,7 @@ bash scripts/assert-production-ready.sh
 printf '\n[verify-release] optional live smoke\n'
 npm run test:smoke:live
 
+printf '\n[verify-release] authenticated live proof gate\n'
+npm run test:live-auth-proof
+
 printf '\n[verify-release] OK\n'
