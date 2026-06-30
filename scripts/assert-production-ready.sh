@@ -15,6 +15,7 @@ required_files=(
   "scripts/smoke-routes.mjs"
   "scripts/smoke-live.mjs"
   "scripts/verify-authenticated-live-proof.mjs"
+  "scripts/final-production-lock.sh"
   "scripts/staging-evidence.mjs"
   "docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md"
   "app/page.tsx"
@@ -75,7 +76,13 @@ fi
 echo "[assert-production-ready] Checking package release scripts"
 grep -q '"test:smoke:live"' package.json
 grep -q '"test:live-auth-proof"' package.json
+grep -q '"final:production-lock"' package.json
 grep -q '"release:evidence:staging"' package.json
+
+echo "[assert-production-ready] Checking final production lock strictness"
+grep -q 'URAI_PRIVACY_REQUIRE_LIVE=1' scripts/final-production-lock.sh
+grep -q 'URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1' scripts/final-production-lock.sh
+grep -q 'URAI_PRIVACY_BASE_URL is required' scripts/final-production-lock.sh
 
 echo "[assert-production-ready] Checking deployment docs"
 if [[ ! -f "docs/PRODUCTION_READINESS.md" ]]; then
@@ -89,4 +96,4 @@ grep -q 'Smoke test' docs/PRODUCTION_READINESS.md
 grep -q 'AUTHENTICATED_LIVE_WORKFLOW_PROOF' docs/RELEASE_SIGNOFF.md
 grep -q 'URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF' docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md
 
-echo "[assert-production-ready] ok: code release checks passed; live deploy still requires operator env/project verification and authenticated live proof in strict mode"
+echo "[assert-production-ready] ok: code release checks passed; final READY requires npm run final:production-lock with live URL and authenticated proof"
