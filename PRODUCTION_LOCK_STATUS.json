@@ -1,0 +1,34 @@
+{
+  "repo": "LifeLoggerAI/urai-privacy",
+  "status": "REPO_SIDE_LOCKED_LIVE_PROOF_REQUIRED",
+  "fullProductionReady": false,
+  "narrowPublicTrustCenterLaunchEligible": true,
+  "strictFinalCommand": "npm run final:production-lock",
+  "requiredLiveEnvironmentVariable": "URAI_PRIVACY_BASE_URL",
+  "requiredProofEnvironmentVariable": "URAI_PRIVACY_AUTH_LIVE_PROOF_PATH",
+  "requiredStrictModeVariables": [
+    "URAI_PRIVACY_REQUIRE_LIVE=1",
+    "URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1"
+  ],
+  "requiredProofArtifact": "release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.json",
+  "requiredProofVerifier": "scripts/verify-authenticated-live-proof.mjs",
+  "releaseVerifier": "scripts/verify-release.sh",
+  "productionAssertions": "scripts/assert-production-ready.sh",
+  "ciWorkflow": ".github/workflows/privacy-release-verification.yml",
+  "blockedUntil": [
+    "current build and release verification pass on latest main",
+    "public live smoke passes against intended deployment host",
+    "authenticated live workflow proof artifact exists and passes strict verifier",
+    "admin authorization proof is attached",
+    "owner export proof is attached",
+    "owner deletion proof is attached",
+    "consent proof is attached",
+    "legal hold proof is attached",
+    "cross-user denial proof is attached",
+    "monitoring and rollback proof are attached",
+    "legal or counsel approval location is attached",
+    "Tier-One ecosystem adoption evidence is attached"
+  ],
+  "lastRepoSideLockUpdate": "2026-06-30T00:00:00-05:00",
+  "finalVerdict": "PARTIAL: repo-side gates are locked; full production readiness requires live proof."
+}
