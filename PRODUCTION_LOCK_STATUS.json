@@ -1,10 +1,12 @@
 {
   "repo": "LifeLoggerAI/urai-privacy",
-  "status": "REPO_SIDE_DONE_EXTERNAL_LIVE_PROOF_REQUIRED",
+  "status": "REPO_SIDE_DONE_DEPLOY_BLOCKED_BY_EXTERNAL_CREDENTIALS",
   "fullProductionReady": false,
   "repoSideComplete": true,
+  "deploymentConfirmedByAgent": false,
   "narrowPublicTrustCenterLaunchEligible": true,
   "strictFinalCommand": "npm run final:production-lock",
+  "deployCommand": "npm run deploy",
   "requiredLiveEnvironmentVariable": "URAI_PRIVACY_BASE_URL",
   "requiredProofEnvironmentVariable": "URAI_PRIVACY_AUTH_LIVE_PROOF_PATH",
   "requiredStrictModeVariables": [
@@ -18,7 +20,8 @@
   "ciWorkflow": ".github/workflows/privacy-release-verification.yml",
   "doneReport": "DONE_STATUS_REPORT.md",
   "coordinatorHandoff": "ECOSYSTEM_COORDINATOR_HANDOFF.md",
-  "latestConnectorVerifiedCommit": "e945344a4e148d9f5ca8015d5f641d128145565e",
+  "latestConnectorVerifiedCommit": "aff003dfb156f9f194aa575e269cd1ce640f2454",
+  "latestDeployAttemptReceipt": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/CONTINUE8_DEPLOY_ATTEMPT_RECEIPT.md",
   "latestSafetySweep": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/CONTINUE7_REPO_SAFETY_SWEEP.md",
   "latestConnectorStatusChecks": "none returned by connector for prior handoff commit",
   "latestConnectorWorkflowRuns": "none returned by connector for prior handoff commit",
@@ -26,6 +29,7 @@
     "current build and release verification pass on latest main",
     "public live smoke passes against intended deployment host",
     "authenticated live workflow proof artifact exists and passes strict verifier",
+    "Firebase deployment credentials are available to operator or CI",
     "admin authorization proof is attached",
     "owner export proof is attached",
     "owner deletion proof is attached",
@@ -37,5 +41,5 @@
     "Tier-One ecosystem adoption evidence is attached"
   ],
   "lastRepoSideLockUpdate": "2026-06-30T00:00:00-05:00",
-  "finalVerdict": "DONE BUT NEEDS EXTERNAL ENV: repo-side gates and safety sweep are complete; full production readiness requires strict live proof."
+  "finalVerdict": "DONE BUT NEEDS EXTERNAL ENV: repo-side gates are complete; deployment was attempted but not confirmed because Firebase/GitHub deployment credentials and strict live proof were not available to this agent."
 }
