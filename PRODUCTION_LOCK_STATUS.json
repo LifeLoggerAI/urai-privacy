@@ -1,7 +1,8 @@
 {
   "repo": "LifeLoggerAI/urai-privacy",
-  "status": "REPO_SIDE_LOCKED_LIVE_PROOF_REQUIRED",
+  "status": "REPO_SIDE_DONE_EXTERNAL_LIVE_PROOF_REQUIRED",
   "fullProductionReady": false,
+  "repoSideComplete": true,
   "narrowPublicTrustCenterLaunchEligible": true,
   "strictFinalCommand": "npm run final:production-lock",
   "requiredLiveEnvironmentVariable": "URAI_PRIVACY_BASE_URL",
@@ -15,6 +16,11 @@
   "releaseVerifier": "scripts/verify-release.sh",
   "productionAssertions": "scripts/assert-production-ready.sh",
   "ciWorkflow": ".github/workflows/privacy-release-verification.yml",
+  "doneReport": "DONE_STATUS_REPORT.md",
+  "coordinatorHandoff": "ECOSYSTEM_COORDINATOR_HANDOFF.md",
+  "latestConnectorVerifiedCommit": "716e3610d86e51af50a643ea66651e1b980fa4eb",
+  "latestConnectorStatusChecks": "none returned by connector",
+  "latestConnectorWorkflowRuns": "none returned by connector",
   "blockedUntil": [
     "current build and release verification pass on latest main",
     "public live smoke passes against intended deployment host",
@@ -30,5 +36,5 @@
     "Tier-One ecosystem adoption evidence is attached"
   ],
   "lastRepoSideLockUpdate": "2026-06-30T00:00:00-05:00",
-  "finalVerdict": "PARTIAL: repo-side gates are locked; full production readiness requires live proof."
+  "finalVerdict": "DONE BUT NEEDS EXTERNAL ENV: repo-side gates are complete; full production readiness requires strict live proof."
 }
