@@ -1,0 +1,29 @@
+{
+  "commitSha": "REPLACE_WITH_TESTED_COMMIT_SHA",
+  "environment": "staging-or-production",
+  "baseUrl": "https://uraiprivacy.com",
+  "firebaseProjectAlias": "urai-privacy",
+  "operator": "REPLACE_WITH_OPERATOR_NAME",
+  "generatedAt": "2026-06-30T00:00:00.000Z",
+  "redactionStatement": "All user identifiers, emails, session material, export contents, and personal data were removed before committing this proof artifact.",
+  "workflows": {
+    "public_route_smoke": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "All required routes render safely.", "actual": "pending" },
+    "owner_export_request": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Owner can create export request and export job scoped to owner UID.", "actual": "pending" },
+    "admin_process_export_job": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Admin can process export job and create private export package plus manifest.", "actual": "pending" },
+    "owner_export_download_link": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Owner receives short-lived export download link only after export completion.", "actual": "pending" },
+    "cross_user_export_denied": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Second user cannot read first user's export job or download link.", "actual": "pending" },
+    "owner_deletion_request": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Owner can create deletion request and audit event.", "actual": "pending" },
+    "admin_deletion_dry_run": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Admin dry-run returns plan hash without destructive deletion.", "actual": "pending" },
+    "stale_deletion_hash_fails": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Execute with stale or missing plan hash fails closed.", "actual": "pending" },
+    "legal_hold_blocks_deletion": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Active legal hold blocks destructive deletion and writes audit evidence.", "actual": "pending" },
+    "admin_execute_deletion_current_hash": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Admin execute with current plan hash deletes supported user-scoped records and keeps retained evidence.", "actual": "pending" },
+    "consent_grant_deny_revoke": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Consent grant deny and revoke create records events and audits.", "actual": "pending" },
+    "user_audit_log_scope": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Owner sees only own actor or target audit events.", "actual": "pending" },
+    "anonymous_access_denied": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Anonymous user cannot perform privacy-center operations.", "actual": "pending" },
+    "admin_denied_without_claim": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Signed-in non-admin cannot view or mutate admin data.", "actual": "pending" },
+    "admin_allowed_with_claim": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Admin with approved authority can perform allowed workflows and every action is audited.", "actual": "pending" },
+    "storage_owner_admin_scope": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Export storage paths are not public and are owner or admin scoped.", "actual": "pending" },
+    "firestore_deny_by_default": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Unknown collections and cross-user reads or writes fail closed.", "actual": "pending" },
+    "monitoring_rollback_evidence": { "status": "blocked", "proof": "pending", "timestamp": "2026-06-30T00:00:00.000Z", "expected": "Monitoring dashboard alert route rollback SHA and rollback smoke proof are attached.", "actual": "pending" }
+  }
+}
