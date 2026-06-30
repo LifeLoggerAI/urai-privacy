@@ -1,0 +1,87 @@
+name: URAI Privacy Release Verification
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      require_live_auth_proof:
+        description: "Require authenticated live workflow proof artifact"
+        required: false
+        default: "0"
+
+env:
+  URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF: ${{ github.event.inputs.require_live_auth_proof || '0' }}
+
+jobs:
+  release-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+
+      - name: Setup Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install functions dependencies
+        run: npm ci --prefix functions
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Static rules validation
+        run: npm run test:rules:static
+
+      - name: Route smoke
+        run: npm run test:e2e
+
+      - name: Privacy adoption audit
+        run: npm run audit:privacy
+
+      - name: Tier-One privacy audit
+        run: npm run audit:tier-one
+
+      - name: Build app
+        run: npm run build
+
+      - name: Build functions
+        run: npm --prefix functions run build
+
+      - name: Typecheck functions
+        run: npm --prefix functions run typecheck
+
+      - name: Check Java
+        run: npm run check:java
+
+      - name: Emulator-backed tests
+        run: npm run test:emulators
+
+      - name: Security gate
+        run: npm run security:gate
+
+      - name: Production readiness assertions
+        run: bash scripts/assert-production-ready.sh
+
+      - name: Authenticated live proof gate
+        run: npm run test:live-auth-proof
