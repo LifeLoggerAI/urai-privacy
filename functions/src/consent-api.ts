@@ -78,8 +78,8 @@ export const setCanonicalConsent = onCall(async (request) => {
   const auditRef = db.collection("auditLogs").doc();
 
   await db.runTransaction(async (transaction) => {
-    transaction.set(recordRef, { ...receipt, updatedAt: FieldValue.serverTimestamp(), receiptHash }, { merge: true });
-    transaction.set(eventRef, { ...receipt, consentRecordId: recordId, actorUid: uid, createdAt: FieldValue.serverTimestamp(), receiptHash: hash({ ...receipt, eventId: eventRef.id }) });
+    transaction.set(recordRef, { ...receipt, receiptHash }, { merge: true });
+    transaction.set(eventRef, { ...receipt, consentRecordId: recordId, actorUid: uid, createdAt: now, receiptHash: hash({ ...receipt, eventId: eventRef.id }) });
     transaction.set(auditRef, {
       actorUid: uid,
       actorRole: "user",
