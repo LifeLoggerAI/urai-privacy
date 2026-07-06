@@ -173,14 +173,22 @@ async function deleteQueryBatch(collectionName: string, uid: string) {
   }
 }
 
-async function executeDeletion(args: { adminUid: string; uid: string; requestId: string; expectedPlanHash: string }) {
-  const plan = await deletionPlan(args.uid);
-  const planHash = deletionPlanHash(plan);
-  if (plan.legalHold) {
-    throw new HttpsError("failed-precondition", "Deletion is blocked by active legal hold.");
+async function executeDeletion(args: {
+  adminUid: string;
+  uid: string;
+  requestId: string;
+  plan: Awaited<ReturnType<typeof deletionPlan>>;
+  planHash: string;
+}) {
+  const { plan, planHash } = args;
+  if (plan.uid !== args.uid) {
+    throw new HttpsError("failed-precondition", "Deletion plan subject does not match the requested account.");
   }
-  if (args.expectedPlanHash !== planHash) {
-    throw new HttpsError("failed-precondition", "Deletion plan changed. Re-run dry run and retry with the latest plan hash.");
+  if (deletionPlanHash(plan) !== planHash) {
+    throw new HttpsError("failed-precondition", "Deletion plan integrity check failed.");
+  }
+  if (plan.legalHold || await hasLegalHold(args.uid)) {
+    throw new HttpsError("failed-precondition", "Deletion is blocked by active legal hold.");
   }
 
   const deleted: Record<string, number> = {};
@@ -295,6 +303,9 @@ export const processDeletionRequest = onCall(async (request) => {
   const deletion = snap.data() ?? {};
   const uid = String(deletion.uid ?? "");
   if (!uid) throw new HttpsError("failed-precondition", "Deletion request is missing uid.");
+  if (["completed", "rejected", "failed"].includes(String(deletion.status))) {
+    throw new HttpsError("failed-precondition", "Deletion request is already in a terminal state.");
+  }
   const plan = await deletionPlan(uid);
   const planHash = deletionPlanHash(plan);
   const safeStatus = status === "completed" ? "processing" : status;
@@ -348,7 +359,7 @@ export const executeDeletionRequest = onCall(async (request) => {
   }
 
   try {
-    const result = await executeDeletion({ adminUid, uid, requestId, expectedPlanHash });
+    const result = await executeDeletion({ adminUid, uid, requestId, plan, planHash });
     await ref.update({ status: "completed", updatedAt: FieldValue.serverTimestamp(), deletionPlan: result.plan, planHash: result.planHash, deletedCounts: result.deleted, retainedData: retainedDeletionCollections, destructiveDeletionBlocked: false, destructiveDeletionCompletedAt: FieldValue.serverTimestamp() });
     const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_execute_completed", targetUid: uid, requestId, source: "function", metadata: { planHash: result.planHash, deletedCounts: result.deleted } });
     return { requestId, status: "completed", mode, auditId, plan: result.plan, planHash: result.planHash, deletedCounts: result.deleted };
