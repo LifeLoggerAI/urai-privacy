@@ -1,0 +1,53 @@
+{
+  "receiptId": "URAI-PRIVACY-CONSENT-20260706-001",
+  "recordedAt": "2026-07-06T00:00:00-05:00",
+  "classification": "IMPLEMENTED BUT NOT DEPLOYED",
+  "repository": "LifeLoggerAI/urai-privacy",
+  "branch": "privacy/consent-decision-p0-20260706",
+  "commitSha": "af0fc3e3e251a13b6462220ed0690fab3498a598",
+  "pullRequest": null,
+  "issue": "#83",
+  "changedFiles": [
+    "functions/src/consent-policy.ts",
+    "functions/src/consent-functions.ts",
+    "functions/src/exports.ts",
+    "functions/package.json",
+    "firestore.rules",
+    "src/lib/firebase-privacy-client.ts",
+    "app/privacy-center/consent/page.tsx",
+    "tests/unit/consent-policy.test.ts",
+    "tests/rules/firestore.rules.test.ts",
+    "scripts/validate-rules.mjs",
+    "docs/CONSENT_DECISION_SERVICE.md"
+  ],
+  "workflowRuns": [],
+  "validation": {
+    "commands": [
+      "npm run test:unit",
+      "npm run test:rules:static",
+      "npm run test:emulators",
+      "npm --prefix functions run typecheck",
+      "npm --prefix functions run build",
+      "npm run security:gate"
+    ],
+    "testResult": "PENDING_EXACT_HEAD_GITHUB_ACTIONS_AND_EMULATOR_RUN",
+    "buildResult": "PENDING_EXACT_HEAD_GITHUB_ACTIONS",
+    "runtimeVerification": "NOT DEPLOYED; no staging or production callable was invoked",
+    "screenshotsOrArtifacts": []
+  },
+  "deployment": {
+    "target": null,
+    "environment": null,
+    "deployedSha": null,
+    "publicUrls": [],
+    "rollbackSha": null
+  },
+  "provider": null,
+  "remainingCaveats": [
+    "No downstream URAI service is certified as enforcing the returned decision before processing.",
+    "Revocation propagation is not complete across jobs, analytics, content, communications, providers, caches, vectors, or backups.",
+    "Consent decision records are not yet proven in the live cross-system export and deletion cascade.",
+    "App Check, service-specific rate limits, staging evidence, production evidence, and rollback evidence remain open.",
+    "Older policy-version grants intentionally fail closed and require re-consent under policy 1.0.0."
+  ]
+}
