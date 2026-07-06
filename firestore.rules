@@ -3,17 +3,22 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
-    function hasAdminClaim() { return signedIn() && request.auth.token.admin == true; }
-    function isRoleAdmin() {
-      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    function hasAdminClaim() {
+      return signedIn() && (request.auth.token.admin == true || request.auth.token.role == 'admin');
     }
-    function isAdmin() { return hasAdminClaim() || isRoleAdmin(); }
+    function isAdmin() { return hasAdminClaim(); }
     function ownsNewDoc() { return signedIn() && request.resource.data.uid == request.auth.uid; }
+    function ownerIsNotChangingAuthority() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'admin', 'isAdmin']);
+    }
+    function ownerIsNotCreatingAuthority() {
+      return !request.resource.data.keys().hasAny(['role', 'admin', 'isAdmin']);
+    }
 
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
-      allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && ownerIsNotCreatingAuthority();
+      allow update: if isAdmin() || (isOwner(uid) && ownerIsNotChangingAuthority());
       allow delete: if false;
     }
 
