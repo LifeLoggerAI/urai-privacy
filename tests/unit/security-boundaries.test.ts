@@ -13,10 +13,19 @@ describe("privacy security boundaries", () => {
     expect(firestoreRules).toContain("request.auth.token.role == 'admin'");
   });
 
-  it("blocks owners from creating or changing authority fields", () => {
-    expect(firestoreRules).toContain("ownerIsNotCreatingAuthority");
-    expect(firestoreRules).toContain("ownerIsNotChangingAuthority");
-    expect(firestoreRules).toContain("['role', 'admin', 'isAdmin']");
+  it("blocks owners from creating or changing privileged user fields", () => {
+    expect(firestoreRules).toContain("ownerIsNotCreatingPrivilegedFields");
+    expect(firestoreRules).toContain("ownerIsNotChangingPrivilegedFields");
+    for (const field of ["'role'", "'admin'", "'isAdmin'", "'legalHold'", "'markedForDeletion'", "'deletionMarkedAt'"]) {
+      expect(firestoreRules).toContain(field);
+    }
+  });
+
+  it("requires privacy records and evidence to be written by trusted server code", () => {
+    for (const collection of ["privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "consentEvents", "legalHoldRecords", "auditLogs", "adminActions", "dataAccessEvents", "policyVersions"]) {
+      expect(firestoreRules).toContain(`match /${collection}/{id}`);
+    }
+    expect(firestoreRules).toContain("allow create, update, delete: if false;");
   });
 
   it("requires a stable approved plan hash for destructive deletion", () => {
