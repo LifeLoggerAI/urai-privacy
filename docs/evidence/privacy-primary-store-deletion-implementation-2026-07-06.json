@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "urai-material-change-receipt-1",
+  "receiptId": "PRIV-DELETE-PRIMARY-20260706-001",
+  "recordedAt": "2026-07-06T07:20:00Z",
+  "status": "PARTIALLY IMPLEMENTED",
+  "repository": "LifeLoggerAI/urai-privacy",
+  "branch": "privacy-primary-stores-20260706",
+  "base": "audit/privacy-authz-p0-2026-07-06",
+  "issue": 84,
+  "implemented": [
+    "versioned executeDeletionRequestV2 callable",
+    "idempotent deletion execution ledger",
+    "dry-run plan and deterministic plan hash",
+    "active legal-hold block",
+    "Firestore user-scoped record deletion and verification",
+    "Storage export/user/upload/artifact prefix deletion and verification",
+    "Firebase Auth refresh-token revocation and account deletion verification",
+    "retained-record declaration",
+    "no user-visible completion receipt while downstream acknowledgements are pending",
+    "production default downstream acknowledgement list",
+    "unit contract tests for completion and downstream gates"
+  ],
+  "notCompleted": [
+    "downstream deletion adapters for Spatial, Jobs, Analytics, Content, and Communications",
+    "backup-expiry acknowledgement",
+    "provider-held data deletion",
+    "full emulator end-to-end receipt",
+    "staging deployment and authenticated live proof"
+  ],
+  "verification": {
+    "commands": [
+      "npm run test:unit",
+      "npm --prefix functions run typecheck",
+      "npm run test:emulators",
+      "npm run security:gate"
+    ],
+    "exactHeadWorkflowStatus": "PENDING",
+    "deploymentExecuted": false,
+    "userDataOperationExecuted": false,
+    "providerCallsExecuted": 0
+  },
+  "claimBoundary": "This receipt proves repository implementation only. Complete account/data deletion remains blocked until every required downstream system acknowledges deletion or an approved retention exception and live staging evidence passes."
+}
