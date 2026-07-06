@@ -75,6 +75,9 @@ function ConsentPanel({ user }: { user: User }) {
     getConsentPurposeRegistry()
       .then((result) => {
         if (cancelled) return;
+        if (!result || typeof result !== "object") {
+          throw new Error("Consent policy registry is unavailable or invalid.");
+        }
         const nextPurposes = Array.isArray(result.purposes)
           ? result.purposes.filter(isConsentPurpose)
           : [];
@@ -106,8 +109,16 @@ function ConsentPanel({ user }: { user: User }) {
     setMessage("");
     try {
       const result = await updateConsentPreference({ purpose, consentTier, status });
-      const expiry = typeof result.expiresAt === "string" ? ` Expires ${new Date(result.expiresAt).toLocaleString()}.` : "";
-      setMessage(`Consent updated: ${String(result.consentId ?? purpose)} → ${status}.${expiry}`);
+      if (!result || typeof result !== "object") {
+        throw new Error("Consent update did not return a valid confirmation.");
+      }
+      const expiry = typeof result.expiresAt === "string"
+        ? ` Expires ${new Date(result.expiresAt).toLocaleString()}.`
+        : "";
+      const consentId = typeof result.consentId === "string" && result.consentId
+        ? result.consentId
+        : purpose;
+      setMessage(`Consent updated: ${consentId} → ${status}.${expiry}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Consent update failed");
     } finally {
