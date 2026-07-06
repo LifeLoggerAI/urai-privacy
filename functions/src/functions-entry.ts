@@ -12,3 +12,4 @@ export {
 } from "./index";
 
 export { setCanonicalConsent, evaluateCanonicalConsent } from "./consent-api";
+export { publishConsentRevocation, acknowledgeConsentRevocation } from "./consent-revocation";
