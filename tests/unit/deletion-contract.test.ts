@@ -40,13 +40,19 @@ describe("deletion manifest safeguards", () => {
   it("blocks under a legal hold", () => {
     const value = makeManifest();
     value.legalHold = true;
-    value.adapters = value.adapters.map((entry) => ({ ...entry, status: "active" }));
+    value.adapters = value.adapters.map((entry) => ({
+      ...entry,
+      status: "active" as const
+    }));
     expect(deletionExecutionBlockers(value)).toEqual(["ACTIVE_LEGAL_HOLD"]);
   });
 
   it("permits execution only after every adapter is active", () => {
     const value = makeManifest();
-    value.adapters = value.adapters.map((entry) => ({ ...entry, status: "active" }));
+    value.adapters = value.adapters.map((entry) => ({
+      ...entry,
+      status: "active" as const
+    }));
     expect(canExecuteDeletion(value)).toBe(true);
   });
 
