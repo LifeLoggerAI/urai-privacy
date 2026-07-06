@@ -34,4 +34,18 @@ describe("privacy security boundaries", () => {
     expect(functionsSource).toContain("deletion_execute_blocked_stale_plan_hash");
     expect(functionsSource).not.toContain("if (args.expectedPlanHash && args.expectedPlanHash !== planHash)");
   });
+
+  it("does not reopen terminal deletion requests", () => {
+    expect(functionsSource).toContain('["completed", "rejected", "failed"].includes(String(deletion.status))');
+    expect(functionsSource).toContain("Deletion request is already in a terminal state.");
+  });
+
+  it("reuses and revalidates the caller-approved deletion plan", () => {
+    expect(functionsSource).toContain("plan: Awaited<ReturnType<typeof deletionPlan>>");
+    expect(functionsSource).toContain("if (plan.uid !== args.uid)");
+    expect(functionsSource).toContain("if (deletionPlanHash(plan) !== planHash)");
+    expect(functionsSource).toContain("plan.legalHold || await hasLegalHold(args.uid)");
+    expect(functionsSource).toContain("executeDeletion({ adminUid, uid, requestId, plan, planHash })");
+    expect(functionsSource).not.toContain("executeDeletion({ adminUid, uid, requestId, expectedPlanHash })");
+  });
 });
