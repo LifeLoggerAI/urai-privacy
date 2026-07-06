@@ -13,7 +13,7 @@ export default function AdminPrivacyRequestsPage() {
     <section>
       <div className="eyebrow">Admin review</div>
       <h1>Privacy requests</h1>
-      <p className="lede">Admins can review live export and deletion requests. Admin access is checked through Firebase Auth custom claims or the admin role document before any data is shown.</p>
+      <p className="lede">Admins can review live export and deletion requests. Access is checked using trusted Firebase Auth custom claims before any privacy record is shown.</p>
       <AuthGate adminOnly>{() => <AdminRequestsTable />}</AuthGate>
     </section>
   );
@@ -78,7 +78,7 @@ function AdminRequestsTable() {
       </article>
       <article className="card">
         <h3>Deletion requests</h3>
-        <p className="muted">Run dry-run first. Execute requires the latest plan hash and will delete supported user-scoped data while retaining audit/legal evidence.</p>
+        <p className="muted">Run dry-run first. Execute requires the latest stable plan hash and deletes only the currently supported user-scoped records while retaining audit/legal evidence.</p>
         {deletionRequests.length === 0 ? <p className="muted">No deletion requests found.</p> : deletionRequests.map((request) => {
           const requestId = String(request.id);
           const planHash = typeof request.planHash === "string" ? request.planHash : undefined;
@@ -112,7 +112,7 @@ function ExportJobsPanel({ busyId, processExport }: { busyId: string | null; pro
         <div key={String(job.id)} className="panel">
           <strong>{String(job.id)}</strong>
           <p className="muted">{String(job.uid)} · {String(job.status)}</p>
-          <button className="button" type="button" disabled={busyId !== null || String(job.status) === "completed"} onClick={() => processExport(String(job.id))}>{String(job.status) === "completed" ? "Processed" : "Mark processed"}</button>
+          <button className="button" type="button" disabled={busyId !== null || String(job.status) === "completed"} onClick={() => processExport(String(job.id))}>{String(job.status) === "completed" ? "Processed" : "Process export"}</button>
         </div>
       ))}
     </article>
