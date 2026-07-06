@@ -4,8 +4,8 @@
   "classification": "IMPLEMENTED BUT NOT DEPLOYED",
   "repository": "LifeLoggerAI/urai-privacy",
   "branch": "privacy/consent-decision-p0-20260706",
-  "commitSha": "af0fc3e3e251a13b6462220ed0690fab3498a598",
-  "pullRequest": null,
+  "commitSha": "c16a9b6c2041f4dcfccce0f1771e33681848cfb6",
+  "pullRequest": "#93",
   "issue": "#83",
   "changedFiles": [
     "functions/src/consent-policy.ts",
@@ -18,17 +18,24 @@
     "tests/unit/consent-policy.test.ts",
     "tests/rules/firestore.rules.test.ts",
     "scripts/validate-rules.mjs",
-    "docs/CONSENT_DECISION_SERVICE.md"
+    "docs/CONSENT_DECISION_SERVICE.md",
+    ".github/workflows/consent-decision-branch-validation.yml"
   ],
   "workflowRuns": [],
   "validation": {
     "commands": [
+      "npm ci",
+      "npm ci --prefix functions",
+      "npm run lint",
+      "npm run typecheck",
       "npm run test:unit",
       "npm run test:rules:static",
-      "npm run test:emulators",
+      "npm run test:e2e",
       "npm --prefix functions run typecheck",
       "npm --prefix functions run build",
-      "npm run security:gate"
+      "npm run build",
+      "npm run security:gate",
+      "npm run test:emulators"
     ],
     "testResult": "PENDING_EXACT_HEAD_GITHUB_ACTIONS_AND_EMULATOR_RUN",
     "buildResult": "PENDING_EXACT_HEAD_GITHUB_ACTIONS",
