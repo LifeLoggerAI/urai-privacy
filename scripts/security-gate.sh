@@ -40,10 +40,21 @@ require_pattern "storage.rules" 'match /[{]allPaths=[*][*][}]' "Storage fallback
 require_pattern "storage.rules" 'allow read, write: if false|allow read: if false' "Storage deny reads"
 require_pattern "storage.rules" 'allow read, write: if false|allow write: if false' "Storage deny writes"
 
-echo "[security-gate] Checking immutable privacy evidence rules"
+echo "[security-gate] Checking trusted administrator authority"
+require_pattern "firestore.rules" 'request\.auth\.token\.admin == true' "Firestore admin custom claim"
+require_pattern "firestore.rules" "request\.auth\.token\.role == 'admin'" "Firestore role custom claim"
+require_pattern "storage.rules" 'request\.auth\.token\.admin == true' "Storage admin custom claim"
+require_pattern "storage.rules" "request\.auth\.token\.role == 'admin'" "Storage role custom claim"
+reject_pattern "firestore.rules" 'function isRoleAdmin|documents/users/.+data\.role.+admin' "user-document-derived admin authority"
+reject_pattern "functions/src/index.ts" 'snap\.data\(\)\?\.role === "admin"' "callable user-document-derived admin authority"
+
+echo "[security-gate] Checking server-mediated privacy evidence rules"
 require_pattern "firestore.rules" 'match /auditLogs/[{]id[}]' "Audit log match"
-require_pattern "firestore.rules" 'allow update, delete: if false|allow update: if false' "Audit log update deny"
-require_pattern "firestore.rules" 'allow update, delete: if false|allow delete: if false' "Audit log delete deny"
+require_pattern "firestore.rules" 'allow (create, )?update, delete: if false|allow update: if false' "Audit log update deny"
+require_pattern "firestore.rules" 'allow (create, update, )?delete: if false|allow delete: if false' "Audit log delete deny"
+require_pattern "firestore.rules" 'ownerIsNotCreatingPrivilegedFields' "Privileged user create guard"
+require_pattern "firestore.rules" 'ownerIsNotChangingPrivilegedFields' "Privileged user update guard"
+require_pattern "firestore.rules" 'allow create, update, delete: if false' "Server-mediated mutation rule"
 
 reject_pattern "storage.rules" 'allow[[:space:]]+delete:[[:space:]]+if[[:space:]]+(true|isAdmin\(\)|request\.auth)' "Storage delete allowance"
 
