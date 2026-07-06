@@ -21,6 +21,8 @@ const firestoreChecks = [
   "match /privacyRequests/{id}",
   "match /deletionRequests/{id}",
   "match /consentRecords/{id}",
+  "match /consentEvents/{id}",
+  "match /consentDecisions/{id}",
   "allow create, update, delete: if false"
 ];
 const storageChecks = [
