@@ -1,4 +1,4 @@
-name: Consent Decision Branch Validation
+name: Consent and Export Branch Validation
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: urai-privacy-consent-${{ github.ref }}
+  group: urai-privacy-consent-export-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -36,6 +36,8 @@ jobs:
         run: npm run test:unit
       - name: Static rules validation
         run: npm run test:rules:static
+      - name: Complete export contract
+        run: npm run test:export:contract
       - name: Route smoke
         run: npm run test:e2e
       - name: Functions typecheck
