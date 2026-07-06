@@ -8,11 +8,11 @@ export default function AdminPage() {
     <section>
       <div className="eyebrow">Admin Console</div>
       <h1>Privacy operations control room</h1>
-      <p className="lede">Admin routes require an admin custom claim or role document. Actions that view or mutate sensitive privacy workflows must write admin action and audit records.</p>
+      <p className="lede">Operational admin routes require trusted Firebase Auth custom claims. Privacy mutations are performed through audited callable functions rather than direct client writes.</p>
       <article className="card">
         <h2>Production evidence boundary</h2>
         <p className="muted">
-          This overview is a route shell and release-readiness summary, not proof of live Firebase health by itself. Use the linked request, audit, retention, and policy screens plus the deploy-time release ledger for operational proof.
+          This overview is a route shell and release-readiness summary, not proof of live Firebase health by itself. Use the linked request and audit screens plus deploy-time release evidence for operational proof.
         </p>
       </article>
       <div className="grid">
