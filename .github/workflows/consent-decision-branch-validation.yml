@@ -1,17 +1,18 @@
-name: Consent and Export Branch Validation
+name: Consent Export and Deletion Branch Validation
 
 on:
   pull_request:
   push:
     branches:
       - privacy/consent-decision-p0-20260706
+      - privacy/deletion-orchestration-p0-20260706
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: urai-privacy-consent-export-${{ github.ref }}
+  group: urai-privacy-consent-export-deletion-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -38,6 +39,8 @@ jobs:
         run: npm run test:rules:static
       - name: Complete export contract
         run: npm run test:export:contract
+      - name: Deletion orchestration contract
+        run: npm run test:deletion:contract
       - name: Route smoke
         run: npm run test:e2e
       - name: Functions typecheck
