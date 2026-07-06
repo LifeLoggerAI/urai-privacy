@@ -36,7 +36,7 @@ export function normalizeRequiredDownstreamSystems(raw: string | undefined, prod
     .map((value) => value.trim())
     .filter(Boolean);
 
-  if (normalized.length === 1 && normalized[0].toLowerCase() === "none") {
+  if (normalized.some((system) => system.toLowerCase() === "none")) {
     if (productionRuntime) {
       throw new Error("Production deletion cannot disable downstream acknowledgements with 'none'.");
     }
