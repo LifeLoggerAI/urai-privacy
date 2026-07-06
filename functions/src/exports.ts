@@ -1,6 +1,5 @@
 export {
   createExportRequest,
-  getExportDownloadUrl,
   createDeletionRequest,
   processDeletionRequest,
   executeDeletionRequest,
@@ -10,6 +9,11 @@ export {
 } from "./index";
 
 export { processExportRequest } from "./export-functions";
+
+export {
+  getExportDownloadUrl,
+  cleanupExpiredExportPackages
+} from "./export-lifecycle-functions";
 
 export {
   getConsentPurposeRegistry,
