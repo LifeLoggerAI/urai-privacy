@@ -4,7 +4,7 @@
   "classification": "IMPLEMENTED BUT NOT DEPLOYED",
   "repository": "LifeLoggerAI/urai-privacy",
   "branch": "privacy/consent-decision-p0-20260706",
-  "commitSha": "c16a9b6c2041f4dcfccce0f1771e33681848cfb6",
+  "commitSha": "043955f983b9ec9980f195d9eae7560e6401ab69",
   "pullRequest": "#93",
   "issue": "#83",
   "changedFiles": [
@@ -37,8 +37,8 @@
       "npm run security:gate",
       "npm run test:emulators"
     ],
-    "testResult": "PENDING_EXACT_HEAD_GITHUB_ACTIONS_AND_EMULATOR_RUN",
-    "buildResult": "PENDING_EXACT_HEAD_GITHUB_ACTIONS",
+    "testResult": "BLOCKED_GITHUB_ACTIONS_RUN_NOT_SCHEDULED_FOR_EXACT_HEAD",
+    "buildResult": "BLOCKED_GITHUB_ACTIONS_RUN_NOT_SCHEDULED_FOR_EXACT_HEAD",
     "runtimeVerification": "NOT DEPLOYED; no staging or production callable was invoked",
     "screenshotsOrArtifacts": []
   },
@@ -51,6 +51,7 @@
   },
   "provider": null,
   "remainingCaveats": [
+    "GitHub returned no pull-request workflow run for exact head 043955f983b9ec9980f195d9eae7560e6401ab69 after adding the pull_request trigger.",
     "No downstream URAI service is certified as enforcing the returned decision before processing.",
     "Revocation propagation is not complete across jobs, analytics, content, communications, providers, caches, vectors, or backups.",
     "Consent decision records are not yet proven in the live cross-system export and deletion cascade.",
