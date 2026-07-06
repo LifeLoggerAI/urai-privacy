@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_REQUIRED_DOWNSTREAM_SYSTEMS,
+  DELETION_EXECUTION_STALE_MS,
   deletionCompletionStatus,
   deletionPlanHash,
+  isStaleProcessingExecution,
   normalizeRequiredDownstreamSystems,
   PRIMARY_DELETION_ADAPTERS
 } from "../../functions/src/deletion-contract";
@@ -26,6 +28,13 @@ describe("deletion orchestration contract", () => {
     expect(() => normalizeRequiredDownstreamSystems("none", true)).toThrow(
       "Production deletion cannot disable downstream acknowledgements"
     );
+    expect(() => normalizeRequiredDownstreamSystems("urai-spatial,none", true)).toThrow(
+      "Production deletion cannot disable downstream acknowledgements"
+    );
+  });
+
+  it("allows explicit none only outside production", () => {
+    expect(normalizeRequiredDownstreamSystems("none,urai-spatial", false)).toEqual([]);
   });
 
   it("normalizes and deduplicates configured downstream systems", () => {
@@ -33,6 +42,28 @@ describe("deletion orchestration contract", () => {
       "urai-jobs",
       "urai-spatial"
     ]);
+  });
+
+  it("marks only expired processing executions as stale", () => {
+    const now = Date.parse("2026-07-06T12:00:00.000Z");
+    expect(isStaleProcessingExecution({
+      status: "processing",
+      startedAt: new Date(now - DELETION_EXECUTION_STALE_MS - 1).toISOString()
+    }, now)).toBe(true);
+    expect(isStaleProcessingExecution({
+      status: "processing",
+      startedAt: new Date(now - DELETION_EXECUTION_STALE_MS + 1).toISOString()
+    }, now)).toBe(false);
+    expect(isStaleProcessingExecution({ status: "failed" }, now)).toBe(false);
+    expect(isStaleProcessingExecution({ status: "processing" }, now)).toBe(false);
+  });
+
+  it("supports Firestore-like timestamps when checking staleness", () => {
+    const now = Date.parse("2026-07-06T12:00:00.000Z");
+    expect(isStaleProcessingExecution({
+      status: "processing",
+      startedAt: { toMillis: () => now - DELETION_EXECUTION_STALE_MS - 1 }
+    }, now)).toBe(true);
   });
 
   it("produces a deterministic plan hash regardless of object insertion order", () => {
