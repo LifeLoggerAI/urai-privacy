@@ -2,7 +2,7 @@
   "name": "urai-privacy-functions",
   "version": "0.2.0-staging-scaffold",
   "private": true,
-  "main": "lib/index.js",
+  "main": "lib/exports.js",
   "engines": { "node": "20" },
   "scripts": {
     "build": "tsc",
