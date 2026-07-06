@@ -67,6 +67,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /consentDecisions/{id} {
+      allow read: if isOwner(resource.data.uid) || isAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /retentionPolicies/{id} {
       allow read: if signedIn();
       allow create, update, delete: if false;
