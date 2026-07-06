@@ -1,0 +1,63 @@
+name: Privacy Emulator Diagnostics
+
+on:
+  pull_request:
+    paths:
+      - "firestore.rules"
+      - "storage.rules"
+      - "functions/**"
+      - "tests/**"
+      - "package.json"
+      - ".github/workflows/privacy-emulator-diagnostics.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  emulator-diagnostics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install functions dependencies
+        run: npm ci --prefix functions
+      - name: Capture emulator verification
+        id: emulator
+        shell: bash
+        run: |
+          set +e
+          npm run test:emulators > emulator-test.log 2>&1
+          status=$?
+          echo "$status" > emulator-status.txt
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload emulator diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-emulator-diagnostic
+          path: |
+            emulator-test.log
+            emulator-status.txt
+          retention-days: 3
+      - name: Enforce emulator result
+        if: always()
+        shell: bash
+        run: |
+          status="$(cat emulator-status.txt)"
+          if [ "$status" != "0" ]; then
+            echo "Emulator verification failed. Diagnostic artifact uploaded."
+            grep -E "FAIL|Error|Assertion|expected|FirebaseError|permission-denied|Test Files|Tests" emulator-test.log | tail -n 120 || true
+            exit "$status"
+          fi
+          tail -n 60 emulator-test.log
