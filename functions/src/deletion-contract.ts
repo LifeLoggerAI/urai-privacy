@@ -14,6 +14,8 @@ export const DEFAULT_REQUIRED_DOWNSTREAM_SYSTEMS = [
   "urai-communications"
 ] as const;
 
+export const DELETION_EXECUTION_STALE_MS = 15 * 60 * 1000;
+
 export type PrimaryDeletionAdapterId = (typeof PRIMARY_DELETION_ADAPTERS)[number];
 
 export type DeletionPlanInput = {
@@ -25,6 +27,35 @@ export type DeletionPlanInput = {
   authAccountExists: boolean;
   requiredDownstreamSystems: string[];
 };
+
+type TimestampLike = {
+  toMillis?: () => number;
+  toDate?: () => Date;
+  seconds?: number;
+};
+
+function timestampMillis(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const timestamp = value as TimestampLike;
+  if (typeof timestamp.toMillis === "function") return timestamp.toMillis();
+  if (typeof timestamp.toDate === "function") return timestamp.toDate().getTime();
+  if (typeof timestamp.seconds === "number") return timestamp.seconds * 1000;
+  return null;
+}
+
+export function isStaleProcessingExecution(
+  execution: Record<string, unknown> | undefined,
+  nowMs = Date.now()
+): boolean {
+  if (execution?.status !== "processing") return false;
+  const startedMs = timestampMillis(execution.startedAt ?? execution.updatedAt);
+  return startedMs !== null && nowMs - startedMs > DELETION_EXECUTION_STALE_MS;
+}
 
 export function normalizeRequiredDownstreamSystems(raw: string | undefined, productionRuntime: boolean): string[] {
   if (!raw || !raw.trim()) {
