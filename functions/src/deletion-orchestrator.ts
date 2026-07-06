@@ -8,6 +8,7 @@ import { z } from "zod";
 import {
   deletionCompletionStatus,
   deletionPlanHash,
+  isStaleProcessingExecution,
   normalizeRequiredDownstreamSystems,
   PRIMARY_DELETION_ADAPTERS,
   type DeletionPlanInput
@@ -58,7 +59,6 @@ const STORAGE_PREFIX_TEMPLATES = [
 const DELETE_BATCH_LIMIT = 450;
 
 type CallableRequest = { auth?: { uid?: string; token?: Record<string, unknown> }; data?: unknown };
-
 type AdapterReceipt = {
   adapterId: string;
   status: "verified" | "failed";
@@ -102,12 +102,18 @@ async function countUidCollection(collectionName: string, uid: string): Promise<
   return (await db.collection(collectionName).where("uid", "==", uid).get()).size;
 }
 
-async function hasLegalHold(uid: string): Promise<boolean> {
-  const [userDoc, holdSnap] = await Promise.all([
-    db.collection("users").doc(uid).get(),
-    db.collection("legalHoldRecords").where("uid", "==", uid).where("status", "==", "active").limit(1).get()
-  ]);
-  return (userDoc.exists && userDoc.data()?.legalHold === true) || !holdSnap.empty;
+async function hasLegalHold(
+  uid: string,
+  userDoc?: FirebaseFirestore.DocumentSnapshot
+): Promise<boolean> {
+  if (userDoc?.exists && userDoc.data()?.legalHold === true) return true;
+  const holdSnap = await db
+    .collection("legalHoldRecords")
+    .where("uid", "==", uid)
+    .where("status", "==", "active")
+    .limit(1)
+    .get();
+  return !holdSnap.empty;
 }
 
 async function authAccountExists(uid: string): Promise<boolean> {
@@ -134,8 +140,9 @@ async function buildPlan(uid: string, requestId: string): Promise<DeletionPlanIn
   primaryAdapters: readonly string[];
   generatedAt: string;
 }> {
+  const userDoc = await db.collection("users").doc(uid).get();
   const firestoreCounts: Record<string, number> = {
-    users: (await db.collection("users").doc(uid).get()).exists ? 1 : 0
+    users: userDoc.exists ? 1 : 0
   };
   for (const collectionName of FIRESTORE_DELETE_COLLECTIONS) {
     firestoreCounts[collectionName] = await countUidCollection(collectionName, uid);
@@ -149,7 +156,7 @@ async function buildPlan(uid: string, requestId: string): Promise<DeletionPlanIn
   return {
     uid,
     requestId,
-    legalHold: await hasLegalHold(uid),
+    legalHold: await hasLegalHold(uid, userDoc),
     firestoreCounts,
     storageCounts,
     authAccountExists: await authAccountExists(uid),
@@ -205,8 +212,9 @@ async function executeFirestoreAdapter(uid: string): Promise<AdapterReceipt> {
 async function executeStorageAdapter(uid: string): Promise<AdapterReceipt> {
   let deletedCount = 0;
   for (const prefix of storagePrefixes(uid)) {
-    deletedCount += await countStoragePrefix(prefix);
-    await bucket.deleteFiles({ prefix, force: true });
+    const count = await countStoragePrefix(prefix);
+    deletedCount += count;
+    if (count > 0) await bucket.deleteFiles({ prefix, force: true });
   }
 
   const remaining: Record<string, number> = {};
@@ -243,13 +251,25 @@ async function executeAuthAdapter(uid: string): Promise<AdapterReceipt> {
   };
 }
 
-async function updateAdapterReceipt(executionRef: FirebaseFirestore.DocumentReference, receipt: AdapterReceipt) {
-  await executionRef.set({
-    adapters: {
-      [receipt.adapterId]: receipt
-    },
-    updatedAt: FieldValue.serverTimestamp()
-  }, { merge: true });
+function assertExecutionOwner(data: FirebaseFirestore.DocumentData | undefined, executionToken: string) {
+  if (data?.executionToken !== executionToken) {
+    throw new HttpsError("aborted", "Deletion execution ownership changed.");
+  }
+}
+
+async function updateAdapterReceipt(
+  executionRef: FirebaseFirestore.DocumentReference,
+  receipt: AdapterReceipt,
+  executionToken: string
+) {
+  await db.runTransaction(async (tx) => {
+    const current = await tx.get(executionRef);
+    assertExecutionOwner(current.data(), executionToken);
+    tx.set(executionRef, {
+      adapters: { [receipt.adapterId]: receipt },
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+  });
 }
 
 export const executeDeletionRequestV2 = onCall(async (request) => {
@@ -258,6 +278,7 @@ export const executeDeletionRequestV2 = onCall(async (request) => {
   if (!parsed.success) {
     throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
   }
+
   const { requestId, mode, expectedPlanHash } = parsed.data;
   const requestRef = db.collection("deletionRequests").doc(requestId);
   const executionRef = db.collection("deletionExecutions").doc(requestId);
@@ -268,15 +289,16 @@ export const executeDeletionRequestV2 = onCall(async (request) => {
   if (!uid) throw new HttpsError("failed-precondition", "Deletion request is missing uid.");
 
   const existingExecution = await executionRef.get();
-  if (deletion.status === "completed" && existingExecution.data()?.status === "completed") {
+  const existingData = existingExecution.data();
+  if (deletion.status === "completed" && existingData?.status === "completed") {
     return {
       requestId,
       status: "completed",
       alreadyCompleted: true,
-      receiptId: existingExecution.data()?.receiptId ?? null
+      receiptId: existingData.receiptId ?? null
     };
   }
-  if (existingExecution.data()?.status === "processing") {
+  if (existingData?.status === "processing" && !isStaleProcessingExecution(existingData)) {
     throw new HttpsError("aborted", "Deletion execution is already in progress.");
   }
 
@@ -311,7 +333,7 @@ export const executeDeletionRequestV2 = onCall(async (request) => {
       planHash,
       requiredDownstreamSystems,
       primaryAdapters: PRIMARY_DELETION_ADAPTERS,
-      createdAt: existingExecution.exists ? existingExecution.data()?.createdAt : FieldValue.serverTimestamp(),
+      createdAt: existingExecution.exists ? existingData?.createdAt : FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
     await requestRef.set({
@@ -344,16 +366,23 @@ export const executeDeletionRequestV2 = onCall(async (request) => {
   }
 
   const executionToken = randomUUID();
-  await db.runTransaction(async (tx) => {
+  const staleTakeover = await db.runTransaction(async (tx) => {
     const current = await tx.get(executionRef);
-    if (current.data()?.status === "processing") {
+    const currentData = current.data();
+    if (currentData?.status === "completed") {
+      throw new HttpsError("already-exists", "Deletion execution is already complete.");
+    }
+    if (currentData?.status === "processing" && !isStaleProcessingExecution(currentData)) {
       throw new HttpsError("aborted", "Deletion execution is already in progress.");
     }
+    const takingOver = currentData?.status === "processing";
     tx.set(executionRef, {
       requestId,
       uid,
       status: "processing",
       executionToken,
+      supersededExecutionToken: takingOver ? currentData?.executionToken ?? null : null,
+      staleTakeoverAt: takingOver ? FieldValue.serverTimestamp() : null,
       plan,
       planHash,
       requiredDownstreamSystems,
@@ -367,42 +396,58 @@ export const executeDeletionRequestV2 = onCall(async (request) => {
       destructiveDeletionBlocked: false,
       updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
+    return takingOver;
   });
+
+  if (staleTakeover) {
+    await writeAudit({
+      actorUid: adminUid,
+      action: "deletion_orchestration_stale_execution_taken_over",
+      targetUid: uid,
+      requestId,
+      metadata: { planHash, executionToken }
+    });
+  }
 
   const receipts: AdapterReceipt[] = [];
   try {
     for (const adapter of [executeStorageAdapter, executeFirestoreAdapter, executeAuthAdapter]) {
       const receipt = await adapter(uid);
       receipts.push(receipt);
-      await updateAdapterReceipt(executionRef, receipt);
+      await updateAdapterReceipt(executionRef, receipt, executionToken);
     }
 
-    const primaryStoresVerified = receipts.length === PRIMARY_DELETION_ADAPTERS.length && receipts.every((receipt) => receipt.status === "verified");
+    const primaryStoresVerified = receipts.length === PRIMARY_DELETION_ADAPTERS.length
+      && receipts.every((receipt) => receipt.status === "verified");
     const downstreamPending = [...requiredDownstreamSystems];
     const status = deletionCompletionStatus({ primaryStoresVerified, downstreamPending });
 
     if (status !== "completed") {
-      await executionRef.set({
-        status,
-        primaryStoresVerified,
-        downstreamPending,
-        completedPrimaryStoresAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
-      await requestRef.set({
-        status: "processing",
-        primaryStoresVerified,
-        downstreamPending,
-        destructiveDeletionBlocked: true,
-        destructiveDeletionReason: "Primary stores are verified, but required downstream deletion acknowledgements are still pending.",
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
+      await db.runTransaction(async (tx) => {
+        const current = await tx.get(executionRef);
+        assertExecutionOwner(current.data(), executionToken);
+        tx.set(executionRef, {
+          status,
+          primaryStoresVerified,
+          downstreamPending,
+          completedPrimaryStoresAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+        tx.set(requestRef, {
+          status: "processing",
+          primaryStoresVerified,
+          downstreamPending,
+          destructiveDeletionBlocked: true,
+          destructiveDeletionReason: "Primary stores are verified, but required downstream deletion acknowledgements are still pending.",
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
       const auditId = await writeAudit({
         actorUid: adminUid,
         action: "deletion_primary_stores_verified_downstream_pending",
         targetUid: uid,
         requestId,
-        metadata: { planHash, downstreamPending, receipts }
+        metadata: { planHash, downstreamPending, receipts, executionToken }
       });
       return {
         requestId,
@@ -416,39 +461,43 @@ export const executeDeletionRequestV2 = onCall(async (request) => {
     }
 
     const receiptRef = db.collection("deletionReceipts").doc();
-    await receiptRef.set({
-      requestId,
-      uid,
-      status: "completed",
-      planHash,
-      adapters: receipts,
-      requiredDownstreamSystems,
-      downstreamAcknowledgements: [],
-      issuedAt: FieldValue.serverTimestamp()
+    await db.runTransaction(async (tx) => {
+      const current = await tx.get(executionRef);
+      assertExecutionOwner(current.data(), executionToken);
+      tx.set(receiptRef, {
+        requestId,
+        uid,
+        status: "completed",
+        planHash,
+        adapters: receipts,
+        requiredDownstreamSystems,
+        downstreamAcknowledgements: [],
+        issuedAt: FieldValue.serverTimestamp()
+      });
+      tx.set(executionRef, {
+        status: "completed",
+        primaryStoresVerified: true,
+        downstreamPending: [],
+        receiptId: receiptRef.id,
+        completedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+      tx.set(requestRef, {
+        status: "completed",
+        primaryStoresVerified: true,
+        downstreamPending: [],
+        receiptId: receiptRef.id,
+        destructiveDeletionBlocked: false,
+        destructiveDeletionCompletedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
     });
-    await executionRef.set({
-      status: "completed",
-      primaryStoresVerified: true,
-      downstreamPending: [],
-      receiptId: receiptRef.id,
-      completedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
-    }, { merge: true });
-    await requestRef.set({
-      status: "completed",
-      primaryStoresVerified: true,
-      downstreamPending: [],
-      receiptId: receiptRef.id,
-      destructiveDeletionBlocked: false,
-      destructiveDeletionCompletedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
-    }, { merge: true });
     const auditId = await writeAudit({
       actorUid: adminUid,
       action: "deletion_orchestration_completed",
       targetUid: uid,
       requestId,
-      metadata: { planHash, receiptId: receiptRef.id, receipts }
+      metadata: { planHash, receiptId: receiptRef.id, receipts, executionToken }
     });
     return {
       requestId,
@@ -459,25 +508,41 @@ export const executeDeletionRequestV2 = onCall(async (request) => {
       userVisibleReceiptIssued: true
     };
   } catch (error) {
+    const current = await executionRef.get();
+    if (current.data()?.executionToken !== executionToken) {
+      const auditId = await writeAudit({
+        actorUid: adminUid,
+        action: "deletion_orchestration_superseded",
+        targetUid: uid,
+        requestId,
+        metadata: { planHash, executionToken, receipts }
+      });
+      throw new HttpsError("aborted", "Deletion execution ownership changed.", { auditId });
+    }
+
     const message = error instanceof Error ? error.message : String(error);
-    await executionRef.set({
-      status: "failed",
-      error: message,
-      failedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
-    }, { merge: true });
-    await requestRef.set({
-      status: "failed",
-      destructiveDeletionBlocked: true,
-      destructiveDeletionReason: message,
-      updatedAt: FieldValue.serverTimestamp()
-    }, { merge: true });
+    await db.runTransaction(async (tx) => {
+      const owned = await tx.get(executionRef);
+      assertExecutionOwner(owned.data(), executionToken);
+      tx.set(executionRef, {
+        status: "failed",
+        error: message,
+        failedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+      tx.set(requestRef, {
+        status: "failed",
+        destructiveDeletionBlocked: true,
+        destructiveDeletionReason: message,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    });
     const auditId = await writeAudit({
       actorUid: adminUid,
       action: "deletion_orchestration_failed",
       targetUid: uid,
       requestId,
-      metadata: { planHash, error: message, receipts }
+      metadata: { planHash, error: message, receipts, executionToken }
     });
     throw new HttpsError("internal", "Deletion orchestration failed.", { auditId });
   }
