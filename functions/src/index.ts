@@ -50,15 +50,13 @@ function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknow
   return uid;
 }
 
-async function isAdmin(uid: string, token?: Record<string, unknown>) {
-  if (token?.admin === true || token?.role === "admin") return true;
-  const snap = await db.collection("users").doc(uid).get();
-  return snap.exists && snap.data()?.role === "admin";
+function isAdmin(token?: Record<string, unknown>) {
+  return token?.admin === true || token?.role === "admin";
 }
 
 async function requireAdmin(request: { auth?: { uid?: string; token?: Record<string, unknown> } }) {
   const uid = uidFrom(request);
-  if (!(await isAdmin(uid, request.auth?.token))) {
+  if (!isAdmin(request.auth?.token)) {
     throw new HttpsError("permission-denied", "Admin access is required.");
   }
   return uid;
@@ -66,7 +64,7 @@ async function requireAdmin(request: { auth?: { uid?: string; token?: Record<str
 
 async function requireOwnerOrAdmin(request: { auth?: { uid?: string; token?: Record<string, unknown> } }, targetUid: string) {
   const uid = uidFrom(request);
-  if (uid !== targetUid && !(await isAdmin(uid, request.auth?.token))) {
+  if (uid !== targetUid && !isAdmin(request.auth?.token)) {
     throw new HttpsError("permission-denied", "Owner or admin access is required.");
   }
   return uid;
@@ -151,6 +149,17 @@ async function deletionPlan(uid: string) {
   return { uid, counts, retainedData: retainedDeletionCollections, generatedAt: new Date().toISOString(), mode: "safe-plan", legalHold, deletableCollections: ["users", ...deletableUserCollections] };
 }
 
+function deletionPlanHash(plan: Awaited<ReturnType<typeof deletionPlan>>) {
+  return sha256({
+    uid: plan.uid,
+    counts: plan.counts,
+    retainedData: plan.retainedData,
+    mode: plan.mode,
+    legalHold: plan.legalHold,
+    deletableCollections: plan.deletableCollections
+  });
+}
+
 async function deleteQueryBatch(collectionName: string, uid: string) {
   let deleted = 0;
   while (true) {
@@ -164,13 +173,13 @@ async function deleteQueryBatch(collectionName: string, uid: string) {
   }
 }
 
-async function executeDeletion(args: { adminUid: string; uid: string; requestId: string; expectedPlanHash?: string }) {
+async function executeDeletion(args: { adminUid: string; uid: string; requestId: string; expectedPlanHash: string }) {
   const plan = await deletionPlan(args.uid);
-  const planHash = sha256(plan);
+  const planHash = deletionPlanHash(plan);
   if (plan.legalHold) {
     throw new HttpsError("failed-precondition", "Deletion is blocked by active legal hold.");
   }
-  if (args.expectedPlanHash && args.expectedPlanHash !== planHash) {
+  if (args.expectedPlanHash !== planHash) {
     throw new HttpsError("failed-precondition", "Deletion plan changed. Re-run dry run and retry with the latest plan hash.");
   }
 
@@ -287,19 +296,20 @@ export const processDeletionRequest = onCall(async (request) => {
   const uid = String(deletion.uid ?? "");
   if (!uid) throw new HttpsError("failed-precondition", "Deletion request is missing uid.");
   const plan = await deletionPlan(uid);
+  const planHash = deletionPlanHash(plan);
   const safeStatus = status === "completed" ? "processing" : status;
   await ref.update({
     status: safeStatus,
     updatedAt: FieldValue.serverTimestamp(),
     deletionPlan: plan,
-    planHash: sha256(plan),
+    planHash,
     destructiveDeletionReady: true,
     destructiveDeletionBlocked: status === "completed",
     destructiveDeletionReason: status === "completed" ? "Use executeDeletionRequest with mode=execute and the current plan hash to complete destructive deletion after dry-run/legal-hold verification." : null
   });
   if (safeStatus === "processing") await db.collection("users").doc(uid).set({ markedForDeletion: true, deletionMarkedAt: FieldValue.serverTimestamp() }, { merge: true });
-  const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_processed", targetUid: uid, requestId, source: "function", metadata: { requestedStatus: status, appliedStatus: safeStatus, planHash: sha256(plan), destructiveDeletionReady: true } });
-  return { requestId, status: safeStatus, requestedStatus: status, auditId, plan, planHash: sha256(plan), destructiveDeletionReady: true };
+  const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_processed", targetUid: uid, requestId, source: "function", metadata: { requestedStatus: status, appliedStatus: safeStatus, planHash, destructiveDeletionReady: true } });
+  return { requestId, status: safeStatus, requestedStatus: status, auditId, plan, planHash, destructiveDeletionReady: true };
 });
 
 export const executeDeletionRequest = onCall(async (request) => {
@@ -314,7 +324,7 @@ export const executeDeletionRequest = onCall(async (request) => {
   if (["rejected", "failed", "completed"].includes(String(deletion.status))) throw new HttpsError("failed-precondition", "Deletion request is not executable in its current status.");
 
   const plan = await deletionPlan(uid);
-  const planHash = sha256(plan);
+  const planHash = deletionPlanHash(plan);
   if (plan.legalHold) {
     await ref.update({ status: "failed", updatedAt: FieldValue.serverTimestamp(), deletionPlan: plan, planHash, destructiveDeletionBlocked: true, destructiveDeletionReason: "Active legal hold blocks destructive deletion." });
     const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_execute_blocked_legal_hold", targetUid: uid, requestId, source: "function", metadata: { planHash } });
@@ -327,14 +337,28 @@ export const executeDeletionRequest = onCall(async (request) => {
     return { requestId, status: "processing", mode, auditId, plan, planHash, destructiveDeletionReady: true };
   }
 
+  if (!expectedPlanHash) {
+    const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_execute_blocked_missing_plan_hash", targetUid: uid, requestId, source: "function", metadata: { planHash } });
+    throw new HttpsError("failed-precondition", "A current dry-run plan hash is required before destructive deletion.", { auditId });
+  }
+
+  if (expectedPlanHash !== planHash) {
+    const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_execute_blocked_stale_plan_hash", targetUid: uid, requestId, source: "function", metadata: { expectedPlanHash, currentPlanHash: planHash } });
+    throw new HttpsError("failed-precondition", "Deletion plan changed. Re-run dry run and retry with the latest plan hash.", { auditId });
+  }
+
   try {
     const result = await executeDeletion({ adminUid, uid, requestId, expectedPlanHash });
     await ref.update({ status: "completed", updatedAt: FieldValue.serverTimestamp(), deletionPlan: result.plan, planHash: result.planHash, deletedCounts: result.deleted, retainedData: retainedDeletionCollections, destructiveDeletionBlocked: false, destructiveDeletionCompletedAt: FieldValue.serverTimestamp() });
     const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_execute_completed", targetUid: uid, requestId, source: "function", metadata: { planHash: result.planHash, deletedCounts: result.deleted } });
     return { requestId, status: "completed", mode, auditId, plan: result.plan, planHash: result.planHash, deletedCounts: result.deleted };
   } catch (err) {
-    await ref.update({ status: "failed", updatedAt: FieldValue.serverTimestamp(), destructiveDeletionBlocked: true, destructiveDeletionReason: err instanceof Error ? err.message : "Deletion execution failed." });
-    const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "deletion_execute_failed", targetUid: uid, requestId, source: "function", metadata: { error: err instanceof Error ? err.message : "unknown" } });
+    const isPrecondition = err instanceof HttpsError && err.code === "failed-precondition";
+    await ref.update({ status: isPrecondition ? "processing" : "failed", updatedAt: FieldValue.serverTimestamp(), destructiveDeletionBlocked: true, destructiveDeletionReason: err instanceof Error ? err.message : "Deletion execution failed." });
+    const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: isPrecondition ? "deletion_execute_blocked_precondition" : "deletion_execute_failed", targetUid: uid, requestId, source: "function", metadata: { error: err instanceof Error ? err.message : "unknown" } });
+    if (err instanceof HttpsError) {
+      throw new HttpsError(err.code, err.message, { auditId });
+    }
     throw new HttpsError("internal", "Deletion execution failed.", { auditId });
   }
 });
