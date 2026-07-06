@@ -1,0 +1,69 @@
+name: Consent Decision Branch Validation
+
+on:
+  push:
+    branches:
+      - privacy/consent-decision-p0-20260706
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: urai-privacy-consent-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-and-functions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install Functions dependencies
+        run: npm ci --prefix functions
+      - name: Lint
+        run: npm run lint
+      - name: Root typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Static rules validation
+        run: npm run test:rules:static
+      - name: Route smoke
+        run: npm run test:e2e
+      - name: Functions typecheck
+        run: npm --prefix functions run typecheck
+      - name: Functions build
+        run: npm --prefix functions run build
+      - name: Next production build
+        run: npm run build
+      - name: Security gate
+        run: npm run security:gate
+
+  emulator-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install Functions dependencies
+        run: npm ci --prefix functions
+      - name: Run Firebase emulator tests
+        env:
+          URAI_RELEASE_VERIFY: '1'
+        run: npm run test:emulators
