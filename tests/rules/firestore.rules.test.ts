@@ -91,9 +91,18 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertFails(getDoc(doc(authed("user-b"), "consentRecords/consent-a")));
   });
 
-  it("allows admin custom claim and admin role document reads", async () => {
+  it("requires trusted auth claims for administrator access", async () => {
     await assertSucceeds(getDoc(doc(authed("claim-admin", { admin: true }), "privacyRequests/preq-a")));
-    await assertSucceeds(getDoc(doc(authed("admin-a", { admin: true }), "privacyRequests/preq-a")));
+    await assertSucceeds(getDoc(doc(authed("role-claim-admin", { role: "admin" }), "privacyRequests/preq-a")));
+    await assertFails(getDoc(doc(authed("admin-a"), "privacyRequests/preq-a")));
+  });
+
+  it("prevents owners from creating or changing authority fields", async () => {
+    await assertSucceeds(setDoc(doc(authed("user-new"), "users/user-new"), { uid: "user-new", displayName: "Safe profile" }));
+    await assertFails(setDoc(doc(authed("attacker"), "users/attacker"), { uid: "attacker", role: "admin" }));
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { role: "admin" }));
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { admin: true }));
+    await assertSucceeds(updateDoc(doc(authed("user-a"), "users/user-a"), { displayName: "Updated safely" }));
   });
 
   it("allows users to create only their own pending privacy and deletion requests", async () => {
