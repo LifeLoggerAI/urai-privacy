@@ -1,6 +1,7 @@
 name: Consent Decision Branch Validation
 
 on:
+  pull_request:
   push:
     branches:
       - privacy/consent-decision-p0-20260706
