@@ -1,6 +1,5 @@
 export {
   createExportRequest,
-  processExportRequest,
   getExportDownloadUrl,
   createDeletionRequest,
   processDeletionRequest,
@@ -9,6 +8,8 @@ export {
   recordAdminAction,
   getPrivacyHealthReport
 } from "./index";
+
+export { processExportRequest } from "./export-functions";
 
 export {
   getConsentPurposeRegistry,
