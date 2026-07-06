@@ -11,4 +11,5 @@ export {
   getPrivacyHealthReport
 } from "./index";
 
+export { executeDeletionRequestV2 } from "./deletion-orchestrator";
 export { setCanonicalConsent, evaluateCanonicalConsent } from "./consent-api";
