@@ -31,7 +31,8 @@ const downloadSchema = z.object({
 type RequestAuth = { uid?: string; token?: Record<string, unknown> };
 
 function digest(value: unknown) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  const serialized = JSON.stringify(value) ?? String(value);
+  return createHash("sha256").update(serialized).digest("hex");
 }
 
 function text(value: unknown) {
@@ -237,6 +238,7 @@ export const cleanupExpiredExportPackages = onSchedule(
       if (page.size < EXPORT_CLEANUP_PAGE_SIZE) break;
     }
 
-    return { scanned, deleted, runAt: new Date(now).toISOString() };
+    void scanned;
+    void deleted;
   }
 );
