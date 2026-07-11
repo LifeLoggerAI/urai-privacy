@@ -43,6 +43,12 @@ function requestIdFrom(request: DeletionCallableRequest): string {
   return requestId;
 }
 
+function isUnverifiedCompletedState(state: Record<string, unknown>): boolean {
+  return state.status === "completed" &&
+    state.deletionCompletionVerificationRequired === true &&
+    state.deletionCompletionVerified !== true;
+}
+
 async function releaseDeletionMutationLease(requestId: string, token: string): Promise<void> {
   const ref = db.collection("deletionRequests").doc(requestId);
   await db.runTransaction(async (tx: Transaction) => {
@@ -160,10 +166,29 @@ async function withDeletionMutationLease<T>(args: {
   await db.runTransaction(async (tx: Transaction) => {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) throw new HttpsError("not-found", "Deletion request not found.");
-    const blocked = deletionMutationBlockReason(snapshot.data() ?? {}, nowMillis);
+    const state = snapshot.data() ?? {};
+    const blocked = deletionMutationBlockReason(state, nowMillis);
     if (blocked) throw new HttpsError(blocked.code, blocked.message);
+
+    const unverifiedCompletion = isUnverifiedCompletedState(state);
+    if (unverifiedCompletion && args.operation === "execute") {
+      throw new HttpsError(
+        "failed-precondition",
+        "The prior deletion completion was not verified. Run a new dry run before another destructive execution."
+      );
+    }
+
     tx.update(ref, {
       ...lease,
+      ...(unverifiedCompletion
+        ? {
+            status: "processing",
+            destructiveDeletionBlocked: true,
+            destructiveDeletionReady: false,
+            destructiveDeletionReason: "Prior deletion completion was not verified. Recovery requires a new plan.",
+            deletionExecutionState: "verification_required"
+          }
+        : {}),
       deletionMutationLeaseStartedAt: FieldValue.serverTimestamp(),
       ...(args.operation === "execute"
         ? {
