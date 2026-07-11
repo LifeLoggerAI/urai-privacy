@@ -5,6 +5,7 @@ const functionsSource = readFileSync("functions/src/index.ts", "utf8");
 const functionsEntry = readFileSync("functions/src/functions-entry.ts", "utf8");
 const exportRequest = readFileSync("functions/src/export-request.ts", "utf8");
 const exportPagination = readFileSync("functions/src/export-pagination.ts", "utf8");
+const exportCleanup = readFileSync("functions/src/export-artifact-cleanup.ts", "utf8");
 const consentApi = readFileSync("functions/src/consent-api.ts", "utf8");
 const consentRevocation = readFileSync("functions/src/consent-revocation.ts", "utf8");
 const firebaseClient = readFileSync("src/lib/firebase-privacy-client.ts", "utf8");
@@ -114,10 +115,11 @@ describe("privacy security boundaries", () => {
   });
 
   it("removes or explicitly tracks every deterministic export artifact after failure", () => {
-    expect(exportRequest).toContain("async function removeExportArtifacts");
-    expect(exportRequest).toContain("for (const path of [...cleanupTargets].reverse())");
+    expect(exportRequest).toContain('import { removeExportArtifacts } from "./export-artifact-cleanup";');
+    expect(exportCleanup).toContain("export async function removeExportArtifacts");
+    expect(exportCleanup).toContain("for (const path of [...cleanupTargets].reverse())");
     expect(exportRequest).toContain("delete({ ignoreNotFound: true })");
-    expect(exportRequest).toContain("removeExportArtifacts([exportPath, manifestPath])");
+    expect(exportRequest).toContain("removeExportArtifacts([exportPath, manifestPath], deleteExportArtifact)");
     expect(exportRequest).toContain("artifactCleanupStatus: cleanupStatus");
     expect(exportRequest).toContain("artifactCleanupPendingPaths: cleanup.pendingPaths");
     expect(exportRequest).toContain("artifactCleanupFailureCount: cleanup.pendingPaths.length");
