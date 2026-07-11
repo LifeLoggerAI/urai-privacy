@@ -43,6 +43,7 @@ const redactedFields = new Set(["password", "token", "secret", "apikey", "privat
 const EXPORT_SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 const QUERY_PAGE_LIMIT = 450;
 const DELETE_BATCH_LIMIT = 450;
+const DELETION_EXECUTION_LEASE_MS = 15 * 60 * 1000;
 
 const processExportSchema = z.object({ jobId: z.string().min(1) });
 const getExportDownloadSchema = z.object({ jobId: z.string().min(1), file: z.enum(["export", "manifest"]).default("export") });
@@ -113,6 +114,18 @@ function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown): T {
 
 function sha256(value: unknown) {
   return createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
+}
+
+function timestampMillis(value: unknown) {
+  if (value instanceof Date) return value.getTime();
+  if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }
 
 function scrub(value: unknown): unknown {
@@ -280,9 +293,10 @@ async function executeDeletion(args: {
   uid: string;
   requestId: string;
   plan: DeletionPlan;
+  currentPlan: DeletionPlan;
   planHash: string;
 }) {
-  const { plan, planHash } = args;
+  const { plan, currentPlan, planHash } = args;
   if (plan.uid !== args.uid) {
     throw new HttpsError("failed-precondition", "Deletion plan subject does not match the requested account.");
   }
@@ -301,17 +315,17 @@ async function executeDeletion(args: {
     targetUid: args.uid,
     requestId: args.requestId,
     source: "function",
-    metadata: { planHash, targetCounts: plan.counts }
+    metadata: { planHash, approvedTargetCounts: plan.counts, remainingTargetCounts: currentPlan.counts }
   });
 
   for (const collectionName of deletableUserCollections) {
-    deleted[collectionName] = await deleteDocumentIds(collectionName, plan.targets[collectionName] ?? []);
+    deleted[collectionName] = await deleteDocumentIds(collectionName, currentPlan.targets[collectionName] ?? []);
   }
 
-  deleted.users = await deleteDocumentIds("users", plan.targets.users ?? []);
+  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? []);
 
   let deletedStorageObjects = 0;
-  for (const objectName of plan.storageObjects) {
+  for (const objectName of currentPlan.storageObjects) {
     await bucket.file(objectName).delete({ ignoreNotFound: true });
     deletedStorageObjects += 1;
   }
@@ -660,7 +674,8 @@ export const executeDeletionRequest = onCall(async (request) => {
     if (["rejected", "failed", "completed"].includes(String(state.status))) {
       throw new HttpsError("failed-precondition", "Deletion request is not executable in its current status.");
     }
-    if (state.deletionExecutionState === "executing") {
+    const activeLeaseUntil = timestampMillis(state.deletionExecutionLeaseUntil);
+    if (state.deletionExecutionState === "executing" && activeLeaseUntil > Date.now()) {
       throw new HttpsError("aborted", "Deletion execution is already in progress.");
     }
     if (String(state.approvedPlanHash ?? "") !== approvedPlanHash) {
@@ -671,6 +686,7 @@ export const executeDeletionRequest = onCall(async (request) => {
       deletionExecutionStartedAt: FieldValue.serverTimestamp(),
       deletionExecutionStartedBy: adminUid,
       deletionExecutionPlanHash: approvedPlanHash,
+      deletionExecutionLeaseUntil: new Date(Date.now() + DELETION_EXECUTION_LEASE_MS),
       updatedAt: FieldValue.serverTimestamp()
     });
   });
@@ -686,7 +702,7 @@ export const executeDeletionRequest = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "Deletion targets changed after dry run. Re-run dry run before execution.");
     }
 
-    const result = await executeDeletion({ adminUid, uid, requestId, plan: approvedPlan, planHash: approvedPlanHash });
+    const result = await executeDeletion({ adminUid, uid, requestId, plan: approvedPlan, currentPlan, planHash: approvedPlanHash });
     await ref.update({
       status: "completed",
       updatedAt: FieldValue.serverTimestamp(),
@@ -697,7 +713,8 @@ export const executeDeletionRequest = onCall(async (request) => {
       destructiveDeletionBlocked: false,
       destructiveDeletionReady: false,
       destructiveDeletionCompletedAt: FieldValue.serverTimestamp(),
-      deletionExecutionState: "completed"
+      deletionExecutionState: "completed",
+      deletionExecutionLeaseUntil: FieldValue.delete()
     });
     const auditId = await writeAudit({
       actorUid: adminUid,
@@ -717,7 +734,8 @@ export const executeDeletionRequest = onCall(async (request) => {
       destructiveDeletionBlocked: true,
       destructiveDeletionReady: false,
       destructiveDeletionReason: error instanceof Error ? error.message : "Deletion execution failed.",
-      deletionExecutionState: isPrecondition ? "blocked" : "retry_required"
+      deletionExecutionState: isPrecondition ? "blocked" : "retry_required",
+      deletionExecutionLeaseUntil: FieldValue.delete()
     });
     const auditId = await writeAudit({
       actorUid: adminUid,
