@@ -1,8 +1,14 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   deletionCompletionBlockReason,
   type DeletionCompletionResiduals
 } from "../../functions/src/deletion-completion-verifier";
+
+const deletionMutationGuard = readFileSync(
+  "functions/src/deletion-mutation-guard.ts",
+  "utf8"
+);
 
 function residuals(
   overrides: Partial<DeletionCompletionResiduals> = {}
@@ -62,5 +68,14 @@ describe("deletion completion residual policy", () => {
         code: "failed-precondition",
         message: "Deletion completion cannot be verified because an active legal hold exists."
       });
+  });
+
+  it("atomically records final verification, reopening, and verifier failure evidence", () => {
+    expect(deletionMutationGuard).toContain("deletion_completion_verified");
+    expect(deletionMutationGuard).toContain("deletion_completion_reopened");
+    expect(deletionMutationGuard).toContain("deletion_completion_verification_failed");
+    expect(deletionMutationGuard).toContain("deletionCompletionVerificationAuditId");
+    expect(deletionMutationGuard).toContain("tx.set(auditRef");
+    expect(deletionMutationGuard).toContain("integrityHash");
   });
 });
