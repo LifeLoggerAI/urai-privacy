@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { FieldValue, getFirestore, type Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import {
@@ -49,6 +49,24 @@ function isUnverifiedCompletedState(state: Record<string, unknown>): boolean {
     state.deletionCompletionVerified !== true;
 }
 
+function sha256(value: unknown): string {
+  return createHash("sha256")
+    .update(typeof value === "string" ? value : JSON.stringify(value))
+    .digest("hex");
+}
+
+function completionResidualSummary(residuals: DeletionCompletionResiduals) {
+  return {
+    firestoreCounts: Object.fromEntries(
+      Object.entries(residuals.firestoreTargets).map(([name, ids]) => [name, ids.length])
+    ),
+    storageObjectCount: residuals.storageObjects.length,
+    authUserExists: residuals.authUserExists,
+    legalHold: residuals.legalHold,
+    totalResidualTargets: residuals.totalResidualTargets
+  };
+}
+
 async function releaseDeletionMutationLease(requestId: string, token: string): Promise<void> {
   const ref = db.collection("deletionRequests").doc(requestId);
   await db.runTransaction(async (tx: Transaction) => {
@@ -68,44 +86,118 @@ async function releaseDeletionMutationLease(requestId: string, token: string): P
 
 async function writeCompletionVerification(args: {
   requestId: string;
+  actorUid: string;
+  targetUid: string;
   residuals: DeletionCompletionResiduals;
   verified: boolean;
   reason?: string;
-}): Promise<void> {
+}): Promise<string> {
   const ref = db.collection("deletionRequests").doc(args.requestId);
-  const residualSummary = {
-    firestoreCounts: Object.fromEntries(
-      Object.entries(args.residuals.firestoreTargets).map(([name, ids]) => [name, ids.length])
-    ),
-    storageObjectCount: args.residuals.storageObjects.length,
-    authUserExists: args.residuals.authUserExists,
-    legalHold: args.residuals.legalHold,
-    totalResidualTargets: args.residuals.totalResidualTargets
+  const auditRef = db.collection("auditLogs").doc();
+  const residualSummary = completionResidualSummary(args.residuals);
+  const action = args.verified
+    ? "deletion_completion_verified"
+    : "deletion_completion_reopened";
+  const auditEvent = {
+    actorUid: args.actorUid,
+    actorRole: "admin",
+    action,
+    targetUid: args.targetUid,
+    requestId: args.requestId,
+    source: "system",
+    metadata: {
+      verified: args.verified,
+      reason: args.reason ?? null,
+      residualSummary
+    }
   };
-  await ref.update({
-    ...(args.verified
-      ? {
-          deletionCompletionVerificationRequired: false,
-          deletionCompletionVerified: true,
-          deletionCompletionVerifiedAt: FieldValue.serverTimestamp(),
-          deletionCompletionVerificationReason: FieldValue.delete()
-        }
-      : {
-          status: "processing",
-          destructiveDeletionBlocked: true,
-          destructiveDeletionReady: false,
-          destructiveDeletionReason: args.reason ?? "Deletion completion verification failed.",
-          deletionExecutionState: "verification_required",
-          deletionCompletionVerificationRequired: true,
-          deletionCompletionVerified: false,
-          deletionCompletionVerificationReason: args.reason ?? "Deletion completion verification failed."
-        }),
-    deletionCompletionResidualSummary: residualSummary,
-    updatedAt: FieldValue.serverTimestamp()
+
+  await db.runTransaction(async (tx: Transaction) => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) {
+      throw new HttpsError("not-found", "Deletion request disappeared during completion verification.");
+    }
+    tx.update(ref, {
+      ...(args.verified
+        ? {
+            deletionCompletionVerificationRequired: false,
+            deletionCompletionVerified: true,
+            deletionCompletionVerifiedAt: FieldValue.serverTimestamp(),
+            deletionCompletionVerificationReason: FieldValue.delete()
+          }
+        : {
+            status: "processing",
+            destructiveDeletionBlocked: true,
+            destructiveDeletionReady: false,
+            destructiveDeletionReason: args.reason ?? "Deletion completion verification failed.",
+            deletionExecutionState: "verification_required",
+            deletionCompletionVerificationRequired: true,
+            deletionCompletionVerified: false,
+            deletionCompletionVerificationReason: args.reason ?? "Deletion completion verification failed."
+          }),
+      deletionCompletionResidualSummary: residualSummary,
+      deletionCompletionVerificationAuditId: auditRef.id,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    tx.set(auditRef, {
+      ...auditEvent,
+      timestamp: FieldValue.serverTimestamp(),
+      integrityHash: sha256({ ...auditEvent, id: auditRef.id })
+    });
   });
+
+  return auditRef.id;
 }
 
-async function verifyCompletedDeletion(requestId: string): Promise<void> {
+async function writeCompletionVerificationFailure(args: {
+  requestId: string;
+  actorUid: string;
+  targetUid: string;
+  errorMessage: string;
+}): Promise<string> {
+  const ref = db.collection("deletionRequests").doc(args.requestId);
+  const auditRef = db.collection("auditLogs").doc();
+  const auditEvent = {
+    actorUid: args.actorUid,
+    actorRole: "admin",
+    action: "deletion_completion_verification_failed",
+    targetUid: args.targetUid,
+    requestId: args.requestId,
+    source: "system",
+    metadata: { error: args.errorMessage }
+  };
+
+  await db.runTransaction(async (tx: Transaction) => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) {
+      throw new HttpsError("not-found", "Deletion request disappeared during completion verification failure handling.");
+    }
+    tx.update(ref, {
+      status: "processing",
+      destructiveDeletionBlocked: true,
+      destructiveDeletionReady: false,
+      destructiveDeletionReason: "Deletion completion residual scan failed and must be retried.",
+      deletionExecutionState: "verification_required",
+      deletionCompletionVerificationRequired: true,
+      deletionCompletionVerified: false,
+      deletionCompletionVerificationReason: args.errorMessage,
+      deletionCompletionVerificationAuditId: auditRef.id,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    tx.set(auditRef, {
+      ...auditEvent,
+      timestamp: FieldValue.serverTimestamp(),
+      integrityHash: sha256({ ...auditEvent, id: auditRef.id })
+    });
+  });
+
+  return auditRef.id;
+}
+
+async function verifyCompletedDeletion(
+  requestId: string,
+  actorUid: string
+): Promise<void> {
   const ref = db.collection("deletionRequests").doc(requestId);
   const snapshot = await ref.get();
   if (!snapshot.exists) throw new HttpsError("not-found", "Deletion request not found during completion verification.");
@@ -116,39 +208,47 @@ async function verifyCompletedDeletion(requestId: string): Promise<void> {
   try {
     residuals = await collectDeletionCompletionResiduals(uid);
   } catch (error) {
-    await ref.update({
-      status: "processing",
-      destructiveDeletionBlocked: true,
-      destructiveDeletionReady: false,
-      destructiveDeletionReason: "Deletion completion residual scan failed and must be retried.",
-      deletionExecutionState: "verification_required",
-      deletionCompletionVerificationRequired: true,
-      deletionCompletionVerified: false,
-      deletionCompletionVerificationReason: error instanceof Error ? error.message : "unknown",
-      updatedAt: FieldValue.serverTimestamp()
+    const errorMessage = error instanceof Error ? error.message : "unknown";
+    const auditId = await writeCompletionVerificationFailure({
+      requestId,
+      actorUid,
+      targetUid: uid,
+      errorMessage
     });
-    throw new HttpsError("internal", "Deletion completed its mutation phase but residual verification failed.");
+    throw new HttpsError(
+      "internal",
+      "Deletion completed its mutation phase but residual verification failed.",
+      { auditId }
+    );
   }
 
   const blocked = deletionCompletionBlockReason(residuals);
   if (blocked) {
-    await writeCompletionVerification({
+    const auditId = await writeCompletionVerification({
       requestId,
+      actorUid,
+      targetUid: uid,
       residuals,
       verified: false,
       reason: blocked.message
     });
-    throw new HttpsError(blocked.code, blocked.message);
+    throw new HttpsError(blocked.code, blocked.message, { auditId });
   }
 
-  await writeCompletionVerification({ requestId, residuals, verified: true });
+  await writeCompletionVerification({
+    requestId,
+    actorUid,
+    targetUid: uid,
+    residuals,
+    verified: true
+  });
 }
 
 async function withDeletionMutationLease<T>(args: {
   request: DeletionCallableRequest;
   operation: DeletionMutationOperation;
   run: () => Promise<T>;
-  verifyAfterRun?: () => Promise<void>;
+  verifyAfterRun?: (context: { adminUid: string; requestId: string }) => Promise<void>;
 }): Promise<T> {
   const adminUid = requireAdminUid(args.request);
   const requestId = requestIdFrom(args.request);
@@ -203,7 +303,7 @@ async function withDeletionMutationLease<T>(args: {
 
   try {
     const result = await args.run();
-    if (args.verifyAfterRun) await args.verifyAfterRun();
+    if (args.verifyAfterRun) await args.verifyAfterRun({ adminUid, requestId });
     return result;
   } finally {
     try {
@@ -233,6 +333,8 @@ export const executeDeletionRequest = onCall(DELETION_CALLABLE_OPTIONS, async (r
     request,
     operation,
     run: () => unguardedExecuteDeletionRequest.run(request),
-    verifyAfterRun: operation === "execute" ? () => verifyCompletedDeletion(requestId) : undefined
+    verifyAfterRun: operation === "execute"
+      ? ({ adminUid }) => verifyCompletedDeletion(requestId, adminUid)
+      : undefined
   });
 });
