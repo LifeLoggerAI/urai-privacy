@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const functionsSource = readFileSync("functions/src/index.ts", "utf8");
+const functionsEntry = readFileSync("functions/src/functions-entry.ts", "utf8");
+const consentApi = readFileSync("functions/src/consent-api.ts", "utf8");
+const consentRevocation = readFileSync("functions/src/consent-revocation.ts", "utf8");
+const firebaseClient = readFileSync("src/lib/firebase-privacy-client.ts", "utf8");
+const consentPage = readFileSync("app/privacy-center/consent/page.tsx", "utf8");
 const firestoreRules = readFileSync("firestore.rules", "utf8");
 
 describe("privacy security boundaries", () => {
@@ -28,11 +33,25 @@ describe("privacy security boundaries", () => {
     expect(firestoreRules).toContain("allow create, update, delete: if false;");
   });
 
-  it("requires a stable approved plan hash for destructive deletion", () => {
-    expect(functionsSource).toContain("function deletionPlanHash");
+  it("binds destructive deletion to an immutable exact-target dry-run plan", () => {
+    expect(functionsSource).toContain("const deletionPlanSchema");
+    expect(functionsSource).toContain("targets: z.record");
+    expect(functionsSource).toContain("storageObjects: z.array");
+    expect(functionsSource).toContain("approvedDeletionPlan");
+    expect(functionsSource).toContain("approvedPlanHash");
+    expect(functionsSource).toContain("deletionPlanHash(approvedPlan)");
+    expect(functionsSource).toContain("deletionPlanIsSubsetOfApproved");
+    expect(functionsSource).toContain("Deletion targets changed after dry run");
     expect(functionsSource).toContain("A current dry-run plan hash is required before destructive deletion.");
     expect(functionsSource).toContain("deletion_execute_blocked_stale_plan_hash");
-    expect(functionsSource).not.toContain("if (args.expectedPlanHash && args.expectedPlanHash !== planHash)");
+  });
+
+  it("prevents concurrent execution and deletes only approved account targets", () => {
+    expect(functionsSource).toContain('deletionExecutionState === "executing"');
+    expect(functionsSource).toContain('deletionExecutionState: "executing"');
+    expect(functionsSource).toContain("deleteDocumentIds(collectionName, plan.targets[collectionName]");
+    expect(functionsSource).toContain('bucket.file(objectName).delete({ ignoreNotFound: true })');
+    expect(functionsSource).toContain("await auth.deleteUser(args.uid)");
   });
 
   it("does not reopen terminal deletion requests", () => {
@@ -40,12 +59,41 @@ describe("privacy security boundaries", () => {
     expect(functionsSource).toContain("Deletion request is already in a terminal state.");
   });
 
-  it("reuses and revalidates the caller-approved deletion plan", () => {
-    expect(functionsSource).toContain("plan: Awaited<ReturnType<typeof deletionPlan>>");
-    expect(functionsSource).toContain("if (plan.uid !== args.uid)");
-    expect(functionsSource).toContain("if (deletionPlanHash(plan) !== planHash)");
-    expect(functionsSource).toContain("plan.legalHold || await hasLegalHold(args.uid)");
-    expect(functionsSource).toContain("executeDeletion({ adminUid, uid, requestId, plan, planHash })");
-    expect(functionsSource).not.toContain("executeDeletion({ adminUid, uid, requestId, expectedPlanHash })");
+  it("removes the legacy consent bypass and uses only canonical consent purposes", () => {
+    expect(functionsEntry).not.toMatch(/\bupdateConsent\b/);
+    expect(functionsSource).not.toContain("export const updateConsent");
+    expect(functionsSource).not.toContain('policyVersion: "0.1.0-draft"');
+    expect(firebaseClient).toContain('callPrivacyFunction("setCanonicalConsent"');
+    expect(consentApi).toContain("CONSENT_DECISION_POLICY_VERSION");
+    expect(consentApi).toContain("{ merge: false }");
+    for (const purpose of [
+      "memory.storage",
+      "behavior.passive-context",
+      "location.context",
+      "inference.sensitive",
+      "biometric.identity",
+      "ai.personalization",
+      "data.export",
+      "data.monetization.anonymized"
+    ]) {
+      expect(consentPage).toContain(purpose);
+    }
+    expect(consentPage).not.toContain("audio_transcription");
+    expect(consentPage).not.toContain("gps_context");
+  });
+
+  it("binds revocation acknowledgements to an immutable consumer identity", () => {
+    expect(consentRevocation).toContain("boundConsumerAuthority");
+    expect(consentRevocation).toContain("token?.consumerId");
+    expect(consentRevocation).toContain("parsed.data.consumerId !== authority.consumerId");
+    expect(consentRevocation).toContain("transaction.create(ackRef");
+    expect(consentRevocation).toContain("A different immutable acknowledgement already exists for this consumer.");
+    expect(consentRevocation).not.toContain("transaction.set(ackRef");
+  });
+
+  it("does not claim privacy certification from queue counts alone", () => {
+    expect(functionsSource).toContain('verdict: "evidence_incomplete"');
+    expect(functionsSource).toContain('certification: "not_certified"');
+    expect(functionsSource).not.toContain('? "needs_review" : "healthy"');
   });
 });
