@@ -49,7 +49,9 @@ describe("privacy security boundaries", () => {
   it("prevents concurrent execution and deletes only approved account targets", () => {
     expect(functionsSource).toContain('deletionExecutionState === "executing"');
     expect(functionsSource).toContain('deletionExecutionState: "executing"');
-    expect(functionsSource).toContain("deleteDocumentIds(collectionName, plan.targets[collectionName]");
+    expect(functionsSource).toContain("DELETION_EXECUTION_LEASE_MS");
+    expect(functionsSource).toContain("deletionExecutionLeaseUntil");
+    expect(functionsSource).toContain("deleteDocumentIds(collectionName, currentPlan.targets[collectionName]");
     expect(functionsSource).toContain('bucket.file(objectName).delete({ ignoreNotFound: true })');
     expect(functionsSource).toContain("await auth.deleteUser(args.uid)");
   });
