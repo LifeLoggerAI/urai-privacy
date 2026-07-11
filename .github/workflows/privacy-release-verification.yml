@@ -12,7 +12,15 @@ on:
         required: false
         default: "0"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: privacy-release-verification-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
 env:
+  TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
   URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF: ${{ github.event.inputs.require_live_auth_proof || '0' }}
 
 jobs:
@@ -20,8 +28,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Checkout exact reviewed head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact clean head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain)"
 
       - name: Setup Node
         uses: actions/setup-node@v4
