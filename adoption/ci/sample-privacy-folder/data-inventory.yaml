@@ -1,7 +1,7 @@
 repo: sample-urai-repo
 privacyGovernanceVersion: 0.1.0-draft
 owner: product-privacy
-lastReviewed: 2026-05-06
+lastReviewed: "2026-05-06"
 
 fields:
   - name: app_interaction_rhythm
@@ -17,7 +17,6 @@ fields:
     aiTrainingAllowed: false
     adminAccessible: false
     auditRequired: true
-    notes: Sample behavioral metadata field.
 
   - name: mood_weather_state
     collectionOrTable: user_insights
@@ -32,4 +31,3 @@ fields:
     aiTrainingAllowed: false
     adminAccessible: false
     auditRequired: true
-    notes: Sample sensitive inference field.
