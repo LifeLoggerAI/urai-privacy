@@ -55,8 +55,19 @@ require_pattern "firestore.rules" 'allow (create, update, )?delete: if false|all
 require_pattern "firestore.rules" 'ownerIsNotCreatingPrivilegedFields' "Privileged user create guard"
 require_pattern "firestore.rules" 'ownerIsNotChangingPrivilegedFields' "Privileged user update guard"
 require_pattern "firestore.rules" 'allow create, update, delete: if false' "Server-mediated mutation rule"
-
 reject_pattern "storage.rules" 'allow[[:space:]]+delete:[[:space:]]+if[[:space:]]+(true|isAdmin\(\)|request\.auth)' "Storage delete allowance"
+
+echo "[security-gate] Checking deletion completion evidence boundary"
+require_pattern "functions/src/functions-entry.ts" 'deletion-mutation-guard' "guarded deletion exports"
+require_pattern "functions/src/deletion-mutation-guard.ts" 'timeoutSeconds: 14 \* 60' "bounded deletion callable runtime"
+require_pattern "functions/src/deletion-mutation-guard.ts" 'deletionCompletionVerificationRequired: true' "pre-execution completion verification requirement"
+require_pattern "functions/src/deletion-mutation-guard.ts" 'collectDeletionCompletionResiduals' "post-deletion residual scan"
+require_pattern "functions/src/deletion-mutation-guard.ts" 'deletionCompletionVerified: true' "verified completion marker"
+require_pattern "functions/src/deletion-completion-verifier.ts" 'getAuth\(\)\.getUser\(uid\)' "Auth identity residual check"
+require_pattern "functions/src/deletion-completion-verifier.ts" 'prefix: `exports/\$[{]uid[}]/`' "export-object residual check"
+require_pattern "functions/src/deletion-completion-verifier.ts" 'totalResidualTargets' "aggregate residual target count"
+require_pattern "tests/unit/deletion-completion-verifier.test.ts" 'blocks completion when a Firestore target remains' "Firestore residual regression test"
+require_pattern "tests/unit/deletion-completion-verifier.test.ts" 'blocks completion when the Firebase Auth identity remains' "Auth residual regression test"
 
 echo "[security-gate] Full npm audit visibility (non-blocking)"
 npm audit --omit=dev || true
