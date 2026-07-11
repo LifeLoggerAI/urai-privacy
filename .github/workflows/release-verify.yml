@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: urai-privacy-release-verify-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: urai-privacy-release-verify-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
