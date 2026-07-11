@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const functionsSource = readFileSync("functions/src/index.ts", "utf8");
 const functionsEntry = readFileSync("functions/src/functions-entry.ts", "utf8");
 const exportRequest = readFileSync("functions/src/export-request.ts", "utf8");
+const exportPagination = readFileSync("functions/src/export-pagination.ts", "utf8");
 const consentApi = readFileSync("functions/src/consent-api.ts", "utf8");
 const consentRevocation = readFileSync("functions/src/consent-revocation.ts", "utf8");
 const firebaseClient = readFileSync("src/lib/firebase-privacy-client.ts", "utf8");
@@ -94,17 +95,21 @@ describe("privacy security boundaries", () => {
     expect(consentRevocation).not.toContain("transaction.set(ackRef");
   });
 
-  it("exports every revocation acknowledgement with pagination and parent-event identity", () => {
+  it("exports every revocation acknowledgement with executable pagination and parent-event identity", () => {
     expect(functionsEntry).toContain('export { processExportRequest } from "./export-request";');
     expect(exportRequest).toContain('const revocationAcknowledgementExportKey = "consentRevocationAcknowledgements";');
-    expect(exportRequest).toContain("listSubcollectionDocuments");
+    expect(exportRequest).toContain('import { collectNestedRows, collectPaginatedRows } from "./export-pagination";');
+    expect(exportRequest).toContain("collectPaginatedRows<DocumentData>");
+    expect(exportRequest).toContain("collectNestedRows({");
     expect(exportRequest).toContain('listSubcollectionDocuments("consentRevocationOutbox", outbox.id, "acknowledgements")');
     expect(exportRequest).toContain(".orderBy(FieldPath.documentId())");
-    expect(exportRequest).toContain(".limit(QUERY_PAGE_LIMIT)");
+    expect(exportRequest).toContain(".limit(limit)");
     expect(exportRequest).toContain("query = query.startAfter(cursor)");
     expect(exportRequest).toContain("eventId: outbox.id");
     expect(exportRequest).toContain("recordCount += acknowledgements.length");
     expect(exportRequest).toContain("collections[revocationAcknowledgementExportKey] = []");
+    expect(exportRequest).toContain('onCall({ timeoutSeconds: 540, memory: "1GiB" }');
+    expect(exportPagination).toContain("Pagination cursor did not advance.");
     expect(exportRequest).toContain('action: "export_processing_failed"');
   });
 
