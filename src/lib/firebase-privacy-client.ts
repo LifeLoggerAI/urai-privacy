@@ -7,7 +7,21 @@ import { db, functions } from "../../firebase/firebase";
 export type CallableResult = Record<string, unknown>;
 
 const USER_SCOPED_COLLECTIONS = new Set(["privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "dataAccessEvents"]);
-const ADMIN_COLLECTIONS = new Set(["privacyRequests", "exportJobs", "deletionRequests", "consentRecords", "consentEvents", "auditLogs", "adminActions", "dataAccessEvents", "retentionPolicies", "policyVersions", "users", "legalHoldRecords"]);
+const ADMIN_COLLECTIONS = new Set([
+  "privacyRequests",
+  "exportJobs",
+  "deletionRequests",
+  "consentRecords",
+  "consentEvents",
+  "consentRevocationOutbox",
+  "auditLogs",
+  "adminActions",
+  "dataAccessEvents",
+  "retentionPolicies",
+  "policyVersions",
+  "users",
+  "legalHoldRecords"
+]);
 
 function requireFunctions() {
   if (!functions) throw new Error("FIREBASE_FUNCTIONS_NOT_CONFIGURED");
@@ -39,8 +53,20 @@ export function createDeletionRequest(reason: string) {
   return callPrivacyFunction("createDeletionRequest", { reason });
 }
 
-export function updateConsentPreference(payload: { purpose: string; consentTier: string; status: "granted" | "denied" | "revoked" }) {
-  return callPrivacyFunction("updateConsent", payload);
+export function updateConsentPreference(payload: {
+  purpose: string;
+  status: "granted" | "denied" | "revoked";
+  surface: string;
+  jurisdiction: string;
+  noticeVersion: string;
+  noticeHash?: string;
+  expiresAt?: string;
+}) {
+  return callPrivacyFunction("setCanonicalConsent", payload);
+}
+
+export function evaluateConsentPreference(payload: { purpose: string; correlationId: string; targetUid?: string }) {
+  return callPrivacyFunction("evaluateCanonicalConsent", payload);
 }
 
 export function getExportDownloadUrl(payload: { jobId: string; file?: "export" | "manifest" }) {
