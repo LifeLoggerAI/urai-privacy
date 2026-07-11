@@ -3,6 +3,7 @@ import { FieldPath, FieldValue, getFirestore, type DocumentData } from "firebase
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 
 const exportCollections = [
   "users",
@@ -20,6 +21,7 @@ const exportCollections = [
 const revocationAcknowledgementExportKey = "consentRevocationAcknowledgements";
 const redactedFields = new Set(["password", "token", "secret", "apikey", "privatekey", "refreshtoken", "idtoken"]);
 const QUERY_PAGE_LIMIT = 450;
+const NESTED_QUERY_CONCURRENCY = 8;
 
 const processExportSchema = z.object({ jobId: z.string().min(1) });
 
@@ -83,53 +85,43 @@ async function writeAudit(args: {
 
 async function listScopedDocuments(collectionName: string, field: "uid" | "targetUid", uid: string) {
   const db = getFirestore();
-  const documents: ExportRow[] = [];
-  let cursor: string | null = null;
-  while (true) {
+  return collectPaginatedRows<DocumentData>(async (cursor, limit) => {
     let query = db.collection(collectionName)
       .where(field, "==", uid)
       .orderBy(FieldPath.documentId())
-      .limit(QUERY_PAGE_LIMIT);
+      .limit(limit);
     if (cursor) query = query.startAfter(cursor);
     const snapshot = await query.get();
-    documents.push(...snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() })));
-    if (snapshot.size < QUERY_PAGE_LIMIT) return documents;
-    cursor = snapshot.docs.at(-1)?.id ?? null;
-    if (!cursor) return documents;
-  }
+    return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+  }, QUERY_PAGE_LIMIT);
 }
 
 async function listSubcollectionDocuments(parentCollection: string, parentId: string, subcollectionName: string) {
   const db = getFirestore();
-  const documents: ExportRow[] = [];
-  let cursor: string | null = null;
-  while (true) {
+  return collectPaginatedRows<DocumentData>(async (cursor, limit) => {
     let query = db.collection(parentCollection)
       .doc(parentId)
       .collection(subcollectionName)
       .orderBy(FieldPath.documentId())
-      .limit(QUERY_PAGE_LIMIT);
+      .limit(limit);
     if (cursor) query = query.startAfter(cursor);
     const snapshot = await query.get();
-    documents.push(...snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() })));
-    if (snapshot.size < QUERY_PAGE_LIMIT) return documents;
-    cursor = snapshot.docs.at(-1)?.id ?? null;
-    if (!cursor) return documents;
-  }
+    return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+  }, QUERY_PAGE_LIMIT);
 }
 
 async function collectRevocationAcknowledgements(outboxRows: ExportRow[]) {
-  const acknowledgements: Array<Record<string, unknown>> = [];
-  for (const outbox of outboxRows) {
-    const rows = await listSubcollectionDocuments("consentRevocationOutbox", outbox.id, "acknowledgements");
-    acknowledgements.push(...rows.map((row) => ({
+  return collectNestedRows({
+    parents: outboxRows,
+    concurrency: NESTED_QUERY_CONCURRENCY,
+    loadChildren: (outbox) => listSubcollectionDocuments("consentRevocationOutbox", outbox.id, "acknowledgements"),
+    mapChild: (outbox, row) => ({
       ...(scrub(row.data) as Record<string, unknown>),
       id: row.id,
       eventId: outbox.id,
       parentPath: `consentRevocationOutbox/${outbox.id}`
-    })));
-  }
-  return acknowledgements;
+    })
+  });
 }
 
 async function collectUserExport(uid: string) {
@@ -177,7 +169,7 @@ async function writeJson(path: string, value: unknown) {
   return { path, sha256: sha256(body), bytes: Buffer.byteLength(body, "utf8") };
 }
 
-export const processExportRequest = onCall(async (request) => {
+export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
   const db = getFirestore();
   const adminUid = await requireAdmin(request);
   const { jobId } = parseOrThrow(processExportSchema, request.data);
