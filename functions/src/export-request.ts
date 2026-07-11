@@ -3,6 +3,7 @@ import { FieldPath, FieldValue, getFirestore, type DocumentData } from "firebase
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 
 const exportCollections = [
@@ -169,20 +170,8 @@ async function writeJson(path: string, value: unknown) {
   return { path, sha256: sha256(body), bytes: Buffer.byteLength(body, "utf8") };
 }
 
-async function removeExportArtifacts(paths: readonly string[]) {
-  const bucket = getStorage().bucket();
-  const cleanupTargets = [...new Set(paths)];
-  const pendingPaths: string[] = [];
-
-  for (const path of [...cleanupTargets].reverse()) {
-    try {
-      await bucket.file(path).delete({ ignoreNotFound: true });
-    } catch {
-      pendingPaths.push(path);
-    }
-  }
-
-  return { targetCount: cleanupTargets.length, pendingPaths };
+async function deleteExportArtifact(path: string) {
+  await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
 }
 
 export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
@@ -257,7 +246,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     });
     return { jobId, status: "completed", auditId, manifestPath, exportPath, recordCount: exportData.recordCount };
   } catch (error) {
-    const cleanup = await removeExportArtifacts([exportPath, manifestPath]);
+    const cleanup = await removeExportArtifacts([exportPath, manifestPath], deleteExportArtifact);
     const cleanupStatus = cleanup.pendingPaths.length > 0 ? "incomplete" : "completed";
 
     await db.runTransaction(async (tx) => {
