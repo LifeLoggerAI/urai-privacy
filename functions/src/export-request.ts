@@ -169,6 +169,22 @@ async function writeJson(path: string, value: unknown) {
   return { path, sha256: sha256(body), bytes: Buffer.byteLength(body, "utf8") };
 }
 
+async function removeExportArtifacts(paths: readonly string[]) {
+  const bucket = getStorage().bucket();
+  const cleanupTargets = [...new Set(paths)];
+  const pendingPaths: string[] = [];
+
+  for (const path of [...cleanupTargets].reverse()) {
+    try {
+      await bucket.file(path).delete({ ignoreNotFound: true });
+    } catch {
+      pendingPaths.push(path);
+    }
+  }
+
+  return { targetCount: cleanupTargets.length, pendingPaths };
+}
+
 export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
   const db = getFirestore();
   const adminUid = await requireAdmin(request);
@@ -197,10 +213,11 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     return { uid, requestId, requestRef };
   });
 
+  const exportPath = `exports/${claim.uid}/${jobId}/export.json`;
+  const manifestPath = `exports/${claim.uid}/${jobId}/manifest.json`;
+
   try {
     const exportData = await collectUserExport(claim.uid);
-    const exportPath = `exports/${claim.uid}/${jobId}/export.json`;
-    const manifestPath = `exports/${claim.uid}/${jobId}/manifest.json`;
     const exportFile = await writeJson(exportPath, { uid: claim.uid, requestId: claim.requestId, jobId, generatedAt: new Date().toISOString(), data: exportData.collections });
     const manifestFile = await writeJson(manifestPath, {
       uid: claim.uid,
@@ -220,7 +237,11 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         exportPackagePath: exportPath,
         recordCount: exportData.recordCount,
         manifestSha256: manifestFile.sha256,
-        exportSha256: exportFile.sha256
+        exportSha256: exportFile.sha256,
+        artifactCleanupStatus: FieldValue.delete(),
+        artifactCleanupTargetCount: FieldValue.delete(),
+        artifactCleanupFailureCount: FieldValue.delete(),
+        artifactCleanupPendingPaths: FieldValue.delete()
       });
       tx.update(claim.requestRef, { status: "completed", updatedAt: FieldValue.serverTimestamp() });
     });
@@ -236,8 +257,21 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     });
     return { jobId, status: "completed", auditId, manifestPath, exportPath, recordCount: exportData.recordCount };
   } catch (error) {
+    const cleanup = await removeExportArtifacts([exportPath, manifestPath]);
+    const cleanupStatus = cleanup.pendingPaths.length > 0 ? "incomplete" : "completed";
+
     await db.runTransaction(async (tx) => {
-      tx.update(jobRef, { status: "failed", updatedAt: FieldValue.serverTimestamp() });
+      tx.update(jobRef, {
+        status: "failed",
+        updatedAt: FieldValue.serverTimestamp(),
+        processingBy: FieldValue.delete(),
+        exportManifestPath: manifestPath,
+        exportPackagePath: exportPath,
+        artifactCleanupStatus: cleanupStatus,
+        artifactCleanupTargetCount: cleanup.targetCount,
+        artifactCleanupFailureCount: cleanup.pendingPaths.length,
+        artifactCleanupPendingPaths: cleanup.pendingPaths
+      });
       tx.update(claim.requestRef, { status: "failed", updatedAt: FieldValue.serverTimestamp() });
     });
     const auditId = await writeAudit({
@@ -247,8 +281,14 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       targetUid: claim.uid,
       requestId: claim.requestId,
       source: "function",
-      metadata: { jobId, error: error instanceof Error ? error.message : "unknown" }
+      metadata: {
+        jobId,
+        error: error instanceof Error ? error.message : "unknown",
+        artifactCleanupStatus: cleanupStatus,
+        artifactCleanupTargetCount: cleanup.targetCount,
+        artifactCleanupFailureCount: cleanup.pendingPaths.length
+      }
     });
-    throw new HttpsError("internal", "Export processing failed.", { auditId });
+    throw new HttpsError("internal", "Export processing failed.", { auditId, artifactCleanupStatus: cleanupStatus });
   }
 });
