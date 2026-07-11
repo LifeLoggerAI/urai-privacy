@@ -6,6 +6,10 @@ import {
   processDeletionRequest as unguardedProcessDeletionRequest
 } from "./index";
 import {
+  deletionCompletionAuthorityBlockReason,
+  type DeletionCompletionAuthorityState
+} from "./deletion-completion-authority";
+import {
   collectDeletionCompletionResiduals,
   deletionCompletionBlockReason,
   type DeletionCompletionResiduals
@@ -24,6 +28,12 @@ const DELETION_CALLABLE_OPTIONS = {
 
 type DeletionMutationOperation = "process" | "dryRun" | "execute";
 type DeletionCallableRequest = CallableRequest<Record<string, unknown>>;
+
+type CompletionAuthority = {
+  actorUid: string;
+  targetUid: string;
+  leaseToken: string;
+};
 
 function requireAdminUid(request: DeletionCallableRequest): string {
   const uid = request.auth?.uid;
@@ -67,6 +77,19 @@ function completionResidualSummary(residuals: DeletionCompletionResiduals) {
   };
 }
 
+function requireCompletionAuthority(
+  state: DeletionCompletionAuthorityState,
+  authority: CompletionAuthority
+): void {
+  const blocked = deletionCompletionAuthorityBlockReason(state, {
+    actorUid: authority.actorUid,
+    targetUid: authority.targetUid,
+    leaseToken: authority.leaseToken,
+    nowMillis: Date.now()
+  });
+  if (blocked) throw new HttpsError(blocked.code, blocked.message);
+}
+
 async function releaseDeletionMutationLease(requestId: string, token: string): Promise<void> {
   const ref = db.collection("deletionRequests").doc(requestId);
   await db.runTransaction(async (tx: Transaction) => {
@@ -88,6 +111,7 @@ async function writeCompletionVerification(args: {
   requestId: string;
   actorUid: string;
   targetUid: string;
+  leaseToken: string;
   residuals: DeletionCompletionResiduals;
   verified: boolean;
   reason?: string;
@@ -117,6 +141,7 @@ async function writeCompletionVerification(args: {
     if (!snapshot.exists) {
       throw new HttpsError("not-found", "Deletion request disappeared during completion verification.");
     }
+    requireCompletionAuthority(snapshot.data() ?? {}, args);
     tx.update(ref, {
       ...(args.verified
         ? {
@@ -153,6 +178,7 @@ async function writeCompletionVerificationFailure(args: {
   requestId: string;
   actorUid: string;
   targetUid: string;
+  leaseToken: string;
   errorMessage: string;
 }): Promise<string> {
   const ref = db.collection("deletionRequests").doc(args.requestId);
@@ -172,6 +198,7 @@ async function writeCompletionVerificationFailure(args: {
     if (!snapshot.exists) {
       throw new HttpsError("not-found", "Deletion request disappeared during completion verification failure handling.");
     }
+    requireCompletionAuthority(snapshot.data() ?? {}, args);
     tx.update(ref, {
       status: "processing",
       destructiveDeletionBlocked: true,
@@ -196,13 +223,16 @@ async function writeCompletionVerificationFailure(args: {
 
 async function verifyCompletedDeletion(
   requestId: string,
-  actorUid: string
+  actorUid: string,
+  leaseToken: string
 ): Promise<void> {
   const ref = db.collection("deletionRequests").doc(requestId);
   const snapshot = await ref.get();
   if (!snapshot.exists) throw new HttpsError("not-found", "Deletion request not found during completion verification.");
   const uid = String(snapshot.data()?.uid ?? "");
   if (!uid) throw new HttpsError("failed-precondition", "Deletion request is missing uid during completion verification.");
+  const authority = { actorUid, targetUid: uid, leaseToken };
+  requireCompletionAuthority(snapshot.data() ?? {}, authority);
 
   let residuals: DeletionCompletionResiduals;
   try {
@@ -211,8 +241,7 @@ async function verifyCompletedDeletion(
     const errorMessage = error instanceof Error ? error.message : "unknown";
     const auditId = await writeCompletionVerificationFailure({
       requestId,
-      actorUid,
-      targetUid: uid,
+      ...authority,
       errorMessage
     });
     throw new HttpsError(
@@ -226,8 +255,7 @@ async function verifyCompletedDeletion(
   if (blocked) {
     const auditId = await writeCompletionVerification({
       requestId,
-      actorUid,
-      targetUid: uid,
+      ...authority,
       residuals,
       verified: false,
       reason: blocked.message
@@ -237,8 +265,7 @@ async function verifyCompletedDeletion(
 
   await writeCompletionVerification({
     requestId,
-    actorUid,
-    targetUid: uid,
+    ...authority,
     residuals,
     verified: true
   });
@@ -248,7 +275,11 @@ async function withDeletionMutationLease<T>(args: {
   request: DeletionCallableRequest;
   operation: DeletionMutationOperation;
   run: () => Promise<T>;
-  verifyAfterRun?: (context: { adminUid: string; requestId: string }) => Promise<void>;
+  verifyAfterRun?: (context: {
+    adminUid: string;
+    requestId: string;
+    leaseToken: string;
+  }) => Promise<void>;
 }): Promise<T> {
   const adminUid = requireAdminUid(args.request);
   const requestId = requestIdFrom(args.request);
@@ -303,7 +334,9 @@ async function withDeletionMutationLease<T>(args: {
 
   try {
     const result = await args.run();
-    if (args.verifyAfterRun) await args.verifyAfterRun({ adminUid, requestId });
+    if (args.verifyAfterRun) {
+      await args.verifyAfterRun({ adminUid, requestId, leaseToken: token });
+    }
     return result;
   } finally {
     try {
@@ -334,7 +367,7 @@ export const executeDeletionRequest = onCall(DELETION_CALLABLE_OPTIONS, async (r
     operation,
     run: () => unguardedExecuteDeletionRequest.run(request),
     verifyAfterRun: operation === "execute"
-      ? ({ adminUid }) => verifyCompletedDeletion(requestId, adminUid)
+      ? ({ adminUid, leaseToken }) => verifyCompletedDeletion(requestId, adminUid, leaseToken)
       : undefined
   });
 });
