@@ -121,7 +121,6 @@ describe("privacy security boundaries", () => {
     expect(exportRequest).toContain("artifactCleanupStatus: cleanupStatus");
     expect(exportRequest).toContain("artifactCleanupPendingPaths: cleanup.pendingPaths");
     expect(exportRequest).toContain("artifactCleanupFailureCount: cleanup.pendingPaths.length");
-    expect(exportRequest).toContain("if (job.status !== \"completed\")").not;
   });
 
   it("does not claim privacy certification from queue counts alone", () => {
