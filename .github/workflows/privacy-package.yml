@@ -9,23 +9,48 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: privacy-package-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact clean head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain)"
+
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+
       - name: Install validator dependencies
         run: pip install -r requirements.txt
+
       - name: Run unit tests
         run: python -m unittest discover -s tests -p 'test_*.py'
+
       - name: Scan for committed secrets
         run: python tools/check_secrets.py
+
       - name: Validate website
         run: python tools/check_website.py
+
       - name: Validate privacy package
         run: python tools/validate_privacy_package.py
