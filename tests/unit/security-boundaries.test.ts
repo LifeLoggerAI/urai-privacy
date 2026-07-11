@@ -113,6 +113,17 @@ describe("privacy security boundaries", () => {
     expect(exportRequest).toContain('action: "export_processing_failed"');
   });
 
+  it("removes or explicitly tracks every deterministic export artifact after failure", () => {
+    expect(exportRequest).toContain("async function removeExportArtifacts");
+    expect(exportRequest).toContain("for (const path of [...cleanupTargets].reverse())");
+    expect(exportRequest).toContain("delete({ ignoreNotFound: true })");
+    expect(exportRequest).toContain("removeExportArtifacts([exportPath, manifestPath])");
+    expect(exportRequest).toContain("artifactCleanupStatus: cleanupStatus");
+    expect(exportRequest).toContain("artifactCleanupPendingPaths: cleanup.pendingPaths");
+    expect(exportRequest).toContain("artifactCleanupFailureCount: cleanup.pendingPaths.length");
+    expect(exportRequest).toContain("if (job.status !== \"completed\")").not;
+  });
+
   it("does not claim privacy certification from queue counts alone", () => {
     expect(functionsSource).toContain('verdict: "evidence_incomplete"');
     expect(functionsSource).toContain('certification: "not_certified"');
