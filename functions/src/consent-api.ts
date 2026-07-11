@@ -17,7 +17,8 @@ const setConsentSchema = z.object({
   expiresAt: z.string().datetime().optional(),
   surface: z.string().trim().min(2).max(80).default("feature-gate"),
   jurisdiction: z.string().trim().min(2).max(80).default("unknown"),
-  evidenceHash: z.string().trim().min(16).max(128)
+  noticeVersion: z.string().trim().min(2).max(120),
+  noticeHash: z.string().regex(/^[0-9a-f]{64}$/).optional()
 });
 
 const decisionSchema = z.object({
@@ -36,10 +37,6 @@ function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknow
   return uid;
 }
 
-function isPrivileged(token?: Record<string, unknown>) {
-  return token?.admin === true || token?.system === true || token?.role === "admin" || token?.role === "system";
-}
-
 function canonicalPurpose(value: string): ConsentPurpose {
   if (!(value in consentPurposeRegistry)) {
     throw new HttpsError("failed-precondition", "Unknown consent purpose. Processing must fail closed until the purpose registry is updated.");
@@ -51,6 +48,20 @@ function consentRecordId(uid: string, purpose: string) {
   return `${uid}_${purpose.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
+function crossUserAuthority(token?: Record<string, unknown>) {
+  if (token?.admin === true || token?.role === "admin") {
+    return { role: "admin" as const, consumerId: null };
+  }
+
+  const system = token?.system === true || token?.role === "system";
+  const consumerId = typeof token?.consumerId === "string" ? token.consumerId.trim() : "";
+  if (system && /^[a-zA-Z0-9._-]{2,120}$/.test(consumerId)) {
+    return { role: "system" as const, consumerId };
+  }
+
+  return null;
+}
+
 export const setCanonicalConsent = onCall(async (request) => {
   const uid = uidFrom(request);
   const parsed = setConsentSchema.safeParse(request.data ?? {});
@@ -58,8 +69,23 @@ export const setCanonicalConsent = onCall(async (request) => {
 
   const purpose = canonicalPurpose(parsed.data.purpose);
   const definition = consentPurposeRegistry[purpose];
+  if (parsed.data.status === "granted" && parsed.data.expiresAt && Date.parse(parsed.data.expiresAt) <= Date.now()) {
+    throw new HttpsError("invalid-argument", "Granted consent cannot expire in the past.");
+  }
+
   const recordId = consentRecordId(uid, purpose);
   const now = new Date().toISOString();
+  const evidence = {
+    uid,
+    purpose,
+    status: parsed.data.status,
+    surface: parsed.data.surface,
+    jurisdiction: parsed.data.jurisdiction,
+    noticeVersion: parsed.data.noticeVersion,
+    noticeHash: parsed.data.noticeHash ?? null,
+    policyVersion: CONSENT_DECISION_POLICY_VERSION
+  };
+  const evidenceHash = hash(evidence);
   const receipt = {
     uid,
     purpose,
@@ -69,7 +95,9 @@ export const setCanonicalConsent = onCall(async (request) => {
     expiresAt: parsed.data.expiresAt ?? null,
     surface: parsed.data.surface,
     jurisdiction: parsed.data.jurisdiction,
-    evidenceHash: parsed.data.evidenceHash,
+    noticeVersion: parsed.data.noticeVersion,
+    noticeHash: parsed.data.noticeHash ?? null,
+    evidenceHash,
     updatedAt: now
   };
   const receiptHash = hash(receipt);
@@ -78,8 +106,14 @@ export const setCanonicalConsent = onCall(async (request) => {
   const auditRef = db.collection("auditLogs").doc();
 
   await db.runTransaction(async (transaction) => {
-    transaction.set(recordRef, { ...receipt, updatedAt: FieldValue.serverTimestamp(), receiptHash }, { merge: true });
-    transaction.set(eventRef, { ...receipt, consentRecordId: recordId, actorUid: uid, createdAt: FieldValue.serverTimestamp(), receiptHash: hash({ ...receipt, eventId: eventRef.id }) });
+    transaction.set(recordRef, { ...receipt, updatedAt: FieldValue.serverTimestamp(), receiptHash }, { merge: false });
+    transaction.set(eventRef, {
+      ...receipt,
+      consentRecordId: recordId,
+      actorUid: uid,
+      createdAt: FieldValue.serverTimestamp(),
+      receiptHash: hash({ ...receipt, eventId: eventRef.id })
+    });
     transaction.set(auditRef, {
       actorUid: uid,
       actorRole: "user",
@@ -87,12 +121,29 @@ export const setCanonicalConsent = onCall(async (request) => {
       targetUid: uid,
       source: "function",
       timestamp: FieldValue.serverTimestamp(),
-      metadata: { purpose, status: parsed.data.status, consentTier: definition.requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, consentRecordId: recordId, consentEventId: eventRef.id },
-      integrityHash: hash({ uid, purpose, status: parsed.data.status, consentRecordId: recordId, auditId: auditRef.id })
+      metadata: {
+        purpose,
+        status: parsed.data.status,
+        consentTier: definition.requiredTier,
+        policyVersion: CONSENT_DECISION_POLICY_VERSION,
+        consentRecordId: recordId,
+        consentEventId: eventRef.id,
+        evidenceHash
+      },
+      integrityHash: hash({ uid, purpose, status: parsed.data.status, consentRecordId: recordId, auditId: auditRef.id, evidenceHash })
     });
   });
 
-  return { consentId: recordId, consentEventId: eventRef.id, auditId: auditRef.id, status: parsed.data.status, consentTier: definition.requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, receiptHash };
+  return {
+    consentId: recordId,
+    consentEventId: eventRef.id,
+    auditId: auditRef.id,
+    status: parsed.data.status,
+    consentTier: definition.requiredTier,
+    policyVersion: CONSENT_DECISION_POLICY_VERSION,
+    evidenceHash,
+    receiptHash
+  };
 });
 
 export const evaluateCanonicalConsent = onCall(async (request) => {
@@ -102,8 +153,9 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
 
   const purpose = canonicalPurpose(parsed.data.purpose);
   const targetUid = parsed.data.targetUid ?? actorUid;
-  if (targetUid !== actorUid && !isPrivileged(request.auth?.token)) {
-    throw new HttpsError("permission-denied", "Owner, administrator, or trusted system authority is required.");
+  const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthority(request.auth?.token);
+  if (!authority) {
+    throw new HttpsError("permission-denied", "Owner, administrator, or a consumer-bound trusted system authority is required.");
   }
 
   const recordId = consentRecordId(targetUid, purpose);
@@ -113,6 +165,8 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
   await accessRef.set({
     uid: targetUid,
     actorUid,
+    actorRole: authority.role,
+    consumerId: authority.consumerId,
     purpose,
     correlationId: parsed.data.correlationId,
     decision: decision.allowed ? "allow" : "deny",
@@ -121,7 +175,17 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     policyVersion: decision.policyVersion,
     evaluatedAt: FieldValue.serverTimestamp(),
     consentRecordId: snapshot.exists ? recordId : null,
-    integrityHash: hash({ targetUid, actorUid, purpose, correlationId: parsed.data.correlationId, allowed: decision.allowed, reason: decision.reason, eventId: accessRef.id })
+    integrityHash: hash({
+      targetUid,
+      actorUid,
+      actorRole: authority.role,
+      consumerId: authority.consumerId,
+      purpose,
+      correlationId: parsed.data.correlationId,
+      allowed: decision.allowed,
+      reason: decision.reason,
+      eventId: accessRef.id
+    })
   });
 
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
