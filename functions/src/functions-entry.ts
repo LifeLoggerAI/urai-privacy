@@ -5,7 +5,6 @@ export {
   createDeletionRequest,
   processDeletionRequest,
   executeDeletionRequest,
-  updateConsent,
   writeAuditLog,
   recordAdminAction,
   getPrivacyHealthReport
