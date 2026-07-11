@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { FieldPath, FieldValue, getFirestore, type DocumentData } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, getFirestore, Timestamp, type DocumentData } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
@@ -20,9 +20,21 @@ const exportCollections = [
   "legalHoldRecords"
 ] as const;
 const revocationAcknowledgementExportKey = "consentRevocationAcknowledgements";
-const redactedFields = new Set(["password", "token", "secret", "apikey", "privatekey", "refreshtoken", "idtoken"]);
+const sensitiveFieldMarkers = [
+  "password",
+  "token",
+  "secret",
+  "apikey",
+  "privatekey",
+  "credential",
+  "authorization",
+  "cookie",
+  "sessionkey",
+  "webhooksignature"
+] as const;
 const QUERY_PAGE_LIMIT = 450;
 const NESTED_QUERY_CONCURRENCY = 8;
+const EXPORT_PROCESSING_LEASE_MS = 15 * 60 * 1000;
 
 const processExportSchema = z.object({ jobId: z.string().min(1) });
 
@@ -57,16 +69,28 @@ function sha256(value: unknown) {
   return createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
 }
 
-function scrub(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(scrub);
+export function shouldRedactExportField(key: string) {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return sensitiveFieldMarkers.some((marker) => normalized.includes(marker));
+}
+
+export function scrubExportValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(scrubExportValue);
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .filter(([key]) => !redactedFields.has(key.toLowerCase()))
-        .map(([key, nested]) => [key, scrub(nested)])
+        .filter(([key]) => !shouldRedactExportField(key))
+        .map(([key, nested]) => [key, scrubExportValue(nested)])
     );
   }
   return value;
+}
+
+export function processingLeaseIsActive(value: unknown, nowMs = Date.now()) {
+  if (!value || typeof value !== "object" || !("toMillis" in value) || typeof value.toMillis !== "function") {
+    return false;
+  }
+  return value.toMillis() > nowMs;
 }
 
 async function writeAudit(args: {
@@ -117,7 +141,7 @@ async function collectRevocationAcknowledgements(outboxRows: ExportRow[]) {
     concurrency: NESTED_QUERY_CONCURRENCY,
     loadChildren: (outbox) => listSubcollectionDocuments("consentRevocationOutbox", outbox.id, "acknowledgements"),
     mapChild: (outbox, row) => ({
-      ...(scrub(row.data) as Record<string, unknown>),
+      ...(scrubExportValue(row.data) as Record<string, unknown>),
       id: row.id,
       eventId: outbox.id,
       parentPath: `consentRevocationOutbox/${outbox.id}`
@@ -133,7 +157,7 @@ async function collectUserExport(uid: string) {
   for (const name of exportCollections) {
     if (name === "users") {
       const userDoc = await db.collection("users").doc(uid).get();
-      const docs = userDoc.exists ? [{ id: userDoc.id, ...(scrub(userDoc.data() ?? {}) as Record<string, unknown>) }] : [];
+      const docs = userDoc.exists ? [{ id: userDoc.id, ...(scrubExportValue(userDoc.data() ?? {}) as Record<string, unknown>) }] : [];
       collections[name] = docs;
       recordCount += docs.length;
       continue;
@@ -141,7 +165,7 @@ async function collectUserExport(uid: string) {
 
     const field = name === "auditLogs" || name === "adminActions" ? "targetUid" : "uid";
     const rows = await listScopedDocuments(name, field, uid);
-    const docs = rows.map((row) => ({ id: row.id, ...(scrub(row.data) as Record<string, unknown>) }));
+    const docs = rows.map((row) => ({ id: row.id, ...(scrubExportValue(row.data) as Record<string, unknown>) }));
     collections[name] = docs;
     recordCount += docs.length;
 
@@ -187,8 +211,13 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     const uid = String(job.uid ?? "");
     const requestId = String(job.requestId ?? "");
     if (!uid || !requestId) throw new HttpsError("failed-precondition", "Export job is missing uid or requestId.");
-    if (["processing", "completed"].includes(String(job.status))) {
-      throw new HttpsError("failed-precondition", "Export job is already processing or complete.");
+
+    const status = String(job.status ?? "");
+    if (status === "completed") {
+      throw new HttpsError("failed-precondition", "Export job is already complete.");
+    }
+    if (status === "processing" && processingLeaseIsActive(job.processingLeaseExpiresAt)) {
+      throw new HttpsError("failed-precondition", "Export job is already processing under an active lease.");
     }
 
     const requestRef = db.collection("privacyRequests").doc(requestId);
@@ -197,7 +226,13 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       throw new HttpsError("failed-precondition", "Export request linkage is invalid.");
     }
 
-    tx.update(jobRef, { status: "processing", updatedAt: FieldValue.serverTimestamp(), processingBy: adminUid });
+    tx.update(jobRef, {
+      status: "processing",
+      updatedAt: FieldValue.serverTimestamp(),
+      processingBy: adminUid,
+      processingLeaseExpiresAt: Timestamp.fromMillis(Date.now() + EXPORT_PROCESSING_LEASE_MS),
+      processingAttempt: FieldValue.increment(1)
+    });
     tx.update(requestRef, { status: "processing", updatedAt: FieldValue.serverTimestamp() });
     return { uid, requestId, requestRef };
   });
@@ -215,13 +250,15 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       generatedAt: new Date().toISOString(),
       recordCount: exportData.recordCount,
       files: [exportFile],
-      excludedFields: [...redactedFields]
+      excludedFieldMarkers: [...sensitiveFieldMarkers]
     });
 
     await db.runTransaction(async (tx) => {
       tx.update(jobRef, {
         status: "completed",
         updatedAt: FieldValue.serverTimestamp(),
+        processingBy: FieldValue.delete(),
+        processingLeaseExpiresAt: FieldValue.delete(),
         exportManifestPath: manifestPath,
         exportPackagePath: exportPath,
         recordCount: exportData.recordCount,
@@ -254,6 +291,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         status: "failed",
         updatedAt: FieldValue.serverTimestamp(),
         processingBy: FieldValue.delete(),
+        processingLeaseExpiresAt: FieldValue.delete(),
         exportManifestPath: manifestPath,
         exportPackagePath: exportPath,
         artifactCleanupStatus: cleanupStatus,
