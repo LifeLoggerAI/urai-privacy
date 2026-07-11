@@ -3,7 +3,7 @@ repo: sample-urai-repo
 owner: product-privacy
 privacyGovernanceVersion: 0.1.0-draft
 status: approved
-lastReviewed: 2026-05-06
+lastReviewed: "2026-05-06"
 
 summary:
   purpose: Generate a user-facing mood weather summary from consented context signals.
