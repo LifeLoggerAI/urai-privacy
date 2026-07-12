@@ -55,6 +55,13 @@ test("the verification transaction is the sole final completion writer", () => {
   assert.match(guardSource, /deletionCompletionAuthorityBlockReason/);
 });
 
+test("unverified verification_required state requires a fresh dry run before repeat execute", () => {
+  assert.match(authoritySource, /function isUnverifiedDeletionCompletionState/);
+  assert.match(authoritySource, /state\.deletionExecutionState === "verification_required"/);
+  assert.match(guardSource, /isUnverifiedDeletionCompletionState\(state\)/);
+  assert.match(guardSource, /run a new dry run before another destructive execution/);
+});
+
 test("verification authority requires the exact live execute lease and non-final state", () => {
   assert.match(authoritySource, /deletionMutationLeaseToken !== input\.leaseToken/);
   assert.match(authoritySource, /deletionMutationLeaseOperation !== "execute"/);
