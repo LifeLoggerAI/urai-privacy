@@ -79,10 +79,10 @@ export function deletionCompletionAuthorityBlockReason(
       message: "Deletion completion execute lease expired before verification was recorded."
     };
   }
-  if (state.status !== "completed" || state.deletionExecutionState !== "completed") {
+  if (state.status !== "processing" || state.deletionExecutionState !== "verifying") {
     return {
       code: "failed-precondition",
-      message: "Deletion execution is not in the completed mutation state."
+      message: "Deletion execution is not in the pending-verification mutation state."
     };
   }
   if (
