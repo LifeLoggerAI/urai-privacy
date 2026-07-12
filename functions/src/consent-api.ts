@@ -106,7 +106,11 @@ export const setCanonicalConsent = onCall(async (request) => {
   const auditRef = db.collection("auditLogs").doc();
 
   await db.runTransaction(async (transaction) => {
-    transaction.set(recordRef, { ...receipt, updatedAt: FieldValue.serverTimestamp(), receiptHash }, { merge: false });
+    transaction.set(recordRef, {
+      ...receipt,
+      receiptHash,
+      serverUpdatedAt: FieldValue.serverTimestamp()
+    }, { merge: false });
     transaction.set(eventRef, {
       ...receipt,
       consentRecordId: recordId,
@@ -128,9 +132,10 @@ export const setCanonicalConsent = onCall(async (request) => {
         policyVersion: CONSENT_DECISION_POLICY_VERSION,
         consentRecordId: recordId,
         consentEventId: eventRef.id,
-        evidenceHash
+        evidenceHash,
+        updatedAt: now
       },
-      integrityHash: hash({ uid, purpose, status: parsed.data.status, consentRecordId: recordId, auditId: auditRef.id, evidenceHash })
+      integrityHash: hash({ uid, purpose, status: parsed.data.status, consentRecordId: recordId, auditId: auditRef.id, evidenceHash, updatedAt: now })
     });
   });
 
@@ -141,6 +146,7 @@ export const setCanonicalConsent = onCall(async (request) => {
     status: parsed.data.status,
     consentTier: definition.requiredTier,
     policyVersion: CONSENT_DECISION_POLICY_VERSION,
+    updatedAt: now,
     evidenceHash,
     receiptHash
   };
