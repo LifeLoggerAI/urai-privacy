@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deletionCompletionAuthorityBlockReason,
+  isUnverifiedDeletionCompletionState,
   type DeletionCompletionAuthorityState
 } from "../../functions/src/deletion-completion-authority";
 
@@ -86,5 +87,30 @@ describe("deletion completion authority", () => {
       state({ deletionCompletionVerified: true }),
       input
     )).toMatchObject({ code: "failed-precondition" });
+  });
+});
+
+describe("unverified deletion completion recovery state", () => {
+  it("recognizes the actual processing verification_required state", () => {
+    expect(isUnverifiedDeletionCompletionState(state())).toBe(true);
+  });
+
+  it("recognizes legacy completed and verifying non-final states", () => {
+    expect(isUnverifiedDeletionCompletionState(state({ status: "completed" }))).toBe(true);
+    expect(isUnverifiedDeletionCompletionState(
+      state({ deletionExecutionState: "verifying" })
+    )).toBe(true);
+  });
+
+  it("does not block verified or pre-execution states", () => {
+    expect(isUnverifiedDeletionCompletionState(
+      state({ deletionCompletionVerified: true })
+    )).toBe(false);
+    expect(isUnverifiedDeletionCompletionState(
+      state({ deletionCompletionVerificationRequired: false })
+    )).toBe(false);
+    expect(isUnverifiedDeletionCompletionState(
+      state({ deletionExecutionState: "ready" })
+    )).toBe(false);
   });
 });
