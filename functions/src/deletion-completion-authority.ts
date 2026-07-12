@@ -79,7 +79,7 @@ export function deletionCompletionAuthorityBlockReason(
       message: "Deletion completion execute lease expired before verification was recorded."
     };
   }
-  if (state.status !== "processing" || state.deletionExecutionState !== "verifying") {
+  if (state.status !== "processing" || state.deletionExecutionState !== "verification_required") {
     return {
       code: "failed-precondition",
       message: "Deletion execution is not in the pending-verification mutation state."
