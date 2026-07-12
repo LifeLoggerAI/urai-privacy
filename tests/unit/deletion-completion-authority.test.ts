@@ -15,8 +15,8 @@ const input = {
 function state(overrides: Partial<DeletionCompletionAuthorityState> = {}): DeletionCompletionAuthorityState {
   return {
     uid: "user-1",
-    status: "completed",
-    deletionExecutionState: "completed",
+    status: "processing",
+    deletionExecutionState: "verification_required",
     deletionCompletionVerificationRequired: true,
     deletionCompletionVerified: false,
     deletionMutationLeaseToken: "lease-token-1",
@@ -28,7 +28,7 @@ function state(overrides: Partial<DeletionCompletionAuthorityState> = {}): Delet
 }
 
 describe("deletion completion authority", () => {
-  it("allows only the exact unexpired execute lease on the completed pending state", () => {
+  it("allows only the exact unexpired execute lease on the non-final pending-verification state", () => {
     expect(deletionCompletionAuthorityBlockReason(state(), input)).toBeNull();
   });
 
@@ -66,13 +66,13 @@ describe("deletion completion authority", () => {
     )).toMatchObject({ code: "aborted" });
   });
 
-  it("rejects a request that is no longer in completed mutation state", () => {
+  it("rejects a request that is no longer in the pending-verification mutation state", () => {
     expect(deletionCompletionAuthorityBlockReason(
-      state({ status: "processing" }),
+      state({ status: "completed" }),
       input
     )).toMatchObject({ code: "failed-precondition" });
     expect(deletionCompletionAuthorityBlockReason(
-      state({ deletionExecutionState: "verification_required" }),
+      state({ deletionExecutionState: "completed" }),
       input
     )).toMatchObject({ code: "failed-precondition" });
   });
