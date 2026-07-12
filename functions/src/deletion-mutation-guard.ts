@@ -7,6 +7,7 @@ import {
 } from "./index";
 import {
   deletionCompletionAuthorityBlockReason,
+  isUnverifiedDeletionCompletionState,
   type DeletionCompletionAuthorityState
 } from "./deletion-completion-authority";
 import {
@@ -54,12 +55,6 @@ function requestIdFrom(request: DeletionCallableRequest): string {
     throw new HttpsError("invalid-argument", "requestId is required.");
   }
   return requestId;
-}
-
-function isUnverifiedCompletionState(state: Record<string, unknown>): boolean {
-  return state.deletionCompletionVerificationRequired === true &&
-    state.deletionCompletionVerified !== true &&
-    (state.status === "completed" || state.deletionExecutionState === "verifying");
 }
 
 function sha256(value: unknown): string {
@@ -316,7 +311,7 @@ async function withDeletionMutationLease<T>(args: {
     const blocked = deletionMutationBlockReason(state, nowMillis);
     if (blocked) throw new HttpsError(blocked.code, blocked.message);
 
-    const unverifiedCompletion = isUnverifiedCompletionState(state);
+    const unverifiedCompletion = isUnverifiedDeletionCompletionState(state);
     if (unverifiedCompletion && args.operation === "execute") {
       throw new HttpsError(
         "failed-precondition",
