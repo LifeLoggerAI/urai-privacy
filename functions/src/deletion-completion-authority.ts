@@ -40,6 +40,18 @@ function timestampMillis(value: unknown): number | null {
   return null;
 }
 
+export function isUnverifiedDeletionCompletionState(
+  state: DeletionCompletionAuthorityState
+): boolean {
+  return state.deletionCompletionVerificationRequired === true &&
+    state.deletionCompletionVerified !== true &&
+    (
+      state.status === "completed" ||
+      state.deletionExecutionState === "verifying" ||
+      state.deletionExecutionState === "verification_required"
+    );
+}
+
 export function deletionCompletionAuthorityBlockReason(
   state: DeletionCompletionAuthorityState,
   input: DeletionCompletionAuthorityInput
