@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { FieldValue, getFirestore, type Transaction } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, getFirestore, type Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import {
   executeDeletionRequest as unguardedExecuteDeletionRequest,
@@ -25,6 +25,9 @@ const DELETION_CALLABLE_OPTIONS = {
   timeoutSeconds: 14 * 60,
   memory: "1GiB" as const
 };
+
+const COMPLETION_VERIFIER_REQUIRED_MESSAGE =
+  "Deletion completion verifier is required before destructive execution may become final.";
 
 type DeletionMutationOperation = "process" | "dryRun" | "execute";
 type DeletionCallableRequest = CallableRequest<Record<string, unknown>>;
@@ -53,10 +56,10 @@ function requestIdFrom(request: DeletionCallableRequest): string {
   return requestId;
 }
 
-function isUnverifiedCompletedState(state: Record<string, unknown>): boolean {
-  return state.status === "completed" &&
-    state.deletionCompletionVerificationRequired === true &&
-    state.deletionCompletionVerified !== true;
+function isUnverifiedCompletionState(state: Record<string, unknown>): boolean {
+  return state.deletionCompletionVerificationRequired === true &&
+    state.deletionCompletionVerified !== true &&
+    (state.status === "completed" || state.deletionExecutionState === "verifying");
 }
 
 function sha256(value: unknown): string {
@@ -142,12 +145,20 @@ async function writeCompletionVerification(args: {
       throw new HttpsError("not-found", "Deletion request disappeared during completion verification.");
     }
     requireCompletionAuthority(snapshot.data() ?? {}, args);
+    const now = new Date();
     tx.update(ref, {
       ...(args.verified
         ? {
+            status: "completed",
+            destructiveDeletionBlocked: false,
+            destructiveDeletionReady: false,
+            destructiveDeletionReason: FieldValue.delete(),
+            deletionExecutionState: "completed",
+            destructiveDeletionCompletedAt: Timestamp.fromDate(now),
             deletionCompletionVerificationRequired: false,
             deletionCompletionVerified: true,
-            deletionCompletionVerifiedAt: FieldValue.serverTimestamp(),
+            deletionCompletionVerificationStatus: "verified",
+            deletionCompletionVerifiedAt: Timestamp.fromDate(now),
             deletionCompletionVerificationReason: FieldValue.delete()
           }
         : {
@@ -158,15 +169,17 @@ async function writeCompletionVerification(args: {
             deletionExecutionState: "verification_required",
             deletionCompletionVerificationRequired: true,
             deletionCompletionVerified: false,
-            deletionCompletionVerificationReason: args.reason ?? "Deletion completion verification failed."
+            deletionCompletionVerificationStatus: "failed",
+            deletionCompletionVerificationReason: args.reason ?? "Deletion completion verification failed.",
+            destructiveDeletionCompletedAt: FieldValue.delete()
           }),
       deletionCompletionResidualSummary: residualSummary,
       deletionCompletionVerificationAuditId: auditRef.id,
-      updatedAt: FieldValue.serverTimestamp()
+      updatedAt: Timestamp.fromDate(now)
     });
     tx.set(auditRef, {
       ...auditEvent,
-      timestamp: FieldValue.serverTimestamp(),
+      timestamp: Timestamp.fromDate(now),
       integrityHash: sha256({ ...auditEvent, id: auditRef.id })
     });
   });
@@ -207,7 +220,9 @@ async function writeCompletionVerificationFailure(args: {
       deletionExecutionState: "verification_required",
       deletionCompletionVerificationRequired: true,
       deletionCompletionVerified: false,
+      deletionCompletionVerificationStatus: "failed",
       deletionCompletionVerificationReason: args.errorMessage,
+      destructiveDeletionCompletedAt: FieldValue.delete(),
       deletionCompletionVerificationAuditId: auditRef.id,
       updatedAt: FieldValue.serverTimestamp()
     });
@@ -301,11 +316,11 @@ async function withDeletionMutationLease<T>(args: {
     const blocked = deletionMutationBlockReason(state, nowMillis);
     if (blocked) throw new HttpsError(blocked.code, blocked.message);
 
-    const unverifiedCompletion = isUnverifiedCompletedState(state);
+    const unverifiedCompletion = isUnverifiedCompletionState(state);
     if (unverifiedCompletion && args.operation === "execute") {
       throw new HttpsError(
         "failed-precondition",
-        "The prior deletion completion was not verified. Run a new dry run before another destructive execution."
+        `${COMPLETION_VERIFIER_REQUIRED_MESSAGE} The prior deletion mutation was not verified; run a new dry run before another destructive execution.`
       );
     }
 
@@ -317,7 +332,8 @@ async function withDeletionMutationLease<T>(args: {
             destructiveDeletionBlocked: true,
             destructiveDeletionReady: false,
             destructiveDeletionReason: "Prior deletion completion was not verified. Recovery requires a new plan.",
-            deletionExecutionState: "verification_required"
+            deletionExecutionState: "verification_required",
+            destructiveDeletionCompletedAt: FieldValue.delete()
           }
         : {}),
       deletionMutationLeaseStartedAt: FieldValue.serverTimestamp(),
@@ -325,7 +341,9 @@ async function withDeletionMutationLease<T>(args: {
         ? {
             deletionCompletionVerificationRequired: true,
             deletionCompletionVerified: false,
-            deletionCompletionVerificationReason: FieldValue.delete()
+            deletionCompletionVerificationStatus: "pending",
+            deletionCompletionVerificationReason: FieldValue.delete(),
+            destructiveDeletionCompletedAt: FieldValue.delete()
           }
         : {}),
       updatedAt: FieldValue.serverTimestamp()
