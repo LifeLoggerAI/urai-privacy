@@ -704,7 +704,7 @@ export const executeDeletionRequest = onCall(async (request) => {
 
     const result = await executeDeletion({ adminUid, uid, requestId, plan: approvedPlan, currentPlan, planHash: approvedPlanHash });
     await ref.update({
-      status: "completed",
+      status: "processing",
       updatedAt: FieldValue.serverTimestamp(),
       deletionPlan: result.plan,
       planHash: result.planHash,
@@ -712,20 +712,24 @@ export const executeDeletionRequest = onCall(async (request) => {
       retainedData: [...retainedDeletionCollections],
       destructiveDeletionBlocked: false,
       destructiveDeletionReady: false,
-      destructiveDeletionCompletedAt: FieldValue.serverTimestamp(),
-      deletionExecutionState: "completed",
+      destructiveDeletionMutationCompletedAt: FieldValue.serverTimestamp(),
+      destructiveDeletionCompletedAt: FieldValue.delete(),
+      deletionExecutionState: "verification_required",
+      deletionCompletionVerificationRequired: true,
+      deletionCompletionVerified: false,
+      deletionCompletionVerificationStatus: "pending",
       deletionExecutionLeaseUntil: FieldValue.delete()
     });
     const auditId = await writeAudit({
       actorUid: adminUid,
       actorRole: "admin",
-      action: "deletion_execute_completed",
+      action: "deletion_execute_mutation_completed",
       targetUid: uid,
       requestId,
       source: "function",
-      metadata: { planHash: result.planHash, deletedCounts: result.deleted, resumedFromPartialState }
+      metadata: { planHash: result.planHash, deletedCounts: result.deleted, resumedFromPartialState, verificationRequired: true }
     });
-    return { requestId, status: "completed", mode, auditId, plan: result.plan, planHash: result.planHash, deletedCounts: result.deleted };
+    return { requestId, status: "processing", mode, auditId, plan: result.plan, planHash: result.planHash, deletedCounts: result.deleted, verificationRequired: true };
   } catch (error) {
     const isPrecondition = error instanceof HttpsError && error.code === "failed-precondition";
     await ref.update({
