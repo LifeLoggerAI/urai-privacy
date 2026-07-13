@@ -71,7 +71,7 @@ require_pattern "functions/src/deletion-completion-authority.ts" 'state\.deletio
 require_pattern "functions/src/deletion-completion-authority.ts" 'state\.deletionMutationLeaseOperation !== "execute"' "execute operation authority check"
 require_pattern "functions/src/deletion-completion-authority.ts" 'state\.deletionMutationLeaseBy !== input\.actorUid' "lease actor authority check"
 require_pattern "functions/src/deletion-completion-authority.ts" 'leaseUntil === null \|\| leaseUntil <= input\.nowMillis' "unexpired lease check"
-require_pattern "functions/src/deletion-completion-authority.ts" 'state\.status !== "completed"' "completed mutation state check"
+require_pattern "functions/src/deletion-completion-authority.ts" 'state\.status !== "processing"' "pending-verification mutation state check"
 require_pattern "functions/src/deletion-completion-authority.ts" 'deletionCompletionVerificationRequired !== true' "pending verification check"
 require_pattern "functions/src/deletion-completion-verifier.ts" 'getAuth\(\)\.getUser\(uid\)' "Auth identity residual check"
 require_pattern "functions/src/deletion-completion-verifier.ts" 'prefix: `exports/\$[{]uid[}]/`' "export-object residual check"
