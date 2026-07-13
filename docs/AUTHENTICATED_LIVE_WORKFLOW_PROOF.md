@@ -27,8 +27,14 @@ URAI_PRIVACY_BASE_URL="https://uraiprivacy.com" URAI_PRIVACY_REQUIRE_LIVE=1 npm 
 Required strict authenticated proof verification after the real redacted proof artifact is attached:
 
 ```bash
-URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 npm run test:live-auth-proof
+URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 \
+URAI_PRIVACY_EXPECTED_COMMIT_SHA="$(git rev-parse HEAD)" \
+URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT="<exact-firebase-project-id-or-approved-alias>" \
+URAI_PRIVACY_BASE_URL="https://<exact-deployed-host>" \
+npm run test:live-auth-proof
 ```
+
+The strict verifier compares the proof artifact to the exact 40-character checked-out commit SHA, the explicitly approved Firebase project identity, and the normalized HTTPS deployment URL. The full `npm run final:production-lock` command resolves and enforces the checked-out SHA automatically, but still requires `URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT` and `URAI_PRIVACY_BASE_URL` from the operator.
 
 The strict command must fail closed while the proof matrix remains incomplete, stale, synthetic, or not bound to the intended deployed Firebase project and tested commit SHA. Do not replace the required proof artifact with route reachability, emulator evidence, documentation, or a source-only test result.
 
