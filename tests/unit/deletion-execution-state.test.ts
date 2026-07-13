@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import test from "node:test";
+import { test } from "vitest";
 
 const source = readFileSync(new URL("../../functions/src/index.ts", import.meta.url), "utf8");
 const guardSource = readFileSync(new URL("../../functions/src/deletion-mutation-guard.ts", import.meta.url), "utf8");
