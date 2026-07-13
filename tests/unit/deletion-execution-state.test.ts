@@ -51,7 +51,11 @@ test("the verification transaction is the sole final completion writer", () => {
   assert.match(guardSource, /deletionCompletionVerified: true/);
   assert.match(guardSource, /deletionCompletionVerificationRequired: false/);
   assert.match(guardSource, /deletionCompletionVerificationStatus: "verified"/);
-  assert.match(guardSource, /action: "deletion_completion_verified"/);
+  assert.match(
+    guardSource,
+    /const action = args\.verified\s*\? "deletion_completion_verified"\s*: "deletion_completion_reopened";/
+  );
+  assert.match(guardSource, /const auditEvent = \{[\s\S]*?\baction,[\s\S]*?targetUid: args\.targetUid/);
   assert.match(guardSource, /deletionCompletionAuthorityBlockReason/);
 });
 
