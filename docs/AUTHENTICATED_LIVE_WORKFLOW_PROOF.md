@@ -24,6 +24,14 @@ Required public live route smoke:
 URAI_PRIVACY_BASE_URL="https://uraiprivacy.com" URAI_PRIVACY_REQUIRE_LIVE=1 npm run test:smoke:live
 ```
 
+Required strict authenticated proof verification after the real redacted proof artifact is attached:
+
+```bash
+URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 npm run test:live-auth-proof
+```
+
+The strict command must fail closed while the proof matrix remains incomplete, stale, synthetic, or not bound to the intended deployed Firebase project and tested commit SHA. Do not replace the required proof artifact with route reachability, emulator evidence, documentation, or a source-only test result.
+
 ## Required live-auth test identities
 
 | Identity | Purpose | Proof required |
