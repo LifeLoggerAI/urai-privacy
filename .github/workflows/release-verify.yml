@@ -72,10 +72,12 @@ jobs:
         run: |
           set +e
           set -o pipefail
-          mkdir -p artifacts/release-verify
-          npm run verify:release 2>&1 | tee artifacts/release-verify/full-release-verifier.log
+          log_dir="$RUNNER_TEMP/privacy-release-verify"
+          rm -rf -- "$log_dir"
+          mkdir -p -- "$log_dir"
+          npm run verify:release 2>&1 | tee "$log_dir/full-release-verifier.log"
           status=${PIPESTATUS[0]}
-          echo "$status" > artifacts/release-verify/exit-code.txt
+          echo "$status" > "$log_dir/exit-code.txt"
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -84,7 +86,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: privacy-release-verify-${{ env.TARGET_SHA }}-${{ github.run_id }}
-          path: artifacts/release-verify
+          path: ${{ runner.temp }}/privacy-release-verify
           if-no-files-found: error
           retention-days: 365
 
@@ -92,10 +94,9 @@ jobs:
         shell: bash
         run: test "${{ steps.release.outputs.status }}" = "0"
 
-      - name: Restore and prove clean tree
+      - name: Prove final clean tree
         if: always()
         shell: bash
         run: |
-          rm -rf artifacts
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
