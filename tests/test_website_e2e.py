@@ -108,11 +108,12 @@ class WebsiteStaticE2ETests(unittest.TestCase):
         self.assertIn("qualified legal review", status_html)
 
     def test_404_edge_path_recovers_to_safe_destinations(self) -> None:
-        parser = parse_page("404.html")
-        local_links = {target for href in parser.links if (target := local_target(href))}
-        self.assertIn("index.html", local_links)
-        self.assertIn("contact.html", local_links)
-        self.assertIn("#main", parser.skip_links)
+        with self.subTest("404 edge path"):
+            parser = parse_page("404.html")
+            local_links = {target for href in parser.links if (target := local_target(href))}
+            self.assertIn("index.html", local_links)
+            self.assertIn("contact.html", local_links)
+            self.assertIn("#main", parser.skip_links)
 
 
 if __name__ == "__main__":
