@@ -31,11 +31,12 @@ flowchart TD
 ## Required Controls
 
 - C8 consent required for participation
-- Minimum cohort size of 100 unless stricter threshold applies
+- The minimum cohort is 100 eligible, distinct participants unless a stricter documented threshold applies.
+- Cohorts below the threshold must be suppressed, combined into a sufficiently broad group, or blocked; they may not be released through rounding or label changes.
 - Re-identification review required
 - Raw biometric, raw transcript, raw image, and user-linked sensitive records prohibited
 - Opt-out stops future inclusion
-- Data product must document fields, transformations, cohort size, and approval owner
+- Data product must document fields, transformations, cohort size, threshold, suppressed groups, and approval owner
 
 ## Failure Modes
 
