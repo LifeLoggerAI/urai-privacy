@@ -3,6 +3,9 @@ import { existsSync, readFileSync } from "node:fs";
 
 const requireProof = process.env.URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF === "1";
 const proofPath = process.env.URAI_PRIVACY_AUTH_LIVE_PROOF_PATH || "release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.json";
+const expectedCommitSha = String(process.env.URAI_PRIVACY_EXPECTED_COMMIT_SHA || "").trim().toLowerCase();
+const expectedFirebaseProject = String(process.env.URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT || "").trim();
+const expectedBaseUrl = normalizeUrl(process.env.URAI_PRIVACY_BASE_URL || "");
 
 const requiredWorkflows = [
   "public_route_smoke",
@@ -34,6 +37,31 @@ function warn(message) {
   console.warn(`[authenticated-live-proof] ${message}`);
 }
 
+function normalizeUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    url.hash = "";
+    url.search = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return raw.replace(/\/$/, "");
+  }
+}
+
+if (requireProof) {
+  if (!/^[0-9a-f]{40}$/.test(expectedCommitSha)) {
+    fail("URAI_PRIVACY_EXPECTED_COMMIT_SHA must be the exact 40-character lowercase hexadecimal release SHA in strict mode.");
+  }
+  if (expectedFirebaseProject.length < 2) {
+    fail("URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT is required in strict mode.");
+  }
+  if (!/^https:\/\//.test(expectedBaseUrl)) {
+    fail("URAI_PRIVACY_BASE_URL must be the exact expected HTTPS deployment URL in strict mode.");
+  }
+}
+
 if (!existsSync(proofPath)) {
   const message = `Proof file not found at ${proofPath}. Set URAI_PRIVACY_AUTH_LIVE_PROOF_PATH or create the default proof artifact.`;
   if (requireProof) fail(message);
@@ -49,17 +77,32 @@ try {
 }
 
 const failures = [];
+const proofCommitSha = String(proof?.commitSha || "").trim().toLowerCase();
+const proofFirebaseProject = String(proof?.firebaseProjectAlias || "").trim();
+const proofBaseUrl = normalizeUrl(proof?.baseUrl || "");
 
 if (!proof || typeof proof !== "object") failures.push("proof root must be a JSON object");
-if (!proof.commitSha || String(proof.commitSha).trim().length < 7) failures.push("commitSha is required");
+if (!/^[0-9a-f]{40}$/.test(proofCommitSha)) failures.push("commitSha must be a full 40-character hexadecimal Git SHA");
 if (!proof.environment || String(proof.environment).trim().length < 2) failures.push("environment is required");
-if (!proof.baseUrl || !/^https?:\/\//.test(String(proof.baseUrl))) failures.push("baseUrl must be http(s)");
-if (!proof.firebaseProjectAlias || String(proof.firebaseProjectAlias).trim().length < 2) failures.push("firebaseProjectAlias is required");
+if (!/^https:\/\//.test(proofBaseUrl)) failures.push("baseUrl must be HTTPS");
+if (proofFirebaseProject.length < 2) failures.push("firebaseProjectAlias is required");
 if (!proof.operator || String(proof.operator).trim().length < 2) failures.push("operator is required");
 if (!proof.generatedAt || Number.isNaN(Date.parse(String(proof.generatedAt)))) failures.push("generatedAt must be an ISO-like timestamp");
 if (!proof.redactionStatement || String(proof.redactionStatement).trim().length < 20) failures.push("redactionStatement is required and must describe redaction");
 
-const workflows = proof.workflows && typeof proof.workflows === "object" ? proof.workflows : null;
+if (requireProof) {
+  if (proofCommitSha !== expectedCommitSha) {
+    failures.push(`commitSha mismatch: proof=${proofCommitSha || "missing"}, expected=${expectedCommitSha}`);
+  }
+  if (proofFirebaseProject !== expectedFirebaseProject) {
+    failures.push(`firebaseProjectAlias mismatch: proof=${proofFirebaseProject || "missing"}, expected=${expectedFirebaseProject}`);
+  }
+  if (proofBaseUrl !== expectedBaseUrl) {
+    failures.push(`baseUrl mismatch: proof=${proofBaseUrl || "missing"}, expected=${expectedBaseUrl}`);
+  }
+}
+
+const workflows = proof?.workflows && typeof proof.workflows === "object" ? proof.workflows : null;
 if (!workflows) {
   failures.push("workflows object is required");
 } else {
@@ -84,3 +127,6 @@ if (failures.length > 0) {
 }
 
 console.log(`[authenticated-live-proof] OK: ${requiredWorkflows.length} authenticated live workflow proofs validated from ${proofPath}`);
+if (requireProof) {
+  console.log(`[authenticated-live-proof] Bound to commit ${expectedCommitSha}, Firebase project ${expectedFirebaseProject}, and ${expectedBaseUrl}`);
+}
