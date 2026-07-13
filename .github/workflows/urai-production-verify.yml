@@ -52,32 +52,43 @@ jobs:
         run: |
           set +e
           set -o pipefail
-          mkdir -p artifacts/typecheck
-          npm run typecheck --if-present 2>&1 | tee artifacts/typecheck/typecheck.log
+          mkdir -p artifacts/verification
+          npm run typecheck --if-present 2>&1 | tee artifacts/verification/typecheck.log
           status=${PIPESTATUS[0]}
-          echo "$status" > artifacts/typecheck/exit-code.txt
+          echo "$status" > artifacts/verification/typecheck-exit-code.txt
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload typecheck diagnostics
+      - name: Capture root tests
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          npm test --if-present 2>&1 | tee artifacts/verification/root-tests.log
+          status=${PIPESTATUS[0]}
+          echo "$status" > artifacts/verification/root-tests-exit-code.txt
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload verification diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: privacy-typecheck-${{ env.TARGET_SHA }}-${{ github.run_id }}
-          path: artifacts/typecheck
+          name: privacy-source-verification-${{ env.TARGET_SHA }}-${{ github.run_id }}
+          path: artifacts/verification
           if-no-files-found: error
           retention-days: 365
 
-      - name: Enforce typecheck
+      - name: Enforce typecheck and tests
         shell: bash
-        run: test "${{ steps.typecheck.outputs.status }}" = "0"
+        run: |
+          test "${{ steps.typecheck.outputs.status }}" = "0"
+          test "${{ steps.tests.outputs.status }}" = "0"
 
-      - name: Remove typecheck diagnostics
+      - name: Remove verification diagnostics
         if: always()
         run: rm -rf artifacts
-
-      - name: Run tests
-        run: npm test --if-present
 
       - name: Build
         run: npm run build --if-present
@@ -89,5 +100,6 @@ jobs:
         if: always()
         shell: bash
         run: |
+          rm -rf artifacts
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
