@@ -35,7 +35,7 @@ URAI must log privacy-relevant actions in a way that supports investigation, use
 
 ## Integrity Controls
 
-Audit logs should be append-only, access-restricted, and protected from product-level deletion except where legally required.
+Audit logs should be append-only, access-restricted, and protected from product-level deletion except where legally required. Every retained audit event must preserve enough context to support investigation without copying unnecessary sensitive payloads into the log.
 
 ## User-Visible Audit History
 
