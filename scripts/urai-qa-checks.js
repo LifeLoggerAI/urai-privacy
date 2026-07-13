@@ -14,9 +14,18 @@ if (!fs.existsSync(root)) {
 const files = walk(root).filter((file) => file.endsWith('.html'));
 const errors = [];
 const warnings = [];
+let checked = 0;
+let skippedFrameworkInternals = 0;
 
 for (const file of files) {
   const rel = path.relative(root, file).replace(/\\/g, '/');
+  const segments = rel.split('/');
+  if (segments.some((segment) => segment.startsWith('_'))) {
+    skippedFrameworkInternals += 1;
+    continue;
+  }
+
+  checked += 1;
   const html = fs.readFileSync(file, 'utf8');
   const lower = html.toLowerCase();
   const protectedRoute = protectedNames.some((name) => rel.toLowerCase().includes(name));
@@ -36,7 +45,7 @@ for (const file of files) {
 
 for (const warning of warnings) console.log(`WARN ${warning}`);
 for (const error of errors) console.error(`ERROR ${error}`);
-console.log(`URAI QA checked ${files.length} HTML file(s).`);
+console.log(`URAI QA checked ${checked} product HTML file(s); skipped ${skippedFrameworkInternals} framework-internal artifact(s).`);
 process.exit(errors.length ? 1 : 0);
 
 function walk(dir) {
