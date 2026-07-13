@@ -44,11 +44,11 @@ jobs:
           node-version: '20.19.0'
           cache: npm
 
-      - name: Setup Java for Firebase emulators
+      - name: Setup Java 21 for Firebase emulators
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.7.1
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Install root dependencies
         run: npm ci
