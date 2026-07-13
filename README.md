@@ -20,6 +20,10 @@ The strict final command fails closed unless live route smoke is required, authe
 
 Full authenticated privacy operations are not READY unless `npm run final:production-lock` passes against the intended deployment host and the real proof artifact at `release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.json` has been attached.
 
+## Release Gate
+
+Nothing may be represented as production-ready until the repository package validator, release verification, emulator/rules tests, live route smoke, authenticated export/deletion/consent/admin-denial proof, monitoring, rollback, privacy review, and legal approval all pass for the same intended deployment. Missing or stale evidence keeps the gate closed; documentation, route reachability, or a green source build alone cannot open it.
+
 ## Repository role
 
 `urai-privacy` is no longer docs-only. It is now a hybrid operational package:
