@@ -15,6 +15,8 @@ const files = walk(root).filter((file) => file.endsWith('.html'));
 const errors = [];
 const warnings = [];
 let checked = 0;
+let publicChecked = 0;
+let protectedChecked = 0;
 let skippedFrameworkInternals = 0;
 
 for (const file of files) {
@@ -29,6 +31,9 @@ for (const file of files) {
   const html = fs.readFileSync(file, 'utf8');
   const lower = html.toLowerCase();
   const protectedRoute = protectedNames.some((name) => rel.toLowerCase().includes(name));
+  if (protectedRoute) protectedChecked += 1;
+  else publicChecked += 1;
+
   const hasNoIndex = lower.includes('noindex');
   const hasPrivacy = lower.includes('uraiprivacy.com') || lower.includes('/privacy');
 
@@ -43,9 +48,13 @@ for (const file of files) {
   if (!protectedRoute && !/<meta\s+name=['"]description['"]/i.test(html)) errors.push(`${rel}: missing description metadata`);
 }
 
+if (checked === 0) errors.push('no rendered product HTML files were checked');
+if (publicChecked === 0) errors.push('no rendered public product route was checked');
+if (protectedChecked === 0) errors.push('no rendered protected privacy/admin route was checked');
+
 for (const warning of warnings) console.log(`WARN ${warning}`);
 for (const error of errors) console.error(`ERROR ${error}`);
-console.log(`URAI QA checked ${checked} product HTML file(s); skipped ${skippedFrameworkInternals} framework-internal artifact(s).`);
+console.log(`URAI QA checked ${checked} product HTML file(s): ${publicChecked} public and ${protectedChecked} protected; skipped ${skippedFrameworkInternals} framework-internal artifact(s).`);
 process.exit(errors.length ? 1 : 0);
 
 function walk(dir) {
