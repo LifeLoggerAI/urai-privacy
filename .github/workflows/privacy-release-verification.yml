@@ -26,7 +26,7 @@ env:
 jobs:
   release-verification:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout exact reviewed head
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -49,11 +49,11 @@ jobs:
           node-version: "20.19.0"
           cache: npm
 
-      - name: Setup Java for Firebase emulators
+      - name: Setup Java 21 for Firebase emulators
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.7.1
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Install root dependencies
         run: npm ci
@@ -81,6 +81,7 @@ jobs:
           name: privacy-unit-tests-${{ env.TARGET_SHA }}-${{ github.run_id }}
           path: artifacts/ci-diagnostics/privacy-unit-tests.log
           if-no-files-found: ignore
+          retention-days: 365
 
       - name: Remove unit-test diagnostics
         if: always()
@@ -127,4 +128,5 @@ jobs:
         shell: bash
         run: |
           rm -rf artifacts
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
