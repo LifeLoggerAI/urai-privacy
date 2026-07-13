@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: urai-privacy-production-verify-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: urai-privacy-production-verify-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -40,8 +40,11 @@ jobs:
           node-version: '20.19.0'
           cache: npm
 
-      - name: Install dependencies
+      - name: Install root dependencies
         run: npm ci
+
+      - name: Install Functions dependencies
+        run: npm ci --prefix functions
 
       - name: Capture typecheck
         id: typecheck
