@@ -74,6 +74,7 @@ Admin routes:
 
 Start here:
 
+- [`website/`](./website/) — static public governance and rights pages.
 - [`docs/GOVERNANCE_INDEX.md`](./docs/GOVERNANCE_INDEX.md)
 - [`docs/PRODUCTION_READINESS.md`](./docs/PRODUCTION_READINESS.md)
 - [`docs/RELEASE_SIGNOFF.md`](./docs/RELEASE_SIGNOFF.md)
@@ -124,14 +125,15 @@ Implementation contracts:
 
 ## Relationship to other repos
 
-- `UrAi`: canonical main app and V1 demo experience.
-- `UrAi-Dev`: staging/demo work that must not be treated as production truth.
+- `urai-spatial` / `urai-tier1` / `main`: canonical public product authority and the only production application candidate.
+- `UrAi`: older V1 demo/reference application; it must not be treated as current production authority.
+- `UrAi-Dev`: staging/demo reference work that must not be treated as production truth.
 - `B2Bportal`: enterprise/partner portal with strict public-surface minimization.
 - `asset-factory`: generated assets, provider metadata, manifests, and release evidence.
 - `urai-admin`: operator/admin cockpit; must obey custom-claim, least-privilege, and audit rules.
 - `urai-analytics`: must use aggregate/privacy-safe analytics where possible.
 - `urai-jobs`: must audit retries/failures/background destructive work.
-- `urai-content`, `urai-studio`, `urai-spatial`, `urai-communications`, `urai-marketing`, `urai-staging`, and `UrAiProd`: must follow the cross-repo privacy matrix.
+- `urai-content`, `urai-studio`, `urai-communications`, `urai-marketing`, `urai-staging`, and `UrAiProd`: must follow the cross-repo privacy matrix and current authority register.
 
 Nothing ships if it violates this repo.
 
