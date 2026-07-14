@@ -1,14 +1,18 @@
 # Deletion Orchestration
 
-Status: `IMPLEMENTED BUT NOT DEPLOYED`
+Status: `RETAINED PREVIEW SOURCE — NOT ACTIVE — NOT DEPLOYED`
 
 Manifest version: `1.0.0`
 
-## Active callable behavior
+## Authority boundary
 
-The deployed function surface uses `functions/src/deletion-functions.ts` for deletion processing and execution requests.
+The canonical callable deletion surface remains `functions/src/deletion-mutation-guard.ts`, exported through `functions/src/functions-entry.ts`.
 
-A dry run:
+The retained files `deletion-contract.ts`, `deletion-inventory.ts`, `deletion-functions.ts`, `deletion-local-executor.ts`, and `deletion-source-registry.ts` preserve the unique source from PR #96 for focused review. They are deliberately not exported by the active Functions entry point.
+
+## Retained preview behavior
+
+The retained dry-run implementation:
 
 - verifies administrative authority;
 - inventories registered Firestore records;
@@ -19,17 +23,13 @@ A dry run:
 - records pending adapters and blockers;
 - writes auditable dry-run evidence.
 
-Execute mode requires the current dry-run hash but still fails closed. It cannot invoke destructive behavior until all registered adapters and verification gates are certified.
+Its execute mode requires a current dry-run hash and still fails closed. The local destructive executor is source-only and has no active callable path.
 
 ## Registered adapters
 
-Active local definitions:
+Local definitions exist for URAI Privacy Firestore, URAI Privacy Storage, and Firebase Auth.
 
-- urai-privacy Firestore;
-- urai-privacy Storage;
-- Firebase Auth.
-
-Pending definitions:
+The following adapters remain pending and therefore block execution:
 
 - urai-spatial;
 - urai-studio;
@@ -39,23 +39,18 @@ Pending definitions:
 - asset-factory;
 - urai-communications.
 
-Any pending adapter or active legal hold blocks execution.
-
-## Local adapter source
-
-`functions/src/deletion-local-executor.ts` contains idempotent local operations and post-action verification for the registered privacy collections, user document, export objects, session revocation, and Auth account state.
-
-That source is intentionally not called by the active callable in this branch.
+An active legal hold also blocks execution.
 
 ## Required certification
 
-- exact-head unit, typecheck, and Functions build;
+- exact-head unit, typecheck, Functions build, and static contract evidence;
 - emulator tests for inventory, legal holds, stale plans, and cross-user denial;
-- isolated staging tests for local adapters and verification;
+- isolated protected-staging tests for local adapters and verification;
 - downstream adapter contracts and acknowledgements;
 - retained-record minimization and expiry rules;
 - retry, recovery, and terminal-failure tests;
 - user-visible receipt delivery after verification;
+- independent privacy, security, and legal approval;
 - deployment and rollback receipts.
 
-Until those requirements are met, URAI must not claim complete account or data deletion.
+Until every requirement is satisfied, URAI must not claim complete account or data deletion and must not activate the retained preview handlers.
