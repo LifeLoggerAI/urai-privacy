@@ -59,9 +59,14 @@ jobs:
       - name: Generate non-breaking lockfile remediation
         shell: bash
         run: |
+          set +e
+          npm audit fix --package-lock-only --omit=dev > artifacts/dependency-remediation/root-fix.log 2>&1
+          root_fix_status=$?
+          npm --prefix functions audit fix --package-lock-only --omit=dev > artifacts/dependency-remediation/functions-fix.log 2>&1
+          functions_fix_status=$?
+          printf '%s\n' "$root_fix_status" > artifacts/dependency-remediation/root-fix-exit.txt
+          printf '%s\n' "$functions_fix_status" > artifacts/dependency-remediation/functions-fix-exit.txt
           set -euo pipefail
-          npm audit fix --package-lock-only --omit=dev
-          npm --prefix functions audit fix --package-lock-only --omit=dev
           git diff -- package-lock.json functions/package-lock.json > artifacts/dependency-remediation/lockfile.patch
           test -s artifacts/dependency-remediation/lockfile.patch
 
