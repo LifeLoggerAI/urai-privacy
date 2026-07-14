@@ -47,40 +47,48 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Generate non-breaking remediation candidate
+      - name: Generate and test non-breaking remediation candidate
+        id: remediation
         shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/privacy-remediation/root" "$RUNNER_TEMP/privacy-remediation/functions"
-
-          npm install --package-lock-only --save-dev --save-exact vitest@4.1.10
           set +e
-          npm audit fix --package-lock-only > "$RUNNER_TEMP/privacy-remediation/root/audit-fix.log" 2>&1
+          out="$RUNNER_TEMP/privacy-remediation"
+          mkdir -p "$out/root" "$out/functions"
+
+          npm install --package-lock-only --save-dev --save-exact vitest@4.1.10 > "$out/root/vitest-update.log" 2>&1
+          vitest_status=$?
+          npm audit fix --package-lock-only > "$out/root/audit-fix.log" 2>&1
           root_fix_status=$?
-          (cd functions && npm audit fix --package-lock-only > "$RUNNER_TEMP/privacy-remediation/functions/audit-fix.log" 2>&1)
+          (cd functions && npm audit fix --package-lock-only > "$out/functions/audit-fix.log" 2>&1)
           functions_fix_status=$?
-          set -e
 
-          npm ci
-          npm test > "$RUNNER_TEMP/privacy-remediation/root/test.log" 2>&1
-          npm run typecheck > "$RUNNER_TEMP/privacy-remediation/root/typecheck.log" 2>&1
-          (cd functions && npm ci && npm run typecheck > "$RUNNER_TEMP/privacy-remediation/functions/typecheck.log" 2>&1)
+          npm ci > "$out/root/npm-ci.log" 2>&1
+          root_ci_status=$?
+          npm test > "$out/root/test.log" 2>&1
+          root_test_status=$?
+          npm run typecheck > "$out/root/typecheck.log" 2>&1
+          root_typecheck_status=$?
+          (cd functions && npm ci > "$out/functions/npm-ci.log" 2>&1)
+          functions_ci_status=$?
+          (cd functions && npm run typecheck > "$out/functions/typecheck.log" 2>&1)
+          functions_typecheck_status=$?
 
-          set +e
-          npm audit --json > "$RUNNER_TEMP/privacy-remediation/root/audit-after.json"
+          npm audit --json > "$out/root/audit-after.json"
           root_audit_status=$?
-          (cd functions && npm audit --json > "$RUNNER_TEMP/privacy-remediation/functions/audit-after.json")
+          (cd functions && npm audit --json > "$out/functions/audit-after.json")
           functions_audit_status=$?
-          set -e
 
-          cp package.json package-lock.json "$RUNNER_TEMP/privacy-remediation/root/"
-          cp functions/package.json functions/package-lock.json "$RUNNER_TEMP/privacy-remediation/functions/"
-          printf 'target_sha=%s\nnode=%s\nnpm=%s\nroot_fix_status=%s\nfunctions_fix_status=%s\nroot_audit_status=%s\nfunctions_audit_status=%s\nforced_updates=false\n' \
-            "$TARGET_SHA" "$(node --version)" "$(npm --version)" \
-            "$root_fix_status" "$functions_fix_status" "$root_audit_status" "$functions_audit_status" \
-            > "$RUNNER_TEMP/privacy-remediation/identity.txt"
+          cp package.json package-lock.json "$out/root/" 2>/dev/null
+          cp functions/package.json functions/package-lock.json "$out/functions/" 2>/dev/null
+          printf 'target_sha=%s\nnode=%s\nnpm=%s\nvitest_status=%s\nroot_fix_status=%s\nfunctions_fix_status=%s\nroot_ci_status=%s\nroot_test_status=%s\nroot_typecheck_status=%s\nfunctions_ci_status=%s\nfunctions_typecheck_status=%s\nroot_audit_status=%s\nfunctions_audit_status=%s\nforced_updates=false\n' \
+            "$TARGET_SHA" "$(node --version)" "$(npm --version)" "$vitest_status" \
+            "$root_fix_status" "$functions_fix_status" "$root_ci_status" "$root_test_status" \
+            "$root_typecheck_status" "$functions_ci_status" "$functions_typecheck_status" \
+            "$root_audit_status" "$functions_audit_status" > "$out/identity.txt"
+          exit 0
 
       - name: Upload remediation evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: privacy-dependency-remediation-${{ env.TARGET_SHA }}-${{ github.run_id }}
