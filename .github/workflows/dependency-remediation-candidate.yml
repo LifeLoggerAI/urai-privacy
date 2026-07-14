@@ -17,7 +17,7 @@ env:
 
 jobs:
   lockfile-candidate:
-    name: Generate and verify non-breaking production lockfile remediation
+    name: Verify committed production lockfile remediation
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -56,7 +56,7 @@ jobs:
           printf '%s\n' "$?" > artifacts/dependency-remediation/functions-before-exit.txt
           exit 0
 
-      - name: Generate non-breaking lockfile remediation
+      - name: Verify no additional non-breaking lockfile remediation exists
         shell: bash
         run: |
           set +e
@@ -68,9 +68,9 @@ jobs:
           printf '%s\n' "$functions_fix_status" > artifacts/dependency-remediation/functions-fix-exit.txt
           set -euo pipefail
           git diff -- package-lock.json functions/package-lock.json > artifacts/dependency-remediation/lockfile.patch
-          test -s artifacts/dependency-remediation/lockfile.patch
+          test ! -s artifacts/dependency-remediation/lockfile.patch
 
-      - name: Install remediated exact locks
+      - name: Install committed remediated locks
         shell: bash
         run: |
           set -euo pipefail
@@ -113,7 +113,7 @@ jobs:
           npm run build
           npm --prefix functions run build
 
-      - name: Write candidate receipt
+      - name: Write exact-head remediation receipt
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
@@ -127,23 +127,23 @@ jobs:
           const crypto = require('node:crypto');
           const digest = (path) => crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex');
           const receipt = {
-            schemaVersion: 'urai-privacy-dependency-remediation-candidate-1',
+            schemaVersion: 'urai-privacy-dependency-remediation-candidate-2',
             repository: process.env.GITHUB_REPOSITORY,
             exactHeadSha: process.env.TARGET_SHA,
             workflowRunId: process.env.GITHUB_RUN_ID,
             jobStatus: process.env.JOB_STATUS,
+            committedLocksCurrent: fs.statSync('artifacts/dependency-remediation/lockfile.patch').size === 0,
             sourcePackageFilesChanged: false,
-            generatedLockfilesOnly: true,
-            rootCandidateSha256: digest('package-lock.json'),
-            functionsCandidateSha256: digest('functions/package-lock.json'),
+            rootLockSha256: digest('package-lock.json'),
+            functionsLockSha256: digest('functions/package-lock.json'),
             certification: false,
             deployment: false,
-            mutationBoundary: 'Generated candidate lockfiles and verification evidence only; no repository commit, package publication, Firebase deployment, credential mutation or production-data mutation.',
+            mutationBoundary: 'Read-only exact-head dependency verification; no repository commit, package publication, Firebase deployment, credential mutation or production-data mutation.',
           };
           fs.writeFileSync('artifacts/dependency-remediation/receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
           NODE
 
-      - name: Upload remediation candidate evidence
+      - name: Upload remediation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -152,11 +152,10 @@ jobs:
           if-no-files-found: error
           retention-days: 365
 
-      - name: Prove tracked changes are confined to candidate lockfiles
+      - name: Prove final clean source
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
-          unexpected="$(git diff --name-only | grep -Ev '^(package-lock.json|functions/package-lock.json)$' || true)"
-          test -z "$unexpected"
+          test -z "$(git status --porcelain --untracked-files=all)"
