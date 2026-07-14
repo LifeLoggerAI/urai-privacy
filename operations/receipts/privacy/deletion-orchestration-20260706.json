@@ -1,0 +1,42 @@
+{
+  "receiptId": "URAI-PRIVACY-DELETION-20260706-001",
+  "recordedAt": "2026-07-06T03:30:00-05:00",
+  "classification": "IMPLEMENTED BUT NOT DEPLOYED",
+  "repository": "LifeLoggerAI/urai-privacy",
+  "branch": "privacy/deletion-orchestration-p0-20260706",
+  "implementationHeadSha": "9baf45adb52c82a6fabd933c3f728d413a275686",
+  "pullRequest": "#96",
+  "issue": "#84",
+  "activeBehavior": {
+    "dryRun": "INVENTORY_AND_BLOCKER_EVIDENCE",
+    "execute": "FAIL_CLOSED",
+    "destructiveAdapterInvoked": false,
+    "completionReceiptIssued": false
+  },
+  "implementedControls": [
+    "versioned deletion manifest",
+    "opaque subject hash",
+    "stable plan hash",
+    "legal-hold blocker",
+    "pending-adapter blocker",
+    "Firestore, Storage, and Auth inventory",
+    "retry and terminal-failure state contract",
+    "inactive local adapter source with post-action verification",
+    "static deletion contract gate"
+  ],
+  "validation": {
+    "unitTests": "PENDING_EXACT_HEAD_GITHUB_ACTIONS",
+    "functionsBuild": "PENDING_EXACT_HEAD_GITHUB_ACTIONS",
+    "emulatorEvidence": "PENDING",
+    "stagingEvidence": "NOT_RUN",
+    "productionDeployment": "NOT_DEPLOYED"
+  },
+  "remainingBlockers": [
+    "downstream adapter implementations",
+    "retained-record minimization and expiry",
+    "retry and operator recovery evidence",
+    "user-visible receipt delivery",
+    "staging local-adapter verification",
+    "production deployment and rollback evidence"
+  ]
+}
