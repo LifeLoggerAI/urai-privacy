@@ -152,6 +152,11 @@ jobs:
           if-no-files-found: error
           retention-days: 365
 
+      - name: Remove generated remediation evidence
+        if: always()
+        shell: bash
+        run: rm -rf -- artifacts/dependency-remediation
+
       - name: Prove final clean source
         if: always()
         shell: bash
