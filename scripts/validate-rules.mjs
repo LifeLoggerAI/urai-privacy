@@ -22,7 +22,8 @@ const firestoreChecks = [
   "match /deletionRequests/{id}",
   "match /consentRecords/{id}",
   "match /consentEvents/{id}",
-  "match /consentDecisions/{id}",
+  "match /consentRevocationOutbox/{id}",
+  "match /acknowledgements/{consumerId}",
   "allow create, update, delete: if false"
 ];
 const storageChecks = [
@@ -39,6 +40,9 @@ if (!storage.includes("match /{allPaths=**}")) failures.push("storage missing fa
 if (firestore.includes("function isRoleAdmin()")) failures.push("firestore must not trust role documents for admin authority");
 if (firestore.includes("get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'")) {
   failures.push("firestore must not derive admin authority from owner-writable user documents");
+}
+if (firestore.includes("match /consentDecisions/{id}")) {
+  failures.push("firestore must not revive the superseded consentDecisions collection");
 }
 
 if (failures.length > 0) {
