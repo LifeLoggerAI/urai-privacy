@@ -50,7 +50,7 @@ jobs:
           git fetch --no-tags origin \
             +refs/heads/privacy/deletion-orchestration-p0-20260706:refs/remotes/origin/privacy/deletion-orchestration-p0-20260706
 
-      - name: Attempt source-only reconciliation
+      - name: Merge clean deletion files and retain current shared authorities
         id: merge
         shell: bash
         run: |
@@ -64,16 +64,36 @@ jobs:
           status=$?
           set -e
           printf '%s\n' "$status" > "$RUNNER_TEMP/privacy-reconciliation/merge-exit.txt"
-          if [ "$status" -ne 0 ]; then
-            git diff --name-only --diff-filter=U | sort > "$RUNNER_TEMP/privacy-reconciliation/conflicts.txt"
-            git merge --abort || true
-            printf 'conflicted=true\n' >> "$GITHUB_OUTPUT"
+
+          if [ "$status" -eq 0 ]; then
+            printf 'mode=clean\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          printf 'conflicted=false\n' >> "$GITHUB_OUTPUT"
 
-      - name: Upload conflict evidence
-        if: steps.merge.outputs.conflicted == 'true'
+          git diff --name-only --diff-filter=U | sort > "$RUNNER_TEMP/privacy-reconciliation/conflicts.txt"
+          cat > "$RUNNER_TEMP/privacy-reconciliation/expected-conflicts.txt" <<'EOF'
+          app/privacy-center/consent/page.tsx
+          firestore.rules
+          functions/package.json
+          src/lib/firebase-privacy-client.ts
+          EOF
+          sort -o "$RUNNER_TEMP/privacy-reconciliation/expected-conflicts.txt" "$RUNNER_TEMP/privacy-reconciliation/expected-conflicts.txt"
+          if ! cmp -s "$RUNNER_TEMP/privacy-reconciliation/conflicts.txt" "$RUNNER_TEMP/privacy-reconciliation/expected-conflicts.txt"; then
+            git merge --abort || true
+            printf 'mode=unexpected\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          while IFS= read -r path; do
+            git checkout --ours -- "$path"
+            git add "$path"
+          done < "$RUNNER_TEMP/privacy-reconciliation/expected-conflicts.txt"
+          git diff --name-only --diff-filter=U | tee "$RUNNER_TEMP/privacy-reconciliation/remaining-conflicts.txt"
+          test ! -s "$RUNNER_TEMP/privacy-reconciliation/remaining-conflicts.txt"
+          printf 'mode=partial\n' >> "$GITHUB_OUTPUT"
+
+      - name: Upload reconciliation evidence
+        if: steps.merge.outputs.mode != 'clean'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: privacy-deletion-reconciliation-${{ env.AUTHORITY_SHA }}
@@ -81,44 +101,55 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
-      - name: Fail closed on conflicts
-        if: steps.merge.outputs.conflicted == 'true'
+      - name: Fail closed on unexpected conflicts
+        if: steps.merge.outputs.mode == 'unexpected'
         shell: bash
         run: |
-          echo 'Deletion orchestration conflicts require path-by-path privacy review. Evidence retained.'
+          echo 'Unexpected deletion-orchestration conflicts require path-by-path privacy review.'
           exit 1
 
-      - name: Finalize clean reconciliation
-        if: steps.merge.outputs.conflicted == 'false'
+      - name: Finalize bounded reconciliation
+        if: steps.merge.outputs.mode == 'clean' || steps.merge.outputs.mode == 'partial'
         shell: bash
         run: |
           set -euo pipefail
           git rm .github/workflows/reconcile-deletion-orchestration-into-privacy-authority.yml
           mkdir -p operations/receipts/privacy
+          mode='${{ steps.merge.outputs.mode }}'
           cat > operations/receipts/privacy/deletion-orchestration-reconciliation-20260714.md <<EOF
           # Privacy deletion-orchestration reconciliation
 
           - Canonical privacy authority base: ff741bd52534ca60135bd1fa997f9ffd1e930f4b
           - Retained deletion source: eaada05c27822318dd6946189bea75af7aefa9e3
           - Trigger SHA: $AUTHORITY_SHA
+          - Reconciliation mode: $mode
           - Live privacy operation: false
           - Firebase deployment: false
           - Credential mutation: false
           - Production-data mutation: false
 
-          The retained deletion-orchestration source merged without conflicts into the canonical Privacy authority. Exact-head unit/emulator/security validation, downstream adapter review, protected staging, legal/privacy review and rollback proof remain required before consumption into PR #82.
+          The clean, unique deletion-orchestration files were transferred into the canonical Privacy authority.
+
+          When reconciliation mode is partial, canonical #82 versions were deliberately retained for these four sensitive shared paths pending focused privacy/security review:
+
+          - app/privacy-center/consent/page.tsx
+          - firestore.rules
+          - functions/package.json
+          - src/lib/firebase-privacy-client.ts
+
+          This receipt does not claim those paths are reconciled. Exact-head unit/emulator/security validation, downstream adapter review, protected staging, legal/privacy review and rollback proof remain required before consumption into PR #82.
           EOF
           git add operations/receipts/privacy/deletion-orchestration-reconciliation-20260714.md
           git diff --cached --check
 
-      - name: Commit reconciliation and push
-        if: steps.merge.outputs.conflicted == 'false'
+      - name: Commit bounded reconciliation and push
+        if: steps.merge.outputs.mode == 'clean' || steps.merge.outputs.mode == 'partial'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          git commit -m "Reconcile deletion orchestration into Privacy authority"
+          git commit -m "Reconcile non-overlapping deletion orchestration into Privacy authority"
           auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
             push origin HEAD:$AUTHORITY_BRANCH
