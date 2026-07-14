@@ -1,0 +1,124 @@
+name: Reconcile deletion orchestration into Privacy authority
+
+on:
+  push:
+    branches:
+      - reconcile/deletion-orchestration-into-82-20260714
+    paths:
+      - .github/workflows/reconcile-deletion-orchestration-into-privacy-authority.yml
+  pull_request:
+    branches:
+      - audit/privacy-authz-p0-2026-07-06
+    types:
+      - opened
+      - synchronize
+    paths:
+      - .github/workflows/reconcile-deletion-orchestration-into-privacy-authority.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reconcile-deletion-orchestration-into-privacy-82
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: >-
+      github.repository == 'LifeLoggerAI/urai-privacy' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/reconcile/deletion-orchestration-into-82-20260714') ||
+       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'reconcile/deletion-orchestration-into-82-20260714'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AUTHORITY_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      AUTHORITY_BRANCH: reconcile/deletion-orchestration-into-82-20260714
+    steps:
+      - name: Checkout exact reconciliation head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.AUTHORITY_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify authority and fetch retained deletion source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AUTHORITY_SHA"
+          test "$(git status --porcelain --untracked-files=all)" = ""
+          git fetch --no-tags origin \
+            +refs/heads/privacy/deletion-orchestration-p0-20260706:refs/remotes/origin/privacy/deletion-orchestration-p0-20260706
+
+      - name: Attempt source-only reconciliation
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/privacy-reconciliation"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          set +e
+          git merge --no-commit --no-ff origin/privacy/deletion-orchestration-p0-20260706 \
+            > "$RUNNER_TEMP/privacy-reconciliation/merge.log" 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$RUNNER_TEMP/privacy-reconciliation/merge-exit.txt"
+          if [ "$status" -ne 0 ]; then
+            git diff --name-only --diff-filter=U | sort > "$RUNNER_TEMP/privacy-reconciliation/conflicts.txt"
+            git merge --abort || true
+            printf 'conflicted=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf 'conflicted=false\n' >> "$GITHUB_OUTPUT"
+
+      - name: Upload conflict evidence
+        if: steps.merge.outputs.conflicted == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: privacy-deletion-reconciliation-${{ env.AUTHORITY_SHA }}
+          path: ${{ runner.temp }}/privacy-reconciliation
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Fail closed on conflicts
+        if: steps.merge.outputs.conflicted == 'true'
+        shell: bash
+        run: |
+          echo 'Deletion orchestration conflicts require path-by-path privacy review. Evidence retained.'
+          exit 1
+
+      - name: Finalize clean reconciliation
+        if: steps.merge.outputs.conflicted == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/reconcile-deletion-orchestration-into-privacy-authority.yml
+          mkdir -p operations/receipts/privacy
+          cat > operations/receipts/privacy/deletion-orchestration-reconciliation-20260714.md <<EOF
+          # Privacy deletion-orchestration reconciliation
+
+          - Canonical privacy authority base: ff741bd52534ca60135bd1fa997f9ffd1e930f4b
+          - Retained deletion source: eaada05c27822318dd6946189bea75af7aefa9e3
+          - Trigger SHA: $AUTHORITY_SHA
+          - Live privacy operation: false
+          - Firebase deployment: false
+          - Credential mutation: false
+          - Production-data mutation: false
+
+          The retained deletion-orchestration source merged without conflicts into the canonical Privacy authority. Exact-head unit/emulator/security validation, downstream adapter review, protected staging, legal/privacy review and rollback proof remain required before consumption into PR #82.
+          EOF
+          git add operations/receipts/privacy/deletion-orchestration-reconciliation-20260714.md
+          git diff --cached --check
+
+      - name: Commit reconciliation and push
+        if: steps.merge.outputs.conflicted == 'false'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git commit -m "Reconcile deletion orchestration into Privacy authority"
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push origin HEAD:$AUTHORITY_BRANCH
