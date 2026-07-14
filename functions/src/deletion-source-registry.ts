@@ -2,8 +2,6 @@ export const DELETION_FIRESTORE_SOURCES = [
   { collection: "privacyRequests", subjectField: "uid" },
   { collection: "exportJobs", subjectField: "uid" },
   { collection: "consentRecords", subjectField: "uid" },
-  { collection: "consentEvents", subjectField: "uid" },
-  { collection: "consentDecisions", subjectField: "uid" },
   { collection: "dataAccessEvents", subjectField: "uid" }
 ] as const;
 
@@ -14,6 +12,16 @@ export const DELETION_RETENTION_RULES = [
     collection: "deletionRequests",
     legalBasis: "deletion-compliance-evidence",
     treatment: "minimized-receipt"
+  },
+  {
+    collection: "consentEvents",
+    legalBasis: "consent-compliance-evidence",
+    treatment: "minimized-integrity-record"
+  },
+  {
+    collection: "consentRevocationOutbox",
+    legalBasis: "revocation-delivery-evidence",
+    treatment: "minimized-integrity-record"
   },
   {
     collection: "auditLogs",
