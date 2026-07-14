@@ -1,0 +1,157 @@
+name: Dependency remediation candidate
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: urai-privacy-dependency-remediation-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  lockfile-candidate:
+    name: Generate and verify non-breaking production lockfile remediation
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Prove exact clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20.19.5'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - name: Capture before-audit evidence
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/dependency-remediation
+          npm audit --omit=dev --json > artifacts/dependency-remediation/root-before.json
+          printf '%s\n' "$?" > artifacts/dependency-remediation/root-before-exit.txt
+          npm --prefix functions audit --omit=dev --json > artifacts/dependency-remediation/functions-before.json
+          printf '%s\n' "$?" > artifacts/dependency-remediation/functions-before-exit.txt
+          exit 0
+
+      - name: Generate non-breaking lockfile remediation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit fix --package-lock-only --omit=dev
+          npm --prefix functions audit fix --package-lock-only --omit=dev
+          git diff -- package-lock.json functions/package-lock.json > artifacts/dependency-remediation/lockfile.patch
+          test -s artifacts/dependency-remediation/lockfile.patch
+
+      - name: Install remediated exact locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm --prefix functions ci
+
+      - name: Capture after-audit evidence
+        shell: bash
+        run: |
+          set +e
+          npm audit --omit=dev --json > artifacts/dependency-remediation/root-after.json
+          printf '%s\n' "$?" > artifacts/dependency-remediation/root-after-exit.txt
+          npm --prefix functions audit --omit=dev --json > artifacts/dependency-remediation/functions-after.json
+          printf '%s\n' "$?" > artifacts/dependency-remediation/functions-after-exit.txt
+          exit 0
+
+      - name: Enforce no unresolved high or critical production advisories
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          for (const scope of ['root', 'functions']) {
+            const report = JSON.parse(fs.readFileSync(`artifacts/dependency-remediation/${scope}-after.json`, 'utf8'));
+            const counts = report?.metadata?.vulnerabilities ?? {};
+            const high = Number(counts.high ?? 0);
+            const critical = Number(counts.critical ?? 0);
+            console.log(`${scope}: high=${high} critical=${critical}`);
+            if (high !== 0 || critical !== 0) process.exitCode = 1;
+          }
+          NODE
+
+      - name: Verify remediated source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npm run test:unit
+          npm run test:rules:static
+          npm --prefix functions run typecheck
+          npm run build
+          npm --prefix functions run build
+
+      - name: Write candidate receipt
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          mkdir -p artifacts/dependency-remediation
+          cp package-lock.json artifacts/dependency-remediation/package-lock.candidate.json
+          cp functions/package-lock.json artifacts/dependency-remediation/functions-package-lock.candidate.json
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const digest = (path) => crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex');
+          const receipt = {
+            schemaVersion: 'urai-privacy-dependency-remediation-candidate-1',
+            repository: process.env.GITHUB_REPOSITORY,
+            exactHeadSha: process.env.TARGET_SHA,
+            workflowRunId: process.env.GITHUB_RUN_ID,
+            jobStatus: process.env.JOB_STATUS,
+            sourcePackageFilesChanged: false,
+            generatedLockfilesOnly: true,
+            rootCandidateSha256: digest('package-lock.json'),
+            functionsCandidateSha256: digest('functions/package-lock.json'),
+            certification: false,
+            deployment: false,
+            mutationBoundary: 'Generated candidate lockfiles and verification evidence only; no repository commit, package publication, Firebase deployment, credential mutation or production-data mutation.',
+          };
+          fs.writeFileSync('artifacts/dependency-remediation/receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
+          NODE
+
+      - name: Upload remediation candidate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: urai-privacy-dependency-remediation-${{ env.TARGET_SHA }}-${{ github.run_id }}
+          path: artifacts/dependency-remediation
+          if-no-files-found: error
+          retention-days: 365
+
+      - name: Prove tracked changes are confined to candidate lockfiles
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          unexpected="$(git diff --name-only | grep -Ev '^(package-lock.json|functions/package-lock.json)$' || true)"
+          test -z "$unexpected"
