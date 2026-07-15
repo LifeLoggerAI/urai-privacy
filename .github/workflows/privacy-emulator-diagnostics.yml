@@ -1,0 +1,84 @@
+name: Privacy Emulator Diagnostics
+
+on:
+  push:
+    branches:
+      - reconcile/deletion-orchestration-into-82-20260714
+    paths:
+      - .github/workflows/privacy-emulator-diagnostics.yml
+  pull_request:
+    branches:
+      - audit/privacy-authz-p0-2026-07-06
+    paths:
+      - .github/workflows/privacy-emulator-diagnostics.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: privacy-emulator-diagnostics-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+          show-progress: false
+
+      - name: Prove exact clean head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install exact dependencies
+        run: |
+          npm ci
+          npm --prefix functions ci
+
+      - name: Capture emulator command
+        id: emulator
+        shell: bash
+        run: |
+          set +e
+          npm run test:emulators > "$RUNNER_TEMP/privacy-emulator.log" 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          printf '\ntarget_sha=%s\nnode=%s\njava=%s\nstatus=%s\n' \
+            "$TARGET_SHA" "$(node --version)" "$(java -version 2>&1 | head -n 1)" "$status" \
+            >> "$RUNNER_TEMP/privacy-emulator.log"
+          exit 0
+
+      - name: Upload emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: privacy-emulator-diagnostics-${{ env.TARGET_SHA }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/privacy-emulator.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Preserve emulator result
+        run: test "${{ steps.emulator.outputs.status }}" = "0"
