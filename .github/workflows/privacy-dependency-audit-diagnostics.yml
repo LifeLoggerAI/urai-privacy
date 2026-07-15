@@ -55,6 +55,8 @@ jobs:
           out="$RUNNER_TEMP/privacy-remediation"
           mkdir -p "$out/root" "$out/functions"
 
+          npm pkg set overrides.uuid=11.1.1
+          (cd functions && npm pkg set overrides.uuid=11.1.1)
           npm install --package-lock-only --save-dev --save-exact \
             vitest@4.1.10 firebase-functions@6.6.0 > "$out/root/dependency-update.log" 2>&1
           dependency_status=$?
@@ -81,7 +83,7 @@ jobs:
 
           cp package.json package-lock.json "$out/root/" 2>/dev/null
           cp functions/package.json functions/package-lock.json "$out/functions/" 2>/dev/null
-          printf 'target_sha=%s\nnode=%s\nnpm=%s\ndependency_status=%s\nroot_fix_status=%s\nfunctions_fix_status=%s\nroot_ci_status=%s\nroot_test_status=%s\nroot_typecheck_status=%s\nfunctions_ci_status=%s\nfunctions_typecheck_status=%s\nroot_audit_status=%s\nfunctions_audit_status=%s\nforced_updates=false\n' \
+          printf 'target_sha=%s\nnode=%s\nnpm=%s\ndependency_status=%s\nroot_fix_status=%s\nfunctions_fix_status=%s\nroot_ci_status=%s\nroot_test_status=%s\nroot_typecheck_status=%s\nfunctions_ci_status=%s\nfunctions_typecheck_status=%s\nroot_audit_status=%s\nfunctions_audit_status=%s\nuuid_override=11.1.1\nforced_updates=false\n' \
             "$TARGET_SHA" "$(node --version)" "$(npm --version)" "$dependency_status" \
             "$root_fix_status" "$functions_fix_status" "$root_ci_status" "$root_test_status" \
             "$root_typecheck_status" "$functions_ci_status" "$functions_typecheck_status" \
