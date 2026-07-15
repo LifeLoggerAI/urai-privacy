@@ -1,4 +1,4 @@
-name: Privacy Dependency Audit Diagnostics
+name: Privacy Dependency Remediation Publisher
 
 on:
   push:
@@ -13,17 +13,18 @@ on:
       - .github/workflows/privacy-dependency-audit-diagnostics.yml
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: privacy-dependency-audit-${{ github.event.pull_request.head.sha || github.sha }}
+  group: privacy-dependency-remediation-publisher
   cancel-in-progress: false
 
 env:
   TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+  TARGET_BRANCH: reconcile/deletion-orchestration-into-82-20260714
 
 jobs:
-  audit:
+  publish:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -32,69 +33,56 @@ jobs:
         with:
           ref: ${{ env.TARGET_SHA }}
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
           show-progress: false
 
-      - name: Prove exact clean head
+      - name: Prove exact clean and unchanged branch
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
+          git fetch origin "$TARGET_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$TARGET_SHA"
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '20'
 
-      - name: Generate and test non-breaking remediation candidate
-        id: remediation
+      - name: Materialize and verify zero-advisory dependency graph
         shell: bash
         run: |
-          set +e
-          out="$RUNNER_TEMP/privacy-remediation"
-          mkdir -p "$out/root" "$out/functions"
-
+          set -euo pipefail
           npm pkg set overrides.uuid=11.1.1
           (cd functions && npm pkg set overrides.uuid=11.1.1)
           npm install --package-lock-only --save-dev --save-exact \
-            vitest@4.1.10 firebase-functions@6.6.0 > "$out/root/dependency-update.log" 2>&1
-          dependency_status=$?
-          npm audit fix --package-lock-only > "$out/root/audit-fix.log" 2>&1
-          root_fix_status=$?
-          (cd functions && npm audit fix --package-lock-only > "$out/functions/audit-fix.log" 2>&1)
-          functions_fix_status=$?
+            vitest@4.1.10 firebase-functions@6.6.0
+          npm audit fix --package-lock-only
+          (cd functions && npm audit fix --package-lock-only)
+          npm ci
+          npm test
+          npm run typecheck
+          (cd functions && npm ci && npm run typecheck)
+          npm audit --audit-level=low
+          (cd functions && npm audit --audit-level=low)
 
-          npm ci > "$out/root/npm-ci.log" 2>&1
-          root_ci_status=$?
-          npm test > "$out/root/test.log" 2>&1
-          root_test_status=$?
-          npm run typecheck > "$out/root/typecheck.log" 2>&1
-          root_typecheck_status=$?
-          (cd functions && npm ci > "$out/functions/npm-ci.log" 2>&1)
-          functions_ci_status=$?
-          (cd functions && npm run typecheck > "$out/functions/typecheck.log" 2>&1)
-          functions_typecheck_status=$?
-
-          npm audit --json > "$out/root/audit-after.json"
-          root_audit_status=$?
-          (cd functions && npm audit --json > "$out/functions/audit-after.json")
-          functions_audit_status=$?
-
-          cp package.json package-lock.json "$out/root/" 2>/dev/null
-          cp functions/package.json functions/package-lock.json "$out/functions/" 2>/dev/null
-          printf 'target_sha=%s\nnode=%s\nnpm=%s\ndependency_status=%s\nroot_fix_status=%s\nfunctions_fix_status=%s\nroot_ci_status=%s\nroot_test_status=%s\nroot_typecheck_status=%s\nfunctions_ci_status=%s\nfunctions_typecheck_status=%s\nroot_audit_status=%s\nfunctions_audit_status=%s\nuuid_override=11.1.1\nforced_updates=false\n' \
-            "$TARGET_SHA" "$(node --version)" "$(npm --version)" "$dependency_status" \
-            "$root_fix_status" "$functions_fix_status" "$root_ci_status" "$root_test_status" \
-            "$root_typecheck_status" "$functions_ci_status" "$functions_typecheck_status" \
-            "$root_audit_status" "$functions_audit_status" > "$out/identity.txt"
-          exit 0
-
-      - name: Upload remediation evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: privacy-dependency-remediation-${{ env.TARGET_SHA }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/privacy-remediation
-          if-no-files-found: error
-          retention-days: 30
+      - name: Commit only permanent package files and remove publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/privacy-dependency-audit-diagnostics.yml
+          git add package.json package-lock.json functions/package.json functions/package-lock.json
+          changed="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n' \
+            '.github/workflows/privacy-dependency-audit-diagnostics.yml' \
+            'functions/package-lock.json' \
+            'functions/package.json' \
+            'package-lock.json' \
+            'package.json' | sort)"
+          test "$changed" = "$expected"
+          git diff --cached --check
+          git config user.name "LifeLoggerAI release automation"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Remediate Privacy dependency advisories"
+          git push origin "HEAD:$TARGET_BRANCH"
