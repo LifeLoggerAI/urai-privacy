@@ -57,12 +57,14 @@
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.2.6",
     "firebase-admin": "^13.10.0",
+    "firebase-functions": "6.6.0",
     "typescript": "5.9.3",
-    "vitest": "^2.1.4"
+    "vitest": "4.1.10"
   },
   "overrides": {
     "postcss": "^8.5.10",
     "undici": "^7.16.0",
-    "@tootallnate/once": "^3.0.1"
+    "@tootallnate/once": "^3.0.1",
+    "uuid": "11.1.1"
   }
 }
