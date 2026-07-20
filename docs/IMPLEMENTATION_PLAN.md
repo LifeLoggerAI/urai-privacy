@@ -16,7 +16,7 @@ Required work:
 2. Run `npm ci` at the root and in `functions/`.
 3. Run lint, typecheck, unit tests, static rules checks, route smoke checks, Next build, and Functions build/typecheck.
 4. Run `npm run audit:tier-one` to confirm Tier-One privacy evidence exists.
-5. Install Java 17+ and run Firebase emulator-backed tests.
+5. Install Java 21+ and run Firebase emulator-backed tests.
 6. Run `npm run security:gate`.
 7. Run `bash scripts/assert-production-ready.sh`.
 8. Record evidence in `docs/LOCK.md`.
