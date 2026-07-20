@@ -6,7 +6,7 @@ This repository is the URAI privacy control plane: a deployable Next.js/Firebase
 
 URAI is designed with **privacy-by-architecture**, **user sovereignty**, **minimal data exposure**, and **no silent escalation** as first-class system constraints.
 
-## Production lock status
+## Release Gate and production lock status
 
 Current machine-readable status: [`PRODUCTION_LOCK_STATUS.json`](./PRODUCTION_LOCK_STATUS.json)
 
