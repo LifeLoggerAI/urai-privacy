@@ -55,6 +55,7 @@
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.2.6",
     "firebase-admin": "^13.10.0",
+    "firebase-tools": "15.24.0",
     "typescript": "5.9.3",
     "vitest": "^2.1.4"
   },
