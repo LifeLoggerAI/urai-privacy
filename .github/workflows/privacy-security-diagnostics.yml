@@ -1,53 +1,36 @@
-name: Apply Privacy Production Dependency Lock Refresh
+name: Privacy Readiness Assertion Diagnostics
 
 on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  refresh-locks:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+  diagnose:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact repair branch
+      - name: Checkout exact repair source
         uses: actions/checkout@v7
         with:
           ref: fix/protected-noindex-main-d34-20260719
-          fetch-depth: 0
 
-      - name: Set up Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20.19.0'
-          cache: npm
-
-      - name: Apply non-breaking production audit fixes
+      - name: Capture exact readiness assertion output
         shell: bash
         run: |
+          mkdir -p diagnostics
           set +e
-          npm audit fix --package-lock-only --omit=dev --ignore-scripts
-          root_fix=$?
-          npm --prefix functions audit fix --package-lock-only --omit=dev --ignore-scripts
-          functions_fix=$?
-          set -e
-          echo "root audit-fix exit: ${root_fix}"
-          echo "functions audit-fix exit: ${functions_fix}"
-          npm ci --ignore-scripts
-          npm ci --prefix functions --ignore-scripts
-          npm audit --audit-level=critical --omit=dev
-          npm --prefix functions audit --audit-level=critical --omit=dev
+          bash scripts/assert-production-ready.sh > diagnostics/readiness.log 2>&1
+          readiness_exit=$?
+          git status --porcelain > diagnostics/git-status.txt
+          printf 'readiness_exit=%s\n' "$readiness_exit" > diagnostics/exit-codes.txt
+          exit 0
 
-      - name: Commit exact lock refresh
-        shell: bash
-        run: |
-          if git diff --quiet -- package-lock.json functions/package-lock.json; then
-            echo 'Production dependency locks already satisfy the critical gate.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package-lock.json functions/package-lock.json
-          git commit -m 'build(privacy): refresh critical dependency locks'
-          git push origin HEAD:fix/protected-noindex-main-d34-20260719
+      - name: Upload exact readiness diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-readiness-diagnostics-${{ github.sha }}
+          path: diagnostics
+          if-no-files-found: error
+          retention-days: 7
