@@ -125,14 +125,14 @@ Implementation contracts:
 
 ## Relationship to other repos
 
-- `UrAi`: canonical main app and V1 demo experience.
-- `UrAi-Dev`: staging/demo work that must not be treated as production truth.
+- `urai-spatial` (`urai-tier1` / `main` / `https://urai.app`): canonical public product and route experience. It consumes privacy decisions and must not override this repository's privacy authority.
+- `UrAi`, `UrAi-Dev`, and `UrAiProd`: legacy, development, reference, migration, rollback, or quarantined surfaces. They have no competing canonical production authority.
 - `B2Bportal`: enterprise/partner portal with strict public-surface minimization.
 - `asset-factory`: generated assets, provider metadata, manifests, and release evidence.
 - `urai-admin`: operator/admin cockpit; must obey custom-claim, least-privilege, and audit rules.
 - `urai-analytics`: must use aggregate/privacy-safe analytics where possible.
 - `urai-jobs`: must audit retries/failures/background destructive work.
-- `urai-content`, `urai-studio`, `urai-spatial`, `urai-communications`, `urai-marketing`, `urai-staging`, and `UrAiProd`: must follow the cross-repo privacy matrix.
+- `urai-content`, `urai-studio`, `urai-storytime`, `urai-communications`, `urai-marketing`, and `urai-staging`: must follow the cross-repo privacy matrix.
 
 Nothing ships if it violates this repo.
 
