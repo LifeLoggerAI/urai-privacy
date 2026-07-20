@@ -1,17 +1,21 @@
-name: Privacy Security Gate Diagnostics
+name: Refresh Privacy Production Dependency Locks
 
 on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  refresh-locks:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact repair branch
         uses: actions/checkout@v7
+        with:
+          ref: fix/protected-noindex-main-d34-20260719
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -19,29 +23,25 @@ jobs:
           node-version: '20.19.0'
           cache: npm
 
-      - name: Capture exact security gate output
+      - name: Apply non-breaking production audit fixes
         shell: bash
         run: |
-          mkdir -p diagnostics
-          set +e
-          npm ci > diagnostics/npm-ci.log 2>&1
-          root_install=$?
-          npm ci --prefix functions > diagnostics/functions-npm-ci.log 2>&1
-          functions_install=$?
-          bash scripts/security-gate.sh > diagnostics/security-gate.log 2>&1
-          gate_exit=$?
-          npm audit --json --omit=dev > diagnostics/root-audit.json 2>&1
-          root_audit=$?
-          npm --prefix functions audit --json --omit=dev > diagnostics/functions-audit.json 2>&1
-          functions_audit=$?
-          printf 'root_install_exit=%s\nfunctions_install_exit=%s\nsecurity_gate_exit=%s\nroot_audit_exit=%s\nfunctions_audit_exit=%s\n' "$root_install" "$functions_install" "$gate_exit" "$root_audit" "$functions_audit" > diagnostics/exit-codes.txt
-          exit 0
+          npm audit fix --package-lock-only --omit=dev --ignore-scripts
+          npm --prefix functions audit fix --package-lock-only --omit=dev --ignore-scripts
+          npm ci --ignore-scripts
+          npm ci --prefix functions --ignore-scripts
+          npm audit --audit-level=critical --omit=dev
+          npm --prefix functions audit --audit-level=critical --omit=dev
 
-      - name: Upload exact security diagnostic
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: privacy-security-diagnostics-${{ github.sha }}
-          path: diagnostics
-          if-no-files-found: error
-          retention-days: 7
+      - name: Commit exact lock refresh
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json functions/package-lock.json; then
+            echo 'Production dependency locks already satisfy the critical gate.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json functions/package-lock.json
+          git commit -m 'build(privacy): refresh critical dependency locks'
+          git push origin HEAD:fix/protected-noindex-main-d34-20260719
