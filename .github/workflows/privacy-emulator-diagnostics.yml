@@ -1,17 +1,21 @@
-name: Privacy Emulator Diagnostics
+name: Pin Privacy Firebase CLI
 
 on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  pin-cli:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact repair branch
         uses: actions/checkout@v7
+        with:
+          ref: fix/protected-noindex-main-d34-20260719
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -19,33 +23,23 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Capture emulator-backed validation
+      - name: Pin Firebase CLI and refresh lock authority
         shell: bash
         run: |
-          mkdir -p diagnostics
-          set +e
-          npm ci > diagnostics/npm-ci.log 2>&1
-          root_code=$?
-          npm ci --prefix functions > diagnostics/functions-npm-ci.log 2>&1
-          functions_code=$?
-          java -version > diagnostics/java-version.log 2>&1
-          npx firebase --version > diagnostics/firebase-version.log 2>&1
-          npm run test:emulators > diagnostics/emulators.log 2>&1
-          emulator_code=$?
-          printf 'root_install_exit=%s\nfunctions_install_exit=%s\nemulator_exit=%s\n' "$root_code" "$functions_code" "$emulator_code" > diagnostics/exit-codes.txt
-          exit 0
+          npm install --save-dev --save-exact firebase-tools@15.24.0 --ignore-scripts
+          node -e "const p=require('./package.json'); if (p.devDependencies?.['firebase-tools'] !== '15.24.0') process.exit(1)"
+          npm ci --ignore-scripts
+          npx firebase --version | grep '^15\.24\.0$'
 
-      - name: Upload emulator diagnostic
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: privacy-emulator-diagnostics-${{ github.sha }}
-          path: diagnostics
-          if-no-files-found: error
-          retention-days: 7
+      - name: Commit exact dependency update
+        shell: bash
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo 'Firebase CLI dependency is already pinned.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          git commit -m 'build(privacy): pin Firebase CLI for emulator gates'
+          git push origin HEAD:fix/protected-noindex-main-d34-20260719
