@@ -11,6 +11,7 @@ URAI Privacy is the governance and enforcement authority for privacy decisions a
 5. Use synthetic and non-identifying fixtures only. Any authenticated or destructive test requires a separately approved environment and identity.
 6. Preserve export, deletion, correction, consent-revocation, retention, and audit contracts whenever a change touches user data.
 7. Run the repository's permanent validation and release workflows. Green source evidence does not by itself authorize deployment, publication, provider delivery, or production-data mutation.
+8. Use the exact Firebase CLI pinned in `devDependencies` and `package-lock.json` for emulator and deployment commands; do not rely on an untracked global binary.
 
 ## Sensitive Change Areas
 
