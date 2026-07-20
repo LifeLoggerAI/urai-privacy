@@ -1,19 +1,21 @@
-name: Privacy Post-Fix Dependency Diagnostics
+name: Apply Privacy Production Dependency Lock Refresh
 
 on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  refresh-locks:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact repair source
+      - name: Checkout exact repair branch
         uses: actions/checkout@v7
         with:
           ref: fix/protected-noindex-main-d34-20260719
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -21,38 +23,31 @@ jobs:
           node-version: '20.19.0'
           cache: npm
 
-      - name: Capture post-fix audit and dependency trees
+      - name: Apply non-breaking production audit fixes
         shell: bash
         run: |
-          mkdir -p diagnostics
           set +e
-          npm audit fix --package-lock-only --omit=dev --ignore-scripts > diagnostics/root-fix.log 2>&1
+          npm audit fix --package-lock-only --omit=dev --ignore-scripts
           root_fix=$?
-          npm --prefix functions audit fix --package-lock-only --omit=dev --ignore-scripts > diagnostics/functions-fix.log 2>&1
+          npm --prefix functions audit fix --package-lock-only --omit=dev --ignore-scripts
           functions_fix=$?
-          npm ci --ignore-scripts > diagnostics/root-ci.log 2>&1
-          root_ci=$?
-          npm ci --prefix functions --ignore-scripts > diagnostics/functions-ci.log 2>&1
-          functions_ci=$?
-          npm audit --json --omit=dev > diagnostics/root-post-fix-audit.json 2>&1
-          root_audit=$?
-          npm --prefix functions audit --json --omit=dev > diagnostics/functions-post-fix-audit.json 2>&1
-          functions_audit=$?
-          npm ls websocket-driver @grpc/grpc-js protobufjs form-data --all --json > diagnostics/root-tree.json 2>&1
-          root_tree=$?
-          npm --prefix functions ls websocket-driver @grpc/grpc-js protobufjs form-data --all --json > diagnostics/functions-tree.json 2>&1
-          functions_tree=$?
-          git diff -- package-lock.json functions/package-lock.json > diagnostics/lock-diff.patch
-          cp package-lock.json diagnostics/root-package-lock.json
-          cp functions/package-lock.json diagnostics/functions-package-lock.json
-          printf 'root_fix_exit=%s\nfunctions_fix_exit=%s\nroot_ci_exit=%s\nfunctions_ci_exit=%s\nroot_audit_exit=%s\nfunctions_audit_exit=%s\nroot_tree_exit=%s\nfunctions_tree_exit=%s\n' "$root_fix" "$functions_fix" "$root_ci" "$functions_ci" "$root_audit" "$functions_audit" "$root_tree" "$functions_tree" > diagnostics/exit-codes.txt
-          exit 0
+          set -e
+          echo "root audit-fix exit: ${root_fix}"
+          echo "functions audit-fix exit: ${functions_fix}"
+          npm ci --ignore-scripts
+          npm ci --prefix functions --ignore-scripts
+          npm audit --audit-level=critical --omit=dev
+          npm --prefix functions audit --audit-level=critical --omit=dev
 
-      - name: Upload post-fix dependency diagnostic
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: privacy-post-fix-dependencies-${{ github.sha }}
-          path: diagnostics
-          if-no-files-found: error
-          retention-days: 7
+      - name: Commit exact lock refresh
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json functions/package-lock.json; then
+            echo 'Production dependency locks already satisfy the critical gate.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json functions/package-lock.json
+          git commit -m 'build(privacy): refresh critical dependency locks'
+          git push origin HEAD:fix/protected-noindex-main-d34-20260719
