@@ -1,0 +1,47 @@
+name: Privacy Security Gate Diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.19.0'
+          cache: npm
+
+      - name: Capture exact security gate output
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          set +e
+          npm ci > diagnostics/npm-ci.log 2>&1
+          root_install=$?
+          npm ci --prefix functions > diagnostics/functions-npm-ci.log 2>&1
+          functions_install=$?
+          bash scripts/security-gate.sh > diagnostics/security-gate.log 2>&1
+          gate_exit=$?
+          npm audit --json --omit=dev > diagnostics/root-audit.json 2>&1
+          root_audit=$?
+          npm --prefix functions audit --json --omit=dev > diagnostics/functions-audit.json 2>&1
+          functions_audit=$?
+          printf 'root_install_exit=%s\nfunctions_install_exit=%s\nsecurity_gate_exit=%s\nroot_audit_exit=%s\nfunctions_audit_exit=%s\n' "$root_install" "$functions_install" "$gate_exit" "$root_audit" "$functions_audit" > diagnostics/exit-codes.txt
+          exit 0
+
+      - name: Upload exact security diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-security-diagnostics-${{ github.sha }}
+          path: diagnostics
+          if-no-files-found: error
+          retention-days: 7
