@@ -12,6 +12,7 @@ URAI Privacy is the governance and enforcement authority for privacy decisions a
 6. Preserve export, deletion, correction, consent-revocation, retention, and audit contracts whenever a change touches user data.
 7. Run the repository's permanent validation and release workflows. Green source evidence does not by itself authorize deployment, publication, provider delivery, or production-data mutation.
 8. Use the exact Firebase CLI pinned in `devDependencies` and `package-lock.json` for emulator and deployment commands; do not rely on an untracked global binary.
+9. Refresh dependency locks only through deterministic installs and non-breaking audit remediation. Critical production vulnerabilities must be zero; any remaining lower-severity transitive finding must stay visible and be assigned an explicit disposition rather than hidden by a weakened gate.
 
 ## Sensitive Change Areas
 
