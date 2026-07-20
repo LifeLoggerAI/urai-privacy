@@ -13,15 +13,15 @@ fi
 
 if ! command -v java >/dev/null 2>&1 && [ "${URAI_RELEASE_VERIFY_NIX_JAVA:-0}" != "1" ]; then
   if command -v nix >/dev/null 2>&1; then
-    echo "[verify-release] Java not found; re-running release verifier inside a temporary Nix JDK 17 shell."
+    echo "[verify-release] Java not found; re-running release verifier inside a temporary Nix JDK 21 shell."
     export URAI_RELEASE_VERIFY_NIX_JAVA=1
-    if nix shell nixpkgs#jdk17 --command java -version >/dev/null 2>&1; then
-      exec nix shell nixpkgs#jdk17 --command bash scripts/verify-release.sh
+    if nix shell nixpkgs#jdk21 --command java -version >/dev/null 2>&1; then
+      exec nix shell nixpkgs#jdk21 --command bash scripts/verify-release.sh
     fi
     if command -v nix-shell >/dev/null 2>&1; then
-      exec nix-shell -p jdk17 --run "bash scripts/verify-release.sh"
+      exec nix-shell -p jdk21 --run "bash scripts/verify-release.sh"
     fi
-    echo "[verify-release] Nix is available, but could not start a JDK 17 shell." >&2
+    echo "[verify-release] Nix is available, but could not start a JDK 21 shell." >&2
   fi
 fi
 
