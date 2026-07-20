@@ -1,4 +1,4 @@
-name: Privacy Readiness Assertion Diagnostics
+name: Privacy Exact Readiness Diagnostics
 
 on:
   pull_request:
@@ -15,22 +15,49 @@ jobs:
         with:
           ref: fix/protected-noindex-main-d34-20260719
 
-      - name: Capture exact readiness assertion output
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.19.0'
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Reproduce permanent pre-readiness sequence
         shell: bash
         run: |
-          mkdir -p diagnostics
+          set -euo pipefail
+          npm ci
+          npm ci --prefix functions
+          npm run build
+          npm --prefix functions run build
+          npm --prefix functions run typecheck
+          npm run check:java
+          npm run test:emulators
+          npm run security:gate
+
+      - name: Capture readiness output outside repository
+        if: always()
+        shell: bash
+        run: |
+          artifact_dir="${RUNNER_TEMP}/privacy-readiness-diagnostics"
+          mkdir -p "$artifact_dir"
           set +e
-          bash scripts/assert-production-ready.sh > diagnostics/readiness.log 2>&1
+          git status --porcelain > "$artifact_dir/git-status.txt"
+          bash scripts/assert-production-ready.sh > "$artifact_dir/readiness.log" 2>&1
           readiness_exit=$?
-          git status --porcelain > diagnostics/git-status.txt
-          printf 'readiness_exit=%s\n' "$readiness_exit" > diagnostics/exit-codes.txt
+          printf 'readiness_exit=%s\n' "$readiness_exit" > "$artifact_dir/exit-codes.txt"
           exit 0
 
       - name: Upload exact readiness diagnostic
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: privacy-readiness-diagnostics-${{ github.sha }}
-          path: diagnostics
+          name: privacy-exact-readiness-${{ github.sha }}
+          path: ${{ runner.temp }}/privacy-readiness-diagnostics
           if-no-files-found: error
           retention-days: 7
