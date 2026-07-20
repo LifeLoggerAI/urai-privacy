@@ -1,4 +1,4 @@
-name: Privacy Emulator Test Diagnostics
+name: Privacy Compiled Functions Emulator Diagnostics
 
 on:
   pull_request:
@@ -25,7 +25,7 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Capture exact emulator test output
+      - name: Capture exact compiled Functions emulator output
         shell: bash
         run: |
           mkdir -p diagnostics
@@ -33,18 +33,22 @@ jobs:
           npm ci > diagnostics/npm-ci.log 2>&1
           root_code=$?
           npm ci --prefix functions > diagnostics/functions-npm-ci.log 2>&1
-          functions_code=$?
+          functions_install_code=$?
+          npm run build --prefix functions > diagnostics/functions-build.log 2>&1
+          functions_build_code=$?
+          npm run typecheck --prefix functions > diagnostics/functions-typecheck.log 2>&1
+          functions_typecheck_code=$?
           npx firebase --version > diagnostics/firebase-version.log 2>&1
           npm run test:emulators > diagnostics/emulators.log 2>&1
           emulator_code=$?
-          printf 'root_install_exit=%s\nfunctions_install_exit=%s\nemulator_exit=%s\n' "$root_code" "$functions_code" "$emulator_code" > diagnostics/exit-codes.txt
+          printf 'root_install_exit=%s\nfunctions_install_exit=%s\nfunctions_build_exit=%s\nfunctions_typecheck_exit=%s\nemulator_exit=%s\n' "$root_code" "$functions_install_code" "$functions_build_code" "$functions_typecheck_code" "$emulator_code" > diagnostics/exit-codes.txt
           exit 0
 
-      - name: Upload exact emulator test diagnostic
+      - name: Upload exact compiled Functions diagnostic
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: privacy-emulator-test-diagnostics-${{ github.sha }}
+          name: privacy-compiled-functions-emulator-${{ github.sha }}
           path: diagnostics
           if-no-files-found: error
           retention-days: 7
