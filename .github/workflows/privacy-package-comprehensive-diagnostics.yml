@@ -1,0 +1,132 @@
+name: Privacy Package Comprehensive Diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Audit all package contracts without changing gates
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          pip install -r requirements.txt > diagnostics/python-install.log 2>&1
+          python - <<'PY' > diagnostics/comprehensive-package-audit.log 2>&1
+          from pathlib import Path
+          import importlib.util
+          import json
+          import yaml
+          from jsonschema import Draft202012Validator
+
+          root = Path.cwd()
+          spec = importlib.util.spec_from_file_location("privacy_package", root / "tools/validate_privacy_package.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          issues = []
+
+          missing = [path for path in module.REQUIRED_FILES if not (root / path).exists()]
+          for path in missing:
+              issues.append(f"missing-file: {path}")
+
+          for path in ["CNAME", "website/CNAME"]:
+              if (root / path).exists():
+                  value = (root / path).read_text(encoding="utf-8").strip()
+                  if value != "uraiprivacy.com":
+                      issues.append(f"domain-mismatch: {path}={value!r}")
+
+          for path, terms in module.REQUIRED_TERMS.items():
+              target = root / path
+              if not target.exists():
+                  continue
+              text = target.read_text(encoding="utf-8")
+              for term in terms:
+                  if term not in text:
+                      issues.append(f"missing-term: {path}: {term}")
+
+          firestore_schema = root / "schemas/firestore-privacy-schema.json"
+          if firestore_schema.exists():
+              schema = json.loads(firestore_schema.read_text(encoding="utf-8"))
+              if schema.get("version") != "0.1.0-draft":
+                  issues.append(f"firestore-schema-version: {schema.get('version')!r}")
+
+          readme = (root / "README.md").read_text(encoding="utf-8")
+          if "Release Gate" not in readme:
+              issues.append("README missing canonical Release Gate label")
+
+          registries = {
+              "data_classes": yaml.safe_load((root / "policy/data-classes.yaml").read_text(encoding="utf-8"))["classes"],
+              "consent_tiers": yaml.safe_load((root / "policy/consent-tiers.yaml").read_text(encoding="utf-8"))["tiers"],
+              "retention_classes": yaml.safe_load((root / "policy/retention-classes.yaml").read_text(encoding="utf-8"))["classes"],
+              "audit_event_types": yaml.safe_load((root / "policy/audit-event-types.yaml").read_text(encoding="utf-8"))["eventTypes"],
+              "blocked_uses": yaml.safe_load((root / "policy/blocked-data-uses.yaml").read_text(encoding="utf-8"))["blockedUses"],
+          }
+
+          expected_sets = {
+              "data_classes": {"L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7"},
+              "consent_tiers": {"C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"},
+              "retention_classes": {"R0", "R1", "R2", "R3", "R4", "R5", "R6"},
+          }
+          for key, expected in expected_sets.items():
+              actual = set(registries[key].keys())
+              if actual != expected:
+                  issues.append(f"registry-set: {key}: actual={sorted(actual)} expected={sorted(expected)}")
+
+          for class_id, policy in registries["data_classes"].items():
+              tier = policy.get("defaultConsentTier")
+              if tier and tier not in registries["consent_tiers"]:
+                  issues.append(f"registry-reference: {class_id} -> {tier}")
+
+          schema_pairs = [
+              ("schemas/data-inventory.schema.json", "adoption/ci/sample-privacy-folder/data-inventory.yaml"),
+              ("schemas/feature-privacy-manifest.schema.json", "examples/valid-feature.privacy.yaml"),
+              ("schemas/feature-privacy-manifest.schema.json", "adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml"),
+          ]
+          for schema_path, instance_path in schema_pairs:
+              schema = json.loads((root / schema_path).read_text(encoding="utf-8"))
+              instance = yaml.safe_load((root / instance_path).read_text(encoding="utf-8"))
+              for error in sorted(Draft202012Validator(schema).iter_errors(instance), key=lambda err: list(err.path)):
+                  issues.append(f"schema-error: {instance_path}: {error.message}")
+
+          for path in [
+              "examples/valid-feature.privacy.yaml",
+              "adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml",
+          ]:
+              feature = yaml.safe_load((root / path).read_text(encoding="utf-8"))
+              for error in module.validate_feature_manifest(path, feature, registries):
+                  issues.append(f"valid-feature-error: {error}")
+
+          for path in sorted(module.EXPECTED_INVALID_FIXTURES):
+              fixture = yaml.safe_load((root / path).read_text(encoding="utf-8"))
+              errors = module.validate_feature_manifest(path, fixture, registries)
+              if not errors:
+                  issues.append(f"invalid-fixture-passed: {path}")
+
+          if issues:
+              print("COMPREHENSIVE PACKAGE AUDIT: ISSUES")
+              for issue in issues:
+                  print(issue)
+          else:
+              print("COMPREHENSIVE PACKAGE AUDIT: CLEAN")
+          PY
+
+      - name: Upload comprehensive diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-package-comprehensive-${{ github.sha }}
+          path: diagnostics
+          if-no-files-found: error
+          retention-days: 7
