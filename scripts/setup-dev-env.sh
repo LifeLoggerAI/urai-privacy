@@ -9,7 +9,7 @@ if command -v java >/dev/null 2>&1; then
 else
   echo "[setup-dev-env] Java is not currently available on PATH."
   echo "[setup-dev-env] In Nix/Replit-style environments, rebuild or reload the workspace after dev.nix changes."
-  echo "[setup-dev-env] dev.nix now includes pkgs.jdk17 so Firebase emulators can run."
+  echo "[setup-dev-env] dev.nix includes pkgs.jdk21 so the current Firebase emulators can run."
 fi
 
 if command -v node >/dev/null 2>&1; then
