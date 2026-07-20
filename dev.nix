@@ -4,6 +4,6 @@
   packages = [
     pkgs.nodejs_20
     pkgs.firebase-tools
-    pkgs.jdk17
+    pkgs.jdk21
   ];
 }
