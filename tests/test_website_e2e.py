@@ -2,7 +2,7 @@
 
 The website is a static GitHub Pages surface, so these tests validate the core
 user journeys without adding a browser dependency: homepage navigation, user
-rights/contact path, status path, and 404 recovery.
+rights/contact path, status path, and 404 edge path recovery.
 """
 
 from __future__ import annotations
