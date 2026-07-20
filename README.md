@@ -105,6 +105,7 @@ Implementation contracts:
 - [`legal/`](./legal/)
 - [`policy/`](./policy/)
 - [`examples/`](./examples/)
+- [`website/`](./website/) — static public governance surface and publishing package.
 - [`tools/validate_privacy_package.py`](./tools/validate_privacy_package.py)
 
 ## Design principles
