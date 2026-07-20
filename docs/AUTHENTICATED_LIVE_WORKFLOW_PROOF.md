@@ -24,6 +24,14 @@ Required public live route smoke:
 URAI_PRIVACY_BASE_URL="https://uraiprivacy.com" URAI_PRIVACY_REQUIRE_LIVE=1 npm run test:smoke:live
 ```
 
+Required strict authenticated-proof verification after the redacted evidence artifact is complete:
+
+```bash
+URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 npm run test:live-auth-proof
+```
+
+This strict command must remain fail-closed until the real artifact at `release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.json` contains approved, redacted evidence for every required workflow. Do not replace it with sample data or mark blocked rows complete from emulator-only evidence.
+
 ## Required live-auth test identities
 
 | Identity | Purpose | Proof required |

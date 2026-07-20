@@ -6,7 +6,7 @@ This repository is the URAI privacy control plane: a deployable Next.js/Firebase
 
 URAI is designed with **privacy-by-architecture**, **user sovereignty**, **minimal data exposure**, and **no silent escalation** as first-class system constraints.
 
-## Production lock status
+## Release Gate and production lock status
 
 Current machine-readable status: [`PRODUCTION_LOCK_STATUS.json`](./PRODUCTION_LOCK_STATUS.json)
 
@@ -105,6 +105,7 @@ Implementation contracts:
 - [`legal/`](./legal/)
 - [`policy/`](./policy/)
 - [`examples/`](./examples/)
+- [`website/`](./website/) — static public governance surface and publishing package.
 - [`tools/validate_privacy_package.py`](./tools/validate_privacy_package.py)
 
 ## Design principles
@@ -153,7 +154,7 @@ Required runtime:
 
 - Node.js `>=20.19.0`
 - npm
-- Java 17 for Firebase emulator-backed rules/integration tests
+- Java 21 for Firebase emulator-backed rules/integration tests
 - Firebase CLI for emulator/deploy flows
 - Python 3.11+ only for legacy governance validation tools
 

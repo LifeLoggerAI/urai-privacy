@@ -3,7 +3,7 @@ repo: UrAiProd
 owner: product-privacy
 privacyGovernanceVersion: 0.1.0-draft
 status: review
-lastReviewed: 2026-05-06
+lastReviewed: "2026-05-06"
 
 dataProcessing:
   collectedFields: []

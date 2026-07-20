@@ -1,6 +1,6 @@
 # Audit Logging Standard
 
-URAI must log privacy-relevant actions in a way that supports investigation, user rights, compliance, and governance review.
+URAI must log privacy-relevant actions in a way that supports investigation, user rights, compliance, and governance review. Every audit record must remain attributable, reviewable, and protected from silent alteration.
 
 ## Events That Must Be Logged
 

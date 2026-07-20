@@ -31,7 +31,7 @@ flowchart TD
 ## Required Controls
 
 - C8 consent required for participation
-- Minimum cohort size of 100 unless stricter threshold applies
+- Required minimum cohort size of 100 unless a stricter threshold applies
 - Re-identification review required
 - Raw biometric, raw transcript, raw image, and user-linked sensitive records prohibited
 - Opt-out stops future inclusion

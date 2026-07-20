@@ -41,7 +41,7 @@ The script must complete these gates:
 
 ## 3. Firebase emulator verification
 
-- [ ] Java 17+ is installed.
+- [ ] Java 21+ is installed.
 - [ ] `npm run test:emulators` passes.
 - [ ] Firestore rules prove owner-only reads/writes for user privacy records.
 - [ ] Firestore rules prove non-admin denial for admin/server-only records.
