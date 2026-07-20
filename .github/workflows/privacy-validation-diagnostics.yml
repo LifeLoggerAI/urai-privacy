@@ -1,0 +1,59 @@
+name: Privacy Validation Diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Capture Python validator output
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          set +e
+          pip install -r requirements.txt > diagnostics/python-install.log 2>&1
+          install_code=$?
+          python -m unittest discover -s tests -p 'test_*.py' > diagnostics/python-tests.log 2>&1
+          test_code=$?
+          printf 'install_exit=%s\ntests_exit=%s\n' "$install_code" "$test_code" > diagnostics/python-exit-codes.txt
+          exit 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Capture build and generated HTML QA output
+        shell: bash
+        run: |
+          set +e
+          npm ci > diagnostics/npm-ci.log 2>&1
+          install_code=$?
+          npm run build > diagnostics/build.log 2>&1
+          build_code=$?
+          npm run urai:qa > diagnostics/urai-qa.log 2>&1
+          qa_code=$?
+          printf 'npm_install_exit=%s\nbuild_exit=%s\nqa_exit=%s\n' "$install_code" "$build_code" "$qa_code" > diagnostics/node-exit-codes.txt
+          exit 0
+
+      - name: Upload exact diagnostic output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-validation-diagnostics-${{ github.sha }}
+          path: diagnostics
+          if-no-files-found: error
+          retention-days: 7
