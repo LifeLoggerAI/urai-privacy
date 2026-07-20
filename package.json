@@ -22,7 +22,7 @@
     "test:smoke": "node scripts/smoke-routes.mjs",
     "test:smoke:live": "node scripts/smoke-live.mjs",
     "test:live-auth-proof": "node scripts/verify-authenticated-live-proof.mjs",
-    "test:emulators": "firebase emulators:exec --project urai-privacy-integration-test --only auth,firestore,storage,functions \"npm run test:rules:emulated && npm run test:integration:emulated\"",
+    "test:emulators": "firebase emulators:exec --config firebase.emulators.json --project urai-privacy-integration-test --only auth,firestore,storage,functions \"npm run test:rules:emulated && npm run test:integration:emulated\"",
     "check:java": "node scripts/check-java.mjs",
     "audit:privacy": "node scripts/urai_privacy_adoption_check.mjs",
     "audit:tier-one": "node scripts/audit-tier-one.mjs",
