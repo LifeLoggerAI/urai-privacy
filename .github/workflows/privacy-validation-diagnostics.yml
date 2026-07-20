@@ -27,7 +27,9 @@ jobs:
           install_code=$?
           python -m unittest discover -s tests -p 'test_*.py' > diagnostics/python-tests.log 2>&1
           test_code=$?
-          printf 'install_exit=%s\ntests_exit=%s\n' "$install_code" "$test_code" > diagnostics/python-exit-codes.txt
+          python tools/validate_privacy_package.py > diagnostics/privacy-package.log 2>&1
+          package_code=$?
+          printf 'install_exit=%s\ntests_exit=%s\npackage_exit=%s\n' "$install_code" "$test_code" "$package_code" > diagnostics/python-exit-codes.txt
           exit 0
 
       - name: Set up Node
