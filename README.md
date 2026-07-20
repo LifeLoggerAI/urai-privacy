@@ -154,7 +154,7 @@ Required runtime:
 
 - Node.js `>=20.19.0`
 - npm
-- Java 17 for Firebase emulator-backed rules/integration tests
+- Java 21 for Firebase emulator-backed rules/integration tests
 - Firebase CLI for emulator/deploy flows
 - Python 3.11+ only for legacy governance validation tools
 
