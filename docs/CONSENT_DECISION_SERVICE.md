@@ -6,86 +6,66 @@ Policy version: `1.0.0`
 
 ## Authority
 
-`functions/src/consent-policy.ts` is the canonical purpose and decision policy for the `urai-privacy` service.
+`functions/src/consent-decision.ts` is the single canonical purpose registry and fail-closed decision policy for the `urai-privacy` service.
 
-The deployed callable surface is assembled by `functions/src/exports.ts`. The legacy unversioned consent writer in `functions/src/index.ts` is intentionally not exported by that surface.
+`functions/src/consent-api.ts` is the single canonical callable implementation. Firebase deploys `lib/functions-entry.js`, built from `functions/src/functions-entry.ts`. The compatibility files `consent-functions.ts` and `exports.ts` contain delegation only and must never define a second registry, storage model, authorization rule, or audit path.
 
 ## Registered purposes
 
-- `audio_transcription` — C3 — maximum grant duration 365 days
-- `gps_context` — C2 — maximum grant duration 180 days
-- `ai_insights` — C4 — maximum grant duration 180 days
-- `deidentified_analytics` — C5 — maximum grant duration 365 days
-- `data_monetization` — C8 — maximum grant duration 90 days
+- `memory.storage` — C1
+- `behavior.passive-context` — C2
+- `location.context` — C3
+- `inference.sensitive` — C4
+- `biometric.identity` — C5
+- `ai.personalization` — C6
+- `data.export` — C7
+- `data.monetization.anonymized` — C8
 
-An unknown purpose or mismatched tier is denied. Adding a purpose requires a reviewed registry change, policy-version decision, tests, retention mapping, export/deletion mapping, and downstream adoption evidence.
+An unknown purpose is denied. Adding or renaming a purpose requires a reviewed registry and policy-version change, tests, retention mapping, export/deletion mapping, and downstream adoption evidence.
 
 ## Callable contracts
 
-### `getConsentPurposeRegistry`
+### `setCanonicalConsent`
 
-Requires Firebase Authentication. Returns the active policy version and registered purposes used by the Privacy Center UI.
+Requires Firebase Authentication and owner authority. It validates the purpose against the canonical registry, records `granted`, `denied`, or `revoked` state, writes the canonical record, appends an immutable event, and commits the audit record in the same Firestore transaction. A failed transaction reports no successful consent mutation.
 
-### `updateConsent`
+### `evaluateCanonicalConsent`
 
-Requires Firebase Authentication and owner authority. It:
+Requires Firebase Authentication. A user may evaluate only their own consent. An administrator may evaluate a named subject. A system principal may evaluate another subject only when its token carries a validated, explicit `consumerId`; a generic `system: true` or `role: system` token without that binding is denied.
 
-- validates the purpose against the registry;
-- enforces the exact registered tier;
-- records `granted`, `denied`, or `revoked` state;
-- assigns an expiry to every grant;
-- writes the current consent record;
-- appends an immutable consent event;
-- records a receipt hash and audit event.
+Every request supplies a registered purpose and correlation identifier. Every allow or deny creates a scoped `dataAccessEvents` record containing the actor, subject, consumer binding when present, purpose, decision, reason, policy version, and integrity hash.
 
-A policy-version change invalidates older grants until the user re-consents under the current policy.
-
-### `evaluateConsent`
-
-Requires Firebase Authentication. A user may evaluate only their own consent. Trusted `admin` or `system` custom claims may evaluate a named subject.
-
-Every request supplies:
-
-- subject UID when the caller is a trusted service or administrator;
-- registered purpose;
-- exact requested tier;
-- consuming service;
-- action;
-- optional context identifier, stored only as a hash.
-
-The result is fail-closed. It returns `allowed=false` unless the record has the correct owner, purpose, tier, current policy version, granted status, receipt hash, and unexpired grant. Every allow or deny is appended to `consentDecisions` and written to the audit log.
+The result is fail-closed. Missing records, stale policy versions, denied or revoked state, tier mismatch, expiry, and invalid status all deny processing.
 
 ## Consumer enforcement rule
 
-A consuming service must obtain an `allowed=true` decision immediately before the governed processing operation. Storing consent preferences or calling this service without enforcing the returned decision does not satisfy the contract.
+A consuming service must obtain an `allowed=true` decision immediately before the governed processing operation. Storing a preference or calling this service without enforcing the returned decision does not satisfy the contract.
 
-Consumers must retain the decision ID with their processing receipt. They must not cache an allow result past the returned expiry, across policy-version changes, or after a revocation event.
+Consumers must retain the decision event ID with their processing receipt. They must not cache an allow result across policy changes, expiry, or revocation.
 
 ## Firestore boundary
 
-Clients may read their own `consentRecords`, `consentEvents`, and `consentDecisions`. Clients cannot create, update, or delete those records directly. Trusted server functions are the only mutation path.
+Clients may read only records allowed by the reviewed Firestore rules. Clients cannot create, update, or delete canonical consent authority directly. Trusted server functions are the only mutation path.
 
 ## Verification
 
-Repository checks:
+Repository checks include:
 
 ```bash
 npm run test:unit
 npm run test:rules:static
+npm run test:export:contract
 npm run test:emulators
 npm --prefix functions run typecheck
 npm --prefix functions run build
 ```
 
-Key tests:
-
-- `tests/unit/consent-policy.test.ts`
-- `tests/rules/firestore.rules.test.ts`
+The export contract gate verifies the actual deployed `functions-entry.ts` surface, rejects alternate active consent/export authorities, requires consumer-bound cross-user evaluation, requires atomic consent audit commitment, and verifies revocation acknowledgement plus stale export-lease recovery behavior.
 
 ## Remaining blockers
 
-- Exact-head CI and emulator-backed verification are queued.
+- The focused source repair requires fresh exact-head CI and artifact inspection.
+- The consumed Privacy parent is divergent from current `main` and must be reconstructed without losing later protections.
 - No staging or production function deployment has been performed.
-- No downstream URAI service is yet certified as enforcing the decision before processing.
-- Revocation propagation, retention execution, complete cross-system export, complete deletion propagation, and provider-deletion receipts remain separate work.
-- App Check, service-specific rate limits, and authenticated live evidence remain required before production certification.
+- Separate genuine privacy/security and authorized legal/privacy approvals remain required.
+- Protected authenticated consent/export/deletion, denial, failure, recovery, monitoring, residual scan, downstream acknowledgement, and rollback evidence remain mandatory before production certification.
