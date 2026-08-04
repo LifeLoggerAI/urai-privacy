@@ -15,22 +15,24 @@ permissions:
 jobs:
   map-reconstruction:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout exact reconstruction head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prove exact reconstruction head
+      - name: Prove exact clean reconstruction head
         shell: bash
         run: |
           set -euo pipefail
           expected="${{ github.event.pull_request.head.sha || github.sha }}"
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$expected"
-          test -z "$(git status --porcelain=v1)"
+          before="$(git status --porcelain=v1 --untracked-files=all)"
+          test -z "$before"
 
       - name: Fetch reconstruction authorities
         shell: bash
@@ -41,7 +43,7 @@ jobs:
             ec7d05a780d07e89ec5fcc7287344dca012ad100 \
             4d1c1dc0f554423fc7c22db50db83f650524bed3
 
-      - name: Build path-level reconstruction manifest
+      - name: Build path-level reconstruction manifest outside checkout
         shell: bash
         run: |
           set -euo pipefail
@@ -49,40 +51,68 @@ jobs:
           main=c4db195d0b19454df0bb9ef889a5b0d66e030157
           consumed=ec7d05a780d07e89ec5fcc7287344dca012ad100
           repair=4d1c1dc0f554423fc7c22db50db83f650524bed3
-
-          mkdir -p reconstruction-evidence
-          git diff --name-only "$base" "$main" | sort -u > reconstruction-evidence/main-changed.txt
-          git diff --name-only "$base" "$consumed" | sort -u > reconstruction-evidence/consumed-changed.txt
-          git diff --name-only "$consumed" "$repair" | sort -u > reconstruction-evidence/focused-repair.txt
-          comm -12 reconstruction-evidence/main-changed.txt reconstruction-evidence/consumed-changed.txt > reconstruction-evidence/overlap.txt
-          comm -23 reconstruction-evidence/consumed-changed.txt reconstruction-evidence/main-changed.txt > reconstruction-evidence/consumed-only.txt
-          comm -13 reconstruction-evidence/consumed-changed.txt reconstruction-evidence/main-changed.txt > reconstruction-evidence/main-only.txt
+          head="$(git rev-parse HEAD)"
+          evidence="$RUNNER_TEMP/privacy-reconstruction-evidence"
+          rm -rf "$evidence"
+          mkdir -p "$evidence"
+          printf '%s\n' "$evidence" > "$RUNNER_TEMP/privacy-reconstruction-evidence-path"
 
           {
+            echo "diagnostic_head=$head"
             echo "base=$base"
             echo "main=$main"
             echo "consumed=$consumed"
             echo "repair=$repair"
-            echo "main_changed=$(wc -l < reconstruction-evidence/main-changed.txt)"
-            echo "consumed_changed=$(wc -l < reconstruction-evidence/consumed-changed.txt)"
-            echo "overlap=$(wc -l < reconstruction-evidence/overlap.txt)"
-            echo "consumed_only=$(wc -l < reconstruction-evidence/consumed-only.txt)"
-            echo "main_only=$(wc -l < reconstruction-evidence/main-only.txt)"
-            echo "focused_repair=$(wc -l < reconstruction-evidence/focused-repair.txt)"
-          } | tee reconstruction-evidence/summary.txt
+            echo "merge_base=$(git merge-base "$main" "$consumed")"
+            echo "main_tree=$(git rev-parse "$main^{tree}")"
+            echo "consumed_tree=$(git rev-parse "$consumed^{tree}")"
+            echo "repair_tree=$(git rev-parse "$repair^{tree}")"
+            echo "head_tree=$(git rev-parse "$head^{tree}")"
+          } > "$evidence/authorities.txt"
+
+          git diff --name-only "$base" "$main" | LC_ALL=C sort -u > "$evidence/main-changed.txt"
+          git diff --name-only "$base" "$consumed" | LC_ALL=C sort -u > "$evidence/consumed-changed.txt"
+          git diff --name-only "$consumed" "$repair" | LC_ALL=C sort -u > "$evidence/focused-repair.txt"
+          comm -12 "$evidence/main-changed.txt" "$evidence/consumed-changed.txt" > "$evidence/overlap.txt"
+          comm -23 "$evidence/consumed-changed.txt" "$evidence/main-changed.txt" > "$evidence/consumed-only.txt"
+          comm -13 "$evidence/consumed-changed.txt" "$evidence/main-changed.txt" > "$evidence/main-only.txt"
+
+          {
+            cat "$evidence/authorities.txt"
+            echo "main_changed=$(wc -l < "$evidence/main-changed.txt")"
+            echo "consumed_changed=$(wc -l < "$evidence/consumed-changed.txt")"
+            echo "overlap=$(wc -l < "$evidence/overlap.txt")"
+            echo "consumed_only=$(wc -l < "$evidence/consumed-only.txt")"
+            echo "main_only=$(wc -l < "$evidence/main-only.txt")"
+            echo "focused_repair=$(wc -l < "$evidence/focused-repair.txt")"
+          } | tee "$evidence/summary.txt"
+
+          printf 'path\tmain_object\tconsumed_object\trepair_object\tmain_to_consumed_numstat\n' > "$evidence/path-object-map.tsv"
+          cat "$evidence/main-changed.txt" "$evidence/consumed-changed.txt" "$evidence/focused-repair.txt" | LC_ALL=C sort -u | while IFS= read -r path; do
+            main_object="$(git rev-parse "$main:$path" 2>/dev/null || printf 'ABSENT')"
+            consumed_object="$(git rev-parse "$consumed:$path" 2>/dev/null || printf 'ABSENT')"
+            repair_object="$(git rev-parse "$repair:$path" 2>/dev/null || printf 'ABSENT')"
+            numstat="$(git diff --numstat "$main" "$consumed" -- "$path" | tr '\t' ',' | tr '\n' ';')"
+            printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$main_object" "$consumed_object" "$repair_object" "$numstat"
+          done >> "$evidence/path-object-map.tsv"
 
           while IFS= read -r path; do
             printf '%s\t' "$path"
             git diff --numstat "$main" "$consumed" -- "$path" | awk '{print $1" additions, "$2" deletions"}'
-          done < reconstruction-evidence/overlap.txt > reconstruction-evidence/overlap-stats.tsv
+          done < "$evidence/overlap.txt" > "$evidence/overlap-stats.tsv"
 
-          git status --porcelain=v1 > reconstruction-evidence/clean-tree.txt
-          test ! -s reconstruction-evidence/clean-tree.txt
+          git status --porcelain=v1 --untracked-files=all > "$evidence/repository-status-after-evidence.txt"
+          test ! -s "$evidence/repository-status-after-evidence.txt"
+          (
+            cd "$evidence"
+            sha256sum authorities.txt summary.txt main-changed.txt consumed-changed.txt focused-repair.txt overlap.txt consumed-only.txt main-only.txt overlap-stats.tsv path-object-map.tsv repository-status-after-evidence.txt > sha256sums.txt
+          )
 
       - name: Upload reconstruction manifest
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: privacy-reconstruction-map-${{ github.event.pull_request.head.sha || github.sha }}
-          path: reconstruction-evidence
+          path: ${{ runner.temp }}/privacy-reconstruction-evidence
           if-no-files-found: error
           retention-days: 90
