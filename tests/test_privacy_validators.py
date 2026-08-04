@@ -34,9 +34,25 @@ class FeatureManifestValidationTests(unittest.TestCase):
 
     def test_valid_example_passes_policy_rules(self) -> None:
         manifest = privacy_validator.load_yaml("examples/valid-feature.privacy.yaml")
+        self.assertIsInstance(manifest["lastReviewed"], str)
+        privacy_validator.validate_json_schema(
+            "schemas/feature-privacy-manifest.schema.json",
+            "examples/valid-feature.privacy.yaml",
+            manifest,
+        )
         self.assertEqual(
             privacy_validator.validate_feature_manifest("examples/valid-feature.privacy.yaml", manifest, self.registries),
             [],
+        )
+
+    def test_adoption_example_preserves_schema_string_types(self) -> None:
+        path = "adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml"
+        manifest = privacy_validator.load_yaml(path)
+        self.assertIsInstance(manifest["lastReviewed"], str)
+        privacy_validator.validate_json_schema(
+            "schemas/feature-privacy-manifest.schema.json",
+            path,
+            manifest,
         )
 
     def test_sensitive_fixture_requires_c4_consent(self) -> None:

@@ -66,12 +66,13 @@ async function seedStorage(path: string, contents = "{}") {
 }
 
 describe("Storage export and evidence rules", () => {
-  it("allows owners and admins to read user export paths", async ({ skip }) => {
+  it("allows owners and both supported admin claim shapes to read user export paths", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await seedStorage("exports/user-a/export-1/manifest.json");
 
     await assertSucceeds(getBytes(ref(storageFor("user-a"), "exports/user-a/export-1/manifest.json")));
     await assertSucceeds(getBytes(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-1/manifest.json")));
+    await assertSucceeds(getBytes(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-1/manifest.json")));
   });
 
   it("denies other users and anonymous users from reading export paths", async ({ skip }) => {
@@ -82,11 +83,13 @@ describe("Storage export and evidence rules", () => {
     await assertFails(getBytes(ref(anonStorage(), "exports/user-a/export-1/manifest.json")));
   });
 
-  it("allows only admins to write export and evidence objects", async ({ skip }) => {
+  it("allows only either supported admin claim shape to write export and evidence objects", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await assertFails(uploadString(ref(storageFor("user-a"), "exports/user-a/export-2/manifest.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-2/manifest.json"), "{}"));
+    await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-role-admin/manifest.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "evidence/release-lock.json"), "{}"));
+    await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "evidence/role-release-lock.json"), "{}"));
     await assertFails(uploadString(ref(storageFor("user-a"), "evidence/release-lock.json"), "{}"));
   });
 
