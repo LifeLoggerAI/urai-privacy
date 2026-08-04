@@ -57,6 +57,17 @@ npm run audit:tier-one
 printf '\n[verify-release] next build\n'
 npm run build
 
+printf '\n[verify-release] normalize Next generated route typings\n'
+status="$(git status --porcelain --untracked-files=all)"
+unexpected="$(printf '%s\n' "$status" | grep -vE '^ M next-env\.d\.ts$' || true)"
+if [ -n "$unexpected" ]; then
+  echo "[verify-release] Build created unexpected source changes" >&2
+  printf '%s\n' "$unexpected" >&2
+  exit 1
+fi
+git restore --source=HEAD --worktree -- next-env.d.ts
+test -z "$(git status --porcelain --untracked-files=all)"
+
 printf '\n[verify-release] functions build\n'
 npm --prefix functions run build
 
