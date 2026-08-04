@@ -125,4 +125,8 @@ jobs:
         run: |
           rm -rf artifacts
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          status="$(git status --porcelain --untracked-files=all)"
+          unexpected="$(printf '%s\n' "$status" | grep -vE '^ M next-env\.d\.ts$' || true)"
+          test -z "$unexpected"
+          git restore --source=HEAD --worktree -- next-env.d.ts
           test -z "$(git status --porcelain --untracked-files=all)"
