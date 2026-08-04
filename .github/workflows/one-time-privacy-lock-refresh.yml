@@ -93,7 +93,7 @@ jobs:
           fs.writeFileSync(assertionPath, assertion);
           NODE
 
-      - name: Verify exact candidate audits and focused contracts
+      - name: Verify candidate audits and focused contracts before commit
         shell: bash
         run: |
           set -euo pipefail
@@ -103,11 +103,10 @@ jobs:
           npm --prefix functions audit --omit=dev --audit-level=low
           npm run test:export:contract
           npm run test:deletion:contract
-          bash scripts/assert-production-ready.sh
           test "$(git hash-object package-lock.json)" = "$EXPECTED_ROOT_LOCK_BLOB"
           test "$(git hash-object functions/package-lock.json)" = "$EXPECTED_FUNCTIONS_LOCK_BLOB"
 
-      - name: Prove focused final tree and self-remove dispatcher
+      - name: Create self-removing focused successor commit
         shell: bash
         run: |
           set -euo pipefail
@@ -124,4 +123,24 @@ jobs:
           git add package-lock.json functions/package-lock.json package.json scripts/assert-production-ready.sh .github/workflows/one-time-privacy-lock-refresh.yml
           git diff --cached --check
           git commit -m 'Complete audited Privacy lock and release contract refresh'
+
+      - name: Verify committed exact successor before publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e .github/workflows/one-time-privacy-lock-refresh.yml
+          test -z "$(git status --porcelain --untracked-files=all)"
+          test "$(git hash-object package-lock.json)" = "$EXPECTED_ROOT_LOCK_BLOB"
+          test "$(git hash-object functions/package-lock.json)" = "$EXPECTED_FUNCTIONS_LOCK_BLOB"
+          npm audit --omit=dev --audit-level=low
+          npm --prefix functions audit --omit=dev --audit-level=low
+          npm run test:export:contract
+          npm run test:deletion:contract
+          bash scripts/assert-production-ready.sh
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Publish verified successor
+        shell: bash
+        run: |
+          set -euo pipefail
           git push origin "HEAD:$TARGET_BRANCH"
