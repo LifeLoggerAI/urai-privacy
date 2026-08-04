@@ -1,0 +1,128 @@
+name: One-time Privacy lock and release contract refresh
+
+on:
+  push:
+    branches:
+      - reconstruct/privacy-current-main-20260804
+    paths:
+      - '.github/workflows/one-time-privacy-lock-refresh.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-time-privacy-lock-refresh-20260804
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: reconstruct/privacy-current-main-20260804
+  BASE_AUTHORITY_SHA: 2e756859080dadda705e4d04d36603cf0d2c0c72
+  EXPECTED_ROOT_LOCK_BLOB: b7aaf2027b122ed8ed4a3a1a81a938bfcb169299
+  EXPECTED_FUNCTIONS_LOCK_BLOB: 3c052665495b5fb50f0597f351068be645a48837
+  DISPATCH_SHA: ${{ github.sha }}
+
+jobs:
+  refresh:
+    if: github.repository == 'LifeLoggerAI/urai-privacy' && github.ref == 'refs/heads/reconstruct/privacy-current-main-20260804'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact bounded dispatcher head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.DISPATCH_SHA }}
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Prove exact branch and one-file dispatcher scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$DISPATCH_SHA"
+          test "$GITHUB_REF_NAME" = "$TARGET_BRANCH"
+          git merge-base --is-ancestor "$BASE_AUTHORITY_SHA" "$DISPATCH_SHA"
+          changed="$(git diff --name-only "$BASE_AUTHORITY_SHA" "$DISPATCH_SHA")"
+          test "$changed" = '.github/workflows/one-time-privacy-lock-refresh.yml'
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Setup reviewed Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20.19.5
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - name: Deterministically regenerate audited lock candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit fix --package-lock-only --omit=dev
+          npm --prefix functions audit fix --package-lock-only --omit=dev
+          test "$(git hash-object package-lock.json)" = "$EXPECTED_ROOT_LOCK_BLOB"
+          test "$(git hash-object functions/package-lock.json)" = "$EXPECTED_FUNCTIONS_LOCK_BLOB"
+
+      - name: Restore release contract scripts and current-main assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.scripts['test:export:contract'] = 'node scripts/check-complete-export-contract.mjs';
+          pkg.scripts['test:deletion:contract'] = 'node scripts/check-deletion-orchestration-contract.mjs';
+          const expected = 'npm run clean:legacy && npm run lint && npm run typecheck && npm run test:unit && npm run test:rules:static && npm run test:e2e && npm run audit:privacy && npm run audit:tier-one && npm run build && npm run urai:qa';
+          if (pkg.scripts.preflight !== expected) {
+            throw new Error(`Unexpected preflight source: ${pkg.scripts.preflight}`);
+          }
+          pkg.scripts.preflight = 'npm run clean:legacy && npm run lint && npm run typecheck && npm run test:unit && npm run test:rules:static && npm run test:export:contract && npm run test:deletion:contract && npm run test:e2e && npm run audit:privacy && npm run audit:tier-one && npm run build && npm run urai:qa';
+          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+
+          const assertionPath = 'scripts/assert-production-ready.sh';
+          let assertion = fs.readFileSync(assertionPath, 'utf8');
+          assertion = assertion.replace(
+            "grep -q 'firebase-tools@15.23.0' package.json\ngrep -q -- '--config firebase.emulator.json' package.json",
+            "grep -q '\"test:export:contract\"' package.json\ngrep -q '\"test:deletion:contract\"' package.json\ngrep -q '\"firebase-tools\": \"15.24.0\"' package.json\ngrep -q -- '--config firebase.emulators.json' package.json",
+          );
+          if (!assertion.includes('"firebase-tools": "15.24.0"') || !assertion.includes('--config firebase.emulators.json')) {
+            throw new Error('Current-main Firebase authority assertions were not updated');
+          }
+          fs.writeFileSync(assertionPath, assertion);
+          NODE
+
+      - name: Verify exact candidate audits and focused contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm ci --prefix functions
+          npm audit --omit=dev --audit-level=low
+          npm --prefix functions audit --omit=dev --audit-level=low
+          npm run test:export:contract
+          npm run test:deletion:contract
+          bash scripts/assert-production-ready.sh
+          test "$(git hash-object package-lock.json)" = "$EXPECTED_ROOT_LOCK_BLOB"
+          test "$(git hash-object functions/package-lock.json)" = "$EXPECTED_FUNCTIONS_LOCK_BLOB"
+
+      - name: Prove focused final tree and self-remove dispatcher
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git status --porcelain --untracked-files=all | sed 's/^...//' | sort)"
+          expected="$(printf '%s\n' \
+            '.github/workflows/one-time-privacy-lock-refresh.yml' \
+            'functions/package-lock.json' \
+            'package-lock.json' \
+            'package.json' \
+            'scripts/assert-production-ready.sh' | sort)"
+          test "$changed" = "$expected"
+          rm -- .github/workflows/one-time-privacy-lock-refresh.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json functions/package-lock.json package.json scripts/assert-production-ready.sh .github/workflows/one-time-privacy-lock-refresh.yml
+          git diff --cached --check
+          git commit -m 'Complete audited Privacy lock and release contract refresh'
+          git push origin "HEAD:$TARGET_BRANCH"
