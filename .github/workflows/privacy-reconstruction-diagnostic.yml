@@ -1,0 +1,75 @@
+name: Privacy Reconstruction Diagnostic
+
+on:
+  push:
+    branches:
+      - reconstruct/privacy-current-main-20260804
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  map-reconstruction:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact reconstruction head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch reconstruction authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            c4db195d0b19454df0bb9ef889a5b0d66e030157 \
+            ec7d05a780d07e89ec5fcc7287344dca012ad100 \
+            4d1c1dc0f554423fc7c22db50db83f650524bed3
+
+      - name: Build path-level reconstruction manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=b81d5a189aeb1bf233dce0dd539e7aa7d387b36a
+          main=c4db195d0b19454df0bb9ef889a5b0d66e030157
+          consumed=ec7d05a780d07e89ec5fcc7287344dca012ad100
+          repair=4d1c1dc0f554423fc7c22db50db83f650524bed3
+
+          mkdir -p reconstruction-evidence
+          git diff --name-only "$base" "$main" | sort -u > reconstruction-evidence/main-changed.txt
+          git diff --name-only "$base" "$consumed" | sort -u > reconstruction-evidence/consumed-changed.txt
+          git diff --name-only "$consumed" "$repair" | sort -u > reconstruction-evidence/focused-repair.txt
+          comm -12 reconstruction-evidence/main-changed.txt reconstruction-evidence/consumed-changed.txt > reconstruction-evidence/overlap.txt
+          comm -23 reconstruction-evidence/consumed-changed.txt reconstruction-evidence/main-changed.txt > reconstruction-evidence/consumed-only.txt
+          comm -13 reconstruction-evidence/consumed-changed.txt reconstruction-evidence/main-changed.txt > reconstruction-evidence/main-only.txt
+
+          {
+            echo "base=$base"
+            echo "main=$main"
+            echo "consumed=$consumed"
+            echo "repair=$repair"
+            echo "main_changed=$(wc -l < reconstruction-evidence/main-changed.txt)"
+            echo "consumed_changed=$(wc -l < reconstruction-evidence/consumed-changed.txt)"
+            echo "overlap=$(wc -l < reconstruction-evidence/overlap.txt)"
+            echo "consumed_only=$(wc -l < reconstruction-evidence/consumed-only.txt)"
+            echo "main_only=$(wc -l < reconstruction-evidence/main-only.txt)"
+            echo "focused_repair=$(wc -l < reconstruction-evidence/focused-repair.txt)"
+          } | tee reconstruction-evidence/summary.txt
+
+          while IFS= read -r path; do
+            printf '%s\t' "$path"
+            git diff --numstat "$main" "$consumed" -- "$path" | awk '{print $1" additions, "$2" deletions"}'
+          done < reconstruction-evidence/overlap.txt > reconstruction-evidence/overlap-stats.tsv
+
+          git status --porcelain=v1 > reconstruction-evidence/clean-tree.txt
+          test ! -s reconstruction-evidence/clean-tree.txt
+
+      - name: Upload reconstruction manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-reconstruction-map-${{ github.sha }}
+          path: reconstruction-evidence
+          if-no-files-found: error
+          retention-days: 90
