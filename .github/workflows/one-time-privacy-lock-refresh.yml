@@ -35,7 +35,7 @@ jobs:
           persist-credentials: true
           show-progress: false
 
-      - name: Prove exact branch and one-file dispatcher scope
+      - name: Prove exact branch and workflow-only dispatcher scope
         shell: bash
         run: |
           set -euo pipefail
@@ -113,7 +113,6 @@ jobs:
           set -euo pipefail
           changed="$(git status --porcelain --untracked-files=all | sed 's/^...//' | sort)"
           expected="$(printf '%s\n' \
-            '.github/workflows/one-time-privacy-lock-refresh.yml' \
             'functions/package-lock.json' \
             'package-lock.json' \
             'package.json' \
