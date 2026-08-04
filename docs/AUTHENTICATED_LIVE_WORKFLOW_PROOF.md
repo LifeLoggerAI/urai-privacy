@@ -27,6 +27,8 @@ URAI_PRIVACY_BASE_URL="https://uraiprivacy.com" URAI_PRIVACY_REQUIRE_LIVE=1 npm 
 Required strict authenticated-proof verification after the redacted evidence artifact is complete:
 
 ```bash
+URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT="<expected-project-id>" \
+URAI_PRIVACY_EXPECTED_COMMIT_SHA="$(git rev-parse HEAD)" \
 URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 npm run test:live-auth-proof
 ```
 
