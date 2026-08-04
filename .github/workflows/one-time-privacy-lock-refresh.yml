@@ -6,6 +6,13 @@ on:
       - reconstruct/privacy-current-main-20260804
     paths:
       - '.github/workflows/one-time-privacy-lock-refresh.yml'
+  pull_request:
+    branches:
+      - main
+    types:
+      - synchronize
+    paths:
+      - '.github/workflows/one-time-privacy-lock-refresh.yml'
 
 permissions:
   contents: write
@@ -19,11 +26,12 @@ env:
   BASE_AUTHORITY_SHA: 2e756859080dadda705e4d04d36603cf0d2c0c72
   EXPECTED_ROOT_LOCK_BLOB: b7aaf2027b122ed8ed4a3a1a81a938bfcb169299
   EXPECTED_FUNCTIONS_LOCK_BLOB: 3c052665495b5fb50f0597f351068be645a48837
-  DISPATCH_SHA: ${{ github.sha }}
+  DISPATCH_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  EVENT_HEAD_REF: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
 jobs:
   refresh:
-    if: github.repository == 'LifeLoggerAI/urai-privacy' && github.ref == 'refs/heads/reconstruct/privacy-current-main-20260804'
+    if: github.repository == 'LifeLoggerAI/urai-privacy' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name == 'push' || github.event.pull_request.head.ref == 'reconstruct/privacy-current-main-20260804')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -40,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$DISPATCH_SHA"
-          test "$GITHUB_REF_NAME" = "$TARGET_BRANCH"
+          test "$EVENT_HEAD_REF" = "$TARGET_BRANCH"
           git merge-base --is-ancestor "$BASE_AUTHORITY_SHA" "$DISPATCH_SHA"
           changed="$(git diff --name-only "$BASE_AUTHORITY_SHA" "$DISPATCH_SHA")"
           test "$changed" = '.github/workflows/one-time-privacy-lock-refresh.yml'
