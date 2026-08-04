@@ -256,6 +256,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     await db.runTransaction(async (tx) => {
       tx.update(jobRef, {
         status: "completed",
+        complete: true,
+        completedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
         processingBy: FieldValue.delete(),
         processingLeaseExpiresAt: FieldValue.delete(),
