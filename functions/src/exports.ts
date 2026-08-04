@@ -1,12 +1,3 @@
-export {
-  createExportRequest,
-  createDeletionRequest,
-  writeAuditLog,
-  recordAdminAction,
-  getPrivacyHealthReport
-} from "./index";
-
-export { processExportRequest } from "./export-functions";
-export { getExportDownloadUrl, cleanupExpiredExportPackages } from "./export-lifecycle-functions";
-export { processDeletionRequest, executeDeletionRequest } from "./deletion-functions";
-export { getConsentPurposeRegistry, updateConsent, evaluateConsent } from "./consent-functions";
+// Compatibility mirror only. Deployment uses functions-entry.ts via package.json.
+// Re-exporting that exact surface prevents a second callable authority from forming.
+export * from "./functions-entry";
