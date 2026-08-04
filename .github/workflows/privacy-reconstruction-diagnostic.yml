@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - reconstruct/privacy-current-main-20260804
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -16,8 +19,18 @@ jobs:
       - name: Checkout exact reconstruction head
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Prove exact reconstruction head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain=v1)"
 
       - name: Fetch reconstruction authorities
         shell: bash
@@ -69,7 +82,7 @@ jobs:
       - name: Upload reconstruction manifest
         uses: actions/upload-artifact@v4
         with:
-          name: privacy-reconstruction-map-${{ github.sha }}
+          name: privacy-reconstruction-map-${{ github.event.pull_request.head.sha || github.sha }}
           path: reconstruction-evidence
           if-no-files-found: error
           retention-days: 90
