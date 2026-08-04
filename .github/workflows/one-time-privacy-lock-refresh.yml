@@ -99,6 +99,23 @@ jobs:
             throw new Error('Current-main Firebase authority assertions were not updated');
           }
           fs.writeFileSync(assertionPath, assertion);
+
+          const proofPath = 'docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md';
+          let proof = fs.readFileSync(proofPath, 'utf8');
+          const marker = 'URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 npm run test:live-auth-proof';
+          if (!proof.includes(marker)) {
+            throw new Error('Authenticated live proof command marker is missing');
+          }
+          if (!proof.includes('URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT')) {
+            proof = proof.replace(
+              marker,
+              'URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT="<expected-project-id>" \\\nURAI_PRIVACY_EXPECTED_COMMIT_SHA="$(git rev-parse HEAD)" \\\nURAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 npm run test:live-auth-proof',
+            );
+          }
+          if (!proof.includes('URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT') || !proof.includes('URAI_PRIVACY_EXPECTED_COMMIT_SHA')) {
+            throw new Error('Authenticated proof identity-binding documentation was not restored');
+          }
+          fs.writeFileSync(proofPath, proof);
           NODE
 
       - name: Verify candidate audits and focused contracts before commit
@@ -120,6 +137,7 @@ jobs:
           set -euo pipefail
           changed="$(git status --porcelain --untracked-files=all | sed 's/^...//' | sort)"
           expected="$(printf '%s\n' \
+            'docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md' \
             'functions/package-lock.json' \
             'package-lock.json' \
             'package.json' \
@@ -128,7 +146,7 @@ jobs:
           rm -- .github/workflows/one-time-privacy-lock-refresh.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package-lock.json functions/package-lock.json package.json scripts/assert-production-ready.sh .github/workflows/one-time-privacy-lock-refresh.yml
+          git add docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md package-lock.json functions/package-lock.json package.json scripts/assert-production-ready.sh .github/workflows/one-time-privacy-lock-refresh.yml
           git diff --cached --check
           git commit -m 'Complete audited Privacy lock and release contract refresh'
 
