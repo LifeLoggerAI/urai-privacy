@@ -80,7 +80,22 @@ requireMatch("processor must use deterministic document ordering", processor, /o
 requireMatch("processor must paginate with a cursor", processor, /startAfter\(cursor\)/);
 requireMatch("processor must atomically claim jobs", processor, /runTransaction[\s\S]*status:\s*["']processing["']/);
 requireMatch("processor must verify claim ownership before completion", processor, /processingBy[\s\S]*(?:operatorUid|adminUid)/);
+requireMatch(
+  "successful processing must atomically mark the package complete",
+  processor,
+  /tx\.update\(jobRef,\s*\{[\s\S]*status:\s*["']completed["'][\s\S]*complete:\s*true[\s\S]*completedAt:\s*FieldValue\.serverTimestamp\(\)/m
+);
+requireMatch(
+  "successful processing must clear its lease only after completion metadata is present",
+  processor,
+  /complete:\s*true[\s\S]*completedAt:\s*FieldValue\.serverTimestamp\(\)[\s\S]*processingBy:\s*FieldValue\.delete\(\)[\s\S]*processingLeaseExpiresAt:\s*FieldValue\.delete\(\)/m
+);
 requireMatch("processor must write package and manifest digests", processor, /manifestSha256[\s\S]*exportSha256/);
+requireMatch(
+  "failed processing must retain fail-closed cleanup state",
+  processor,
+  /status:\s*["']failed["'][\s\S]*artifactCleanupStatus:\s*cleanupStatus[\s\S]*artifactCleanupPendingPaths:\s*cleanup\.pendingPaths/m
+);
 rejectMatch("processor must not contain the former hard 1000-record ceiling", processor, /\.limit\(\s*1000\s*\)/);
 
 requireMatch("canonical consent must require a consumer-bound system authority", consentApi, /consumerId/);
@@ -91,6 +106,16 @@ requireMatch("contract must include consent events", contract, /collection:\s*["
 requireMatch("contract must include consent decisions", contract, /collection:\s*["']consentDecisions["']/);
 requireMatch("contract must recursively scrub array entries", contract, /value\.map\(\(entry\)\s*=>\s*serializeForExport\(entry\)\)/);
 requireMatch("lifecycle must enforce owner or administrative access", lifecycle, /requireOwnerOrAdmin\(request\.auth,\s*uid\)/);
+requireMatch(
+  "download must reject incomplete jobs even when status says completed",
+  lifecycle,
+  /job\.status\s*!==\s*["']completed["']\s*\|\|\s*job\.complete\s*!==\s*true/m
+);
+requireMatch(
+  "download expiry must be derived from packageExpiresAt or completedAt",
+  lifecycleContract,
+  /resolveExportPackageExpiry[\s\S]*packageExpiresAt[\s\S]*completedAt/m
+);
 requireMatch("download links must not outlive the package", lifecycle, /Math\.min\([\s\S]*EXPORT_DOWNLOAD_URL_TTL_MS[\s\S]*packageExpiresAt/);
 requireMatch("download must verify job-scoped object paths", lifecycle, /validExportObjectPath\(\{\s*uid,\s*jobId,\s*path\s*\}\)/);
 requireMatch("expired package cleanup must be scheduled", lifecycle, /cleanupExpiredExportPackages\s*=\s*onSchedule/);
