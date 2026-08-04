@@ -3,7 +3,9 @@
   "version": "0.2.0-staging-scaffold",
   "private": true,
   "main": "lib/functions-entry.js",
-  "engines": { "node": "20" },
+  "engines": {
+    "node": "20"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
@@ -20,6 +22,8 @@
   },
   "overrides": {
     "@tootallnate/once": "^3.0.1",
-    "undici": "^7.16.0"
+    "undici": "^7.16.0",
+    "uuid": "11.1.1",
+    "websocket-driver": "0.7.5"
   }
 }

@@ -14,21 +14,23 @@
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration --passWithNoTests",
-    "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --minWorkers=1 --passWithNoTests",
+    "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --passWithNoTests",
     "test:e2e": "node scripts/smoke-routes.mjs",
     "test:rules": "vitest run tests/rules",
-    "test:rules:emulated": "vitest run tests/rules --pool=forks --maxWorkers=1 --minWorkers=1",
+    "test:rules:emulated": "vitest run tests/rules --pool=forks --maxWorkers=1",
     "test:rules:static": "node scripts/validate-rules.mjs",
+    "test:export:contract": "node scripts/check-complete-export-contract.mjs",
+    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs",
     "test:smoke": "node scripts/smoke-routes.mjs",
     "test:smoke:live": "node scripts/smoke-live.mjs",
     "test:live-auth-proof": "node scripts/verify-authenticated-live-proof.mjs",
-    "test:emulators": "npx --yes firebase-tools@15.23.0 --config firebase.emulator.json emulators:exec --project urai-privacy-integration-test --only auth,firestore,storage,functions \"npm run test:rules:emulated && npm run test:integration:emulated\"",
+    "test:emulators": "npm --prefix functions run build && npx --yes firebase-tools@15.23.0 --config firebase.emulator.json emulators:exec --project urai-privacy-integration-test --only auth,firestore,storage,functions \"npm run test:rules:emulated && npm run test:integration:emulated\"",
     "check:java": "node scripts/check-java.mjs",
     "audit:privacy": "node scripts/urai_privacy_adoption_check.mjs",
     "audit:tier-one": "node scripts/audit-tier-one.mjs",
     "urai:qa": "node scripts/urai-qa-checks.js .next/server/app",
     "build": "next build",
-    "preflight": "npm run clean:legacy && npm run lint && npm run typecheck && npm run test:unit && npm run test:rules:static && npm run test:e2e && npm run audit:privacy && npm run audit:tier-one && npm run build && npm run urai:qa",
+    "preflight": "npm run clean:legacy && npm run lint && npm run typecheck && npm run test:unit && npm run test:rules:static && npm run test:export:contract && npm run test:deletion:contract && npm run test:e2e && npm run audit:privacy && npm run audit:tier-one && npm run build && npm run urai:qa",
     "preflight:production": "bash scripts/verify-release.sh",
     "security:gate": "bash scripts/security-gate.sh",
     "deploy": "firebase deploy",
@@ -55,12 +57,15 @@
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.2.6",
     "firebase-admin": "^13.10.0",
+    "firebase-functions": "6.6.0",
     "typescript": "5.9.3",
-    "vitest": "^2.1.4"
+    "vitest": "4.1.10"
   },
   "overrides": {
     "postcss": "^8.5.10",
     "undici": "^7.16.0",
-    "@tootallnate/once": "^3.0.1"
+    "@tootallnate/once": "^3.0.1",
+    "uuid": "11.1.1",
+    "websocket-driver": "0.7.5"
   }
 }

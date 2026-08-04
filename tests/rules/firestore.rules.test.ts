@@ -51,8 +51,10 @@ beforeEach(async ({ skip }) => {
     await setDoc(doc(db, "privacyRequests/preq-a"), { uid: "user-a", type: "export", status: "pending" });
     await setDoc(doc(db, "exportJobs/export-a"), { uid: "user-a", requestId: "preq-a", status: "pending" });
     await setDoc(doc(db, "deletionRequests/del-a"), { uid: "user-a", status: "pending" });
-    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
-    await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
+    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
+    await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
+    await setDoc(doc(db, "consentRevocationOutbox/revoke-a"), { uid: "user-a", purpose: "ai.personalization", status: "pending" });
+    await setDoc(doc(db, "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a"), { consumerId: "consumer-a", status: "acknowledged" });
     await setDoc(doc(db, "auditLogs/audit-a"), { actorUid: "admin-a", targetUid: "user-a", action: "admin_viewed_request" });
     await setDoc(doc(db, "dataAccessEvents/data-a"), { uid: "user-a", actorUid: "admin-a", outcome: "allowed" });
     await setDoc(doc(db, "legalHoldRecords/hold-a"), { uid: "user-a", status: "active", reason: "litigation" });
@@ -81,22 +83,26 @@ function anon() {
 }
 
 describe("Firestore owner/admin privacy rules", () => {
-  it("allows owners to read their own privacy records", async () => {
+  it("allows owners to read their own privacy records and revocation envelope", async () => {
     await assertSucceeds(getDoc(doc(authed("user-a"), "users/user-a")));
     await assertSucceeds(getDoc(doc(authed("user-a"), "privacyRequests/preq-a")));
     await assertSucceeds(getDoc(doc(authed("user-a"), "exportJobs/export-a")));
     await assertSucceeds(getDoc(doc(authed("user-a"), "consentRecords/consent-a")));
+    await assertSucceeds(getDoc(doc(authed("user-a"), "consentRevocationOutbox/revoke-a")));
+    await assertFails(getDoc(doc(authed("user-a"), "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a")));
   });
 
   it("denies users reading another user's private records", async () => {
     await assertFails(getDoc(doc(authed("user-b"), "users/user-a")));
     await assertFails(getDoc(doc(authed("user-b"), "privacyRequests/preq-a")));
     await assertFails(getDoc(doc(authed("user-b"), "consentRecords/consent-a")));
+    await assertFails(getDoc(doc(authed("user-b"), "consentRevocationOutbox/revoke-a")));
   });
 
   it("requires trusted auth claims for administrator access", async () => {
     await assertSucceeds(getDoc(doc(authed("claim-admin", { admin: true }), "privacyRequests/preq-a")));
     await assertSucceeds(getDoc(doc(authed("role-claim-admin", { role: "admin" }), "privacyRequests/preq-a")));
+    await assertSucceeds(getDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a")));
     await assertFails(getDoc(doc(authed("admin-a"), "privacyRequests/preq-a")));
   });
 
@@ -120,10 +126,13 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertFails(setDoc(doc(userDb, "deletionRequests/del-new"), { uid: "user-a", status: "pending" }));
     await assertFails(setDoc(doc(userDb, "consentRecords/consent-new"), { uid: "user-a", purpose: "analytics", status: "granted" }));
     await assertFails(updateDoc(doc(userDb, "consentRecords/consent-a"), { status: "revoked" }));
+    await assertFails(setDoc(doc(userDb, "consentRevocationOutbox/revoke-new"), { uid: "user-a", status: "pending" }));
+    await assertFails(setDoc(doc(userDb, "consentRevocationOutbox/revoke-a/acknowledgements/consumer-new"), { status: "acknowledged" }));
     await assertFails(updateDoc(doc(adminDb, "privacyRequests/preq-a"), { status: "approved" }));
     await assertFails(setDoc(doc(adminDb, "auditLogs/audit-new"), { actorUid: "claim-admin", targetUid: "user-a" }));
     await assertFails(setDoc(doc(adminDb, "legalHoldRecords/hold-new"), { uid: "user-a", status: "active" }));
     await assertFails(setDoc(doc(adminDb, "policyVersions/v2"), { version: "0.2.0", status: "draft" }));
+    await assertFails(updateDoc(doc(adminDb, "consentRevocationOutbox/revoke-a"), { status: "delivered" }));
   });
 
   it("keeps retained privacy evidence readable but immutable to clients", async () => {
@@ -131,8 +140,11 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertFails(getDoc(doc(authed("user-b"), "legalHoldRecords/hold-a")));
     await assertSucceeds(getDoc(doc(authed("user-a"), "auditLogs/audit-a")));
     await assertSucceeds(getDoc(doc(authed("user-a"), "consentEvents/consent-event-a")));
+    await assertSucceeds(getDoc(doc(authed("user-a"), "consentRevocationOutbox/revoke-a")));
     await assertFails(updateDoc(doc(authed("claim-admin", { admin: true }), "auditLogs/audit-a"), { action: "tampered" }));
     await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "legalHoldRecords/hold-a")));
+    await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a")));
+    await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a")));
   });
 
   it("denies anonymous access and unknown collections", async () => {
