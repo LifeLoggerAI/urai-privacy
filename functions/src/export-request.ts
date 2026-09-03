@@ -225,16 +225,37 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     }
 
     const requestRef = db.collection("privacyRequests").doc(requestId);
-    const requestSnap = await tx.get(requestRef);
+    const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
+    const [requestSnap, deletionFence] = await Promise.all([
+      tx.get(requestRef),
+      tx.get(deletionFenceRef)
+    ]);
     if (!requestSnap.exists || requestSnap.data()?.uid !== uid || requestSnap.data()?.type !== "export") {
       throw new HttpsError("failed-precondition", "Export request linkage is invalid.");
     }
+    if (deletionFence.data()?.active === true) {
+      throw new HttpsError("failed-precondition", "Account deletion is fenced; export processing is blocked.");
+    }
+    if (
+      deletionFence.data()?.exportProcessingJobId !== jobId &&
+      processingLeaseIsActive(deletionFence.data()?.exportProcessingLeaseExpiresAt)
+    ) {
+      throw new HttpsError("failed-precondition", "Another export is processing for this account.");
+    }
 
+    const processingLeaseExpiresAt = Timestamp.fromMillis(Date.now() + EXPORT_PROCESSING_LEASE_MS);
+    tx.set(deletionFenceRef, {
+      uid,
+      exportProcessingJobId: jobId,
+      exportProcessingLeaseExpiresAt: processingLeaseExpiresAt,
+      exportProcessingBy: adminUid,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
     tx.update(jobRef, {
       status: "processing",
       updatedAt: FieldValue.serverTimestamp(),
       processingBy: adminUid,
-      processingLeaseExpiresAt: Timestamp.fromMillis(Date.now() + EXPORT_PROCESSING_LEASE_MS),
+      processingLeaseExpiresAt,
       processingAttempt: FieldValue.increment(1),
       artifactCleanupLeaseToken: FieldValue.delete(),
       artifactCleanupLeaseExpiresAt: FieldValue.delete()
@@ -260,6 +281,15 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     });
 
     await db.runTransaction(async (tx) => {
+      const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(claim.uid);
+      const deletionFence = await tx.get(deletionFenceRef);
+      if (
+        deletionFence.data()?.active === true ||
+        deletionFence.data()?.exportProcessingJobId !== jobId ||
+        !processingLeaseIsActive(deletionFence.data()?.exportProcessingLeaseExpiresAt)
+      ) {
+        throw new HttpsError("aborted", "Export processing lost its deletion-fence lease before publication.");
+      }
       const completedAt = Date.now();
       tx.update(jobRef, {
         status: "completed",
@@ -280,6 +310,12 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         artifactCleanupPendingPaths: FieldValue.delete()
       });
       tx.update(claim.requestRef, { status: "completed", updatedAt: FieldValue.serverTimestamp() });
+      tx.set(deletionFenceRef, {
+        exportProcessingJobId: FieldValue.delete(),
+        exportProcessingLeaseExpiresAt: FieldValue.delete(),
+        exportProcessingBy: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
     });
 
     const auditId = await writeAudit({
@@ -297,6 +333,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     const cleanupStatus = cleanup.pendingPaths.length > 0 ? "incomplete" : "completed";
 
     await db.runTransaction(async (tx) => {
+      const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(claim.uid);
+      const deletionFence = await tx.get(deletionFenceRef);
       tx.update(jobRef, {
         status: "failed",
         updatedAt: FieldValue.serverTimestamp(),
@@ -312,6 +350,14 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         artifactCleanupLeaseExpiresAt: FieldValue.delete()
       });
       tx.update(claim.requestRef, { status: "failed", updatedAt: FieldValue.serverTimestamp() });
+      if (deletionFence.data()?.exportProcessingJobId === jobId) {
+        tx.set(deletionFenceRef, {
+          exportProcessingJobId: FieldValue.delete(),
+          exportProcessingLeaseExpiresAt: FieldValue.delete(),
+          exportProcessingBy: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
     });
     const auditId = await writeAudit({
       actorUid: adminUid,
