@@ -110,9 +110,21 @@ describe("privacy security boundaries", () => {
     expect(consentApi).not.toContain("await accessRef.set");
   });
 
+  it("fences deletion-request creation in the same transaction as its retained write", () => {
+    expect(functionsSource).toContain('export const createDeletionRequest');
+    expect(functionsSource).toContain('tx.get(db.collection("privacyDeletionTombstones").doc(uid))');
+    expect(functionsSource).toContain('tx.create(ref');
+    expect(functionsSource).toContain("new deletion requests are blocked");
+  });
+
   it("selects expired export packages before applying cleanup page bounds", () => {
     expect(lifecycle).toContain('.where("packageExpiresAt", "<=", Timestamp.fromMillis(now))');
     expect(lifecycle).toContain('.orderBy("packageExpiresAt")');
+    expect(lifecycle).toContain("backfillLegacyExportPackageExpiry");
+    expect(lifecycle).toContain('privacyMaintenance").doc("exportLifecycleLegacyMigration');
+    expect(lifecycle).toContain("lifecycleMigratedAt");
+    expect(lifecycle).toContain('status: "cleanup_blocked"');
+    expect(lifecycle).toContain('cleanupReason: "INVALID_LEGACY_EXPORT"');
   });
 
   it("binds revocation acknowledgements to an immutable consumer identity", () => {
