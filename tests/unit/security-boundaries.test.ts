@@ -7,6 +7,8 @@ const exportRequest = readFileSync("functions/src/export-request.ts", "utf8");
 const exportPagination = readFileSync("functions/src/export-pagination.ts", "utf8");
 const exportCleanup = readFileSync("functions/src/export-artifact-cleanup.ts", "utf8");
 const consentApi = readFileSync("functions/src/consent-api.ts", "utf8");
+const consentExpiry = readFileSync("functions/src/consent-expiry.ts", "utf8");
+const deletionMutationGuard = readFileSync("functions/src/deletion-mutation-guard.ts", "utf8");
 const consentRevocation = readFileSync("functions/src/consent-revocation.ts", "utf8");
 const firebaseClient = readFileSync("src/lib/firebase-privacy-client.ts", "utf8");
 const consentPage = readFileSync("app/privacy-center/consent/page.tsx", "utf8");
@@ -92,6 +94,21 @@ describe("privacy security boundaries", () => {
     }
     expect(consentPage).not.toContain("audio_transcription");
     expect(consentPage).not.toContain("gps_context");
+  });
+
+  it("assigns every grant a bounded server-owned expiry", () => {
+    expect(consentApi).toContain("resolveConsentExpiry");
+    expect(consentApi).toContain("expiresAt: effectiveExpiresAt");
+    expect(consentExpiry).toContain("MAX_CONSENT_GRANT_TTL_MS");
+    expect(consentExpiry).toContain("Math.min(requestedExpiry, maximumExpiry)");
+  });
+
+  it("holds a subject-wide planning fence before deletion plan artifacts can be created", () => {
+    expect(deletionMutationGuard).toContain("deletionPlanningFenceBlockReason");
+    expect(deletionMutationGuard).toContain("deletionPlanningLeaseToken: token");
+    expect(deletionMutationGuard).toContain('args.operation !== "execute"');
+    expect(functionsSource).toContain("deletionPlanningLeaseUntil");
+    expect(functionsSource).toContain("Deletion is blocked while another request prepares a subject deletion plan.");
   });
 
   it("binds consent receipts to server-owned notice metadata", () => {
