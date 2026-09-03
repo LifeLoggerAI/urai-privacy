@@ -265,6 +265,32 @@ function deletionPlanHash(plan: DeletionPlan) {
   return sha256(normalizedDeletionPlan(plan));
 }
 
+function deletionPlanArtifactPath(uid: string, requestId: string, planHash: string) {
+  return `privacy-deletion-plans/${sha256(uid)}/${requestId}/${planHash}.json`;
+}
+
+async function writeDeletionPlanArtifact(uid: string, requestId: string, plan: DeletionPlan, planHash: string) {
+  const path = deletionPlanArtifactPath(uid, requestId, planHash);
+  const body = JSON.stringify(plan);
+  await bucket.file(path).save(body, {
+    resumable: false,
+    contentType: "application/json",
+    metadata: { cacheControl: "private, max-age=0, no-store", metadata: { sha256: sha256(body), planHash } }
+  });
+  return path;
+}
+
+async function readDeletionPlanArtifact(uid: string, requestId: string, planHash: string, path: unknown) {
+  const expectedPath = deletionPlanArtifactPath(uid, requestId, planHash);
+  if (path !== expectedPath) throw new HttpsError("failed-precondition", "Stored deletion-plan artifact path is invalid.");
+  const [body] = await bucket.file(expectedPath).download();
+  const parsed = deletionPlanSchema.safeParse(JSON.parse(body.toString("utf8")));
+  if (!parsed.success || deletionPlanHash(parsed.data) !== planHash) {
+    throw new HttpsError("failed-precondition", "Stored deletion-plan artifact failed integrity validation.");
+  }
+  return parsed.data;
+}
+
 function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: DeletionPlan) {
   if (current.uid !== approved.uid || current.legalHold) return false;
   for (const [collectionName, currentIds] of Object.entries(current.targets)) {
@@ -518,6 +544,7 @@ export const processDeletionRequest = onCall(async (request) => {
 
   const candidatePlan = await deletionPlan(uid);
   const candidatePlanHash = deletionPlanHash(candidatePlan);
+  const candidatePlanPath = await writeDeletionPlanArtifact(uid, requestId, candidatePlan, candidatePlanHash);
   const safeStatus = status === "completed" ? "processing" : status;
   await db.runTransaction(async (tx) => {
     const [current, deletionFence] = await Promise.all([
@@ -534,7 +561,9 @@ export const processDeletionRequest = onCall(async (request) => {
     tx.update(ref, {
       status: safeStatus,
       updatedAt: FieldValue.serverTimestamp(),
-      candidateDeletionPlan: candidatePlan,
+      candidateDeletionPlan: FieldValue.delete(),
+      candidateDeletionPlanPath: candidatePlanPath,
+      candidatePlanCounts: candidatePlan.counts,
       candidatePlanHash,
       approvedDeletionPlan: FieldValue.delete(),
       approvedPlanHash: FieldValue.delete(),
@@ -577,11 +606,14 @@ export const executeDeletionRequest = onCall(async (request) => {
   if (mode === "dryRun") {
     const plan = await deletionPlan(uid);
     const planHash = deletionPlanHash(plan);
+    const planPath = await writeDeletionPlanArtifact(uid, requestId, plan, planHash);
     if (plan.legalHold) {
       await ref.update({
         status: "processing",
         updatedAt: FieldValue.serverTimestamp(),
-        candidateDeletionPlan: plan,
+        candidateDeletionPlan: FieldValue.delete(),
+        candidateDeletionPlanPath: planPath,
+        candidatePlanCounts: plan.counts,
         candidatePlanHash: planHash,
         approvedDeletionPlan: FieldValue.delete(),
         approvedPlanHash: FieldValue.delete(),
@@ -606,9 +638,13 @@ export const executeDeletionRequest = onCall(async (request) => {
     await ref.update({
       status: "processing",
       updatedAt: FieldValue.serverTimestamp(),
-      deletionPlan: plan,
+      deletionPlan: FieldValue.delete(),
+      deletionPlanPath: planPath,
+      deletionPlanCounts: plan.counts,
       planHash,
-      approvedDeletionPlan: plan,
+      approvedDeletionPlan: FieldValue.delete(),
+      approvedDeletionPlanPath: planPath,
+      approvedPlanCounts: plan.counts,
       approvedPlanHash: planHash,
       destructiveDeletionBlocked: false,
       destructiveDeletionReason: null,
@@ -641,9 +677,8 @@ export const executeDeletionRequest = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "A current dry-run plan hash is required before destructive deletion.", { auditId });
   }
 
-  const approvedPlanResult = deletionPlanSchema.safeParse(deletion.approvedDeletionPlan);
   const approvedPlanHash = String(deletion.approvedPlanHash ?? "");
-  if (!approvedPlanResult.success || !approvedPlanHash || !deletion.destructiveDeletionDryRunAt) {
+  if (!approvedPlanHash || !deletion.approvedDeletionPlanPath || !deletion.destructiveDeletionDryRunAt) {
     const auditId = await writeAudit({
       actorUid: adminUid,
       actorRole: "admin",
@@ -656,7 +691,7 @@ export const executeDeletionRequest = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "A stored approved dry-run plan is required before destructive deletion.", { auditId });
   }
 
-  const approvedPlan = approvedPlanResult.data;
+  const approvedPlan = await readDeletionPlanArtifact(uid, requestId, approvedPlanHash, deletion.approvedDeletionPlanPath);
   if (approvedPlan.uid !== uid || deletionPlanHash(approvedPlan) !== approvedPlanHash) {
     const auditId = await writeAudit({
       actorUid: adminUid,
