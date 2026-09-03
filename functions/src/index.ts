@@ -515,32 +515,38 @@ export const processDeletionRequest = onCall(async (request) => {
   const deletion = snap.data() ?? {};
   const uid = String(deletion.uid ?? "");
   if (!uid) throw new HttpsError("failed-precondition", "Deletion request is missing uid.");
-  if (["completed", "rejected", "failed"].includes(String(deletion.status))) {
-    throw new HttpsError("failed-precondition", "Deletion request is already in a terminal state.");
-  }
 
   const candidatePlan = await deletionPlan(uid);
   const candidatePlanHash = deletionPlanHash(candidatePlan);
   const safeStatus = status === "completed" ? "processing" : status;
-  await ref.update({
-    status: safeStatus,
-    updatedAt: FieldValue.serverTimestamp(),
-    candidateDeletionPlan: candidatePlan,
-    candidatePlanHash,
-    approvedDeletionPlan: FieldValue.delete(),
-    approvedPlanHash: FieldValue.delete(),
-    destructiveDeletionDryRunAt: FieldValue.delete(),
-    destructiveDeletionReady: false,
-    destructiveDeletionBlocked: candidatePlan.legalHold || status === "completed",
-    destructiveDeletionReason: candidatePlan.legalHold
-      ? "Active legal hold blocks destructive deletion."
-      : "Run executeDeletionRequest with mode=dryRun before destructive execution.",
-    deletionExecutionState: "not_ready"
+  await db.runTransaction(async (tx) => {
+    const [current, deletionFence] = await Promise.all([
+      tx.get(ref),
+      tx.get(db.collection("privacyDeletionTombstones").doc(uid))
+    ]);
+    if (!current.exists) throw new HttpsError("not-found", "Deletion request not found.");
+    if (["completed", "rejected", "failed"].includes(String(current.data()?.status))) {
+      throw new HttpsError("failed-precondition", "Deletion request is already in a terminal state.");
+    }
+    if (deletionFence.data()?.active === true) {
+      throw new HttpsError("failed-precondition", "Account deletion is already fenced; another request cannot recreate subject data.");
+    }
+    tx.update(ref, {
+      status: safeStatus,
+      updatedAt: FieldValue.serverTimestamp(),
+      candidateDeletionPlan: candidatePlan,
+      candidatePlanHash,
+      approvedDeletionPlan: FieldValue.delete(),
+      approvedPlanHash: FieldValue.delete(),
+      destructiveDeletionDryRunAt: FieldValue.delete(),
+      destructiveDeletionReady: false,
+      destructiveDeletionBlocked: candidatePlan.legalHold || status === "completed",
+      destructiveDeletionReason: candidatePlan.legalHold
+        ? "Active legal hold blocks destructive deletion."
+        : "Run executeDeletionRequest with mode=dryRun before destructive execution.",
+      deletionExecutionState: "not_ready"
+    });
   });
-
-  if (safeStatus === "approved" || safeStatus === "processing") {
-    await db.collection("users").doc(uid).set({ markedForDeletion: true, deletionMarkedAt: FieldValue.serverTimestamp() }, { merge: true });
-  }
 
   const auditId = await writeAudit({
     actorUid: adminUid,
