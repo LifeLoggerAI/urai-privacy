@@ -58,7 +58,10 @@ test("the verification transaction is the sole final completion writer", () => {
   assert.match(guardSource, /const auditEvent = \{[\s\S]*?\baction,[\s\S]*?targetUid: args\.targetUid/);
   assert.match(guardSource, /deletionCompletionAuthorityBlockReason/);
   assert.match(guardSource, /privacyDeletionTombstones/);
-  assert.match(guardSource, /status: "deletion_in_progress"/);
+  assert.match(source, /tx\.set\(db\.collection\("privacyDeletionTombstones"\)\.doc\(uid\)/);
+  assert.match(source, /status: "deletion_in_progress"/);
+  assert.match(source, /expectedPlanHash !== approvedPlanHash[\s\S]*tx\.set\(db\.collection\("privacyDeletionTombstones"\)/);
+  assert.doesNotMatch(guardSource, /if \(args\.operation === "execute"\) \{\s*tx\.set\(db\.collection\("privacyDeletionTombstones"\)/);
   assert.match(source, /Account deletion is in progress or completed; new export requests are blocked/);
   assert.match(consentSource, /Account deletion is in progress or completed; consent changes are blocked/);
 });

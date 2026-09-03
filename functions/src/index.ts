@@ -693,6 +693,14 @@ export const executeDeletionRequest = onCall(async (request) => {
       deletionExecutionLeaseUntil: new Date(Date.now() + DELETION_EXECUTION_LEASE_MS),
       updatedAt: FieldValue.serverTimestamp()
     });
+    tx.set(db.collection("privacyDeletionTombstones").doc(uid), {
+      uid,
+      requestId,
+      active: true,
+      status: "deletion_in_progress",
+      fencedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
   });
 
   try {

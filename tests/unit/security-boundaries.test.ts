@@ -130,6 +130,9 @@ describe("privacy security boundaries", () => {
     expect(lifecycle).toContain('where("status", "==", "failed")');
     expect(lifecycle).toContain('.where("artifactCleanupStatus", "==", "incomplete")');
     expect(lifecycle).toContain('status: "artifact_cleanup"');
+    expect(lifecycle).toContain("reclaimExpiredCleanupClaim(document, now)");
+    expect(lifecycle).toContain('.where("artifactCleanupStatus", "==", "processing")');
+    expect(lifecycle).toContain("artifactCleanupLeaseExpiresAt");
     expect(lifecycle).toContain("artifactCleanupLeaseToken: cleanupToken");
     expect(exportRequest).toContain('status === "artifact_cleanup"');
     expect(lifecycle).toContain("cleanupFailedJob(document)");

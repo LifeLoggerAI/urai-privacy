@@ -353,16 +353,6 @@ async function withDeletionMutationLease<T>(args: {
         : {}),
       updatedAt: FieldValue.serverTimestamp()
     });
-    if (args.operation === "execute") {
-      tx.set(db.collection("privacyDeletionTombstones").doc(targetUid), {
-        uid: targetUid,
-        requestId,
-        active: true,
-        status: "deletion_in_progress",
-        fencedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
-    }
   });
 
   try {

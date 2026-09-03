@@ -251,6 +251,24 @@ async function cleanupFailedJob(document: QueryDocumentSnapshot<DocumentData>) {
   return cleanup.pendingPaths.length === 0;
 }
 
+async function reclaimExpiredCleanupClaim(document: QueryDocumentSnapshot<DocumentData>, now: number) {
+  return db.runTransaction(async (tx) => {
+    const fresh = await tx.get(document.ref);
+    if (!fresh.exists || fresh.data()?.status !== "artifact_cleanup" || fresh.data()?.artifactCleanupStatus !== "processing") return false;
+    const expiry = fresh.data()?.artifactCleanupLeaseExpiresAt;
+    const expiryMillis = expiry && typeof expiry.toMillis === "function" ? expiry.toMillis() : Number.NaN;
+    if (Number.isFinite(expiryMillis) && expiryMillis > now) return false;
+    tx.update(document.ref, {
+      status: "failed",
+      artifactCleanupStatus: "incomplete",
+      artifactCleanupUpdatedAt: FieldValue.serverTimestamp(),
+      artifactCleanupLeaseToken: FieldValue.delete(),
+      artifactCleanupLeaseExpiresAt: FieldValue.delete()
+    });
+    return true;
+  });
+}
+
 export const cleanupExpiredExportPackages = onSchedule(
   {
     schedule: "every 24 hours",
@@ -296,6 +314,27 @@ export const cleanupExpiredExportPackages = onSchedule(
         }
       }
 
+      cursor = page.docs[page.docs.length - 1] ?? null;
+      if (page.size < EXPORT_CLEANUP_PAGE_SIZE) break;
+    }
+
+    cursor = null;
+    for (let pageNumber = 0; pageNumber < EXPORT_CLEANUP_MAX_PAGES; pageNumber += 1) {
+      let query = db.collection("exportJobs")
+        .where("status", "==", "artifact_cleanup")
+        .where("artifactCleanupStatus", "==", "processing")
+        .orderBy(FieldPath.documentId())
+        .limit(EXPORT_CLEANUP_PAGE_SIZE);
+      if (cursor) query = query.startAfter(cursor);
+      const page = await query.get();
+      if (page.empty) break;
+      for (const document of page.docs) {
+        try {
+          await reclaimExpiredCleanupClaim(document, now);
+        } catch (error) {
+          console.error("Failed to reclaim expired export cleanup claim", { jobId: document.id, reasonHash: digest(error) });
+        }
+      }
       cursor = page.docs[page.docs.length - 1] ?? null;
       if (page.size < EXPORT_CLEANUP_PAGE_SIZE) break;
     }
