@@ -36,8 +36,12 @@ function boundConsumerAuthority(request: { auth?: { uid?: string; token?: Record
 export const publishConsentRevocation = onDocumentWritten("consentRecords/{recordId}", async (event) => {
   const before = event.data?.before.exists ? event.data.before.data() : null;
   const after = event.data?.after.exists ? event.data.after.data() : null;
-  if (!after || after.status !== "revoked") return;
-  if (before?.status === "revoked" && before?.receiptHash === after.receiptHash) return;
+  const revokesExistingGrant =
+    before?.status === "granted" &&
+    after !== null &&
+    after.status !== "granted";
+  if (!after || (after.status !== "revoked" && !revokesExistingGrant)) return;
+  if (before?.status === after.status && before?.receiptHash === after.receiptHash) return;
 
   const uid = typeof after.uid === "string" ? after.uid : "";
   const purpose = typeof after.purpose === "string" ? after.purpose : "";
