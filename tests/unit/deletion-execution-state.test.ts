@@ -25,6 +25,8 @@ test("destructive deletion binds a stored dry-run plan and legal-hold check", ()
   assert.match(executeSection, /deletionPlanHash\(approvedPlan\) !== approvedPlanHash/);
   assert.match(executeSection, /currentPlan\.legalHold/);
   assert.match(executeSection, /deletionPlanIsSubsetOfApproved/);
+  assert.match(executeSection, /tombstoneState\.active === true && tombstoneState\.requestId !== requestId/);
+  assert.match(executeSection, /Account deletion is already fenced by another deletion request/);
 });
 
 test("destructive mutation remains non-final until residual verification", () => {
