@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -56,4 +57,16 @@ describe("export redaction and processing lease", () => {
     expect(processingLeaseIsActive(null, now)).toBe(false);
     expect(processingLeaseIsActive({ toMillis: "invalid" }, now)).toBe(false);
   });
+  it("coordinates export publication with the retained deletion fence", () => {
+    const exportSource = readFileSync(new URL("../../functions/src/export-request.ts", import.meta.url), "utf8");
+    const deletionSource = readFileSync(new URL("../../functions/src/index.ts", import.meta.url), "utf8");
+
+    expect(exportSource).toMatch(/exportProcessingJobId/);
+    expect(exportSource).toMatch(/Export processing lost its deletion-fence lease before publication/);
+    expect(exportSource).toMatch(/deletionFence\.data\(\)\?\.active === true/);
+    expect(deletionSource).toMatch(/Deletion is blocked while an export worker holds the subject fence/);
+    expect(deletionSource).toMatch(/Account deletion is already fenced; another request cannot recreate subject data/);
+    expect(deletionSource).not.toMatch(/markedForDeletion: true/);
+  });
+
 });
