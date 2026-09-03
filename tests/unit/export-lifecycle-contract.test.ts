@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   EXPORT_DOWNLOAD_URL_TTL_MS,
@@ -61,5 +62,17 @@ describe("export package lifecycle contract", () => {
         path: "exports/user-1/job-1/../other.json"
       })
     ).toBe(false);
+  });
+});
+
+
+describe("expired export cleanup source boundary", () => {
+  it("moves identifier-invalid expired jobs out of completed pagination", () => {
+    const source = readFileSync(
+      new URL("../../functions/src/export-lifecycle-functions.ts", import.meta.url),
+      "utf8"
+    );
+    expect(source).toContain('cleanupReason: "INVALID_EXPORT_IDENTIFIERS"');
+    expect(source).toMatch(/if \(!uid \|\| !requestId\) \{[\s\S]*status: "cleanup_blocked"[\s\S]*complete: false/);
   });
 });
