@@ -9,6 +9,11 @@ const deletionMutationGuard = readFileSync(
   "functions/src/deletion-mutation-guard.ts",
   "utf8"
 );
+const deletionCompletionVerifier = readFileSync(
+  "functions/src/deletion-completion-verifier.ts",
+  "utf8"
+);
+const privacyFunctions = readFileSync("functions/src/index.ts", "utf8");
 
 function residuals(
   overrides: Partial<DeletionCompletionResiduals> = {}
@@ -77,5 +82,14 @@ describe("deletion completion residual policy", () => {
     expect(deletionMutationGuard).toContain("deletionCompletionVerificationAuditId");
     expect(deletionMutationGuard).toContain("tx.set(auditRef");
     expect(deletionMutationGuard).toContain("integrityHash");
+  });
+
+  it("erases and certifies deletion-plan artifacts without retaining full plans in Firestore", () => {
+    expect(deletionMutationGuard).toContain("removeDeletionPlanArtifacts(uid)");
+    expect(deletionMutationGuard).toContain("privacy-deletion-plans/");
+    expect(deletionCompletionVerifier).toContain("privacy-deletion-plans/");
+    expect(deletionCompletionVerifier).toContain("storageResults.flatMap");
+    expect(privacyFunctions).not.toContain("deletionPlan: result.plan");
+    expect(privacyFunctions).toContain("deletionPlanCounts: result.plan.counts");
   });
 });
