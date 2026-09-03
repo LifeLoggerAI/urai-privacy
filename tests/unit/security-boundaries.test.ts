@@ -69,7 +69,7 @@ describe("privacy security boundaries", () => {
   });
 
   it("does not reopen terminal deletion requests", () => {
-    expect(functionsSource).toContain('["completed", "rejected", "failed"].includes(String(deletion.status))');
+    expect(functionsSource).toContain('["rejected", "failed", "completed"].includes(String(deletion.status))');
     expect(functionsSource).toContain("Deletion request is already in a terminal state.");
   });
 
