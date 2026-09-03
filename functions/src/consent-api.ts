@@ -8,6 +8,7 @@ import {
   evaluateConsentDecision,
   type ConsentPurpose
 } from "./consent-decision";
+import { resolveConsentExpiry } from "./consent-expiry";
 
 const db = getFirestore();
 
@@ -76,12 +77,23 @@ export const setCanonicalConsent = onCall(async (request) => {
 
   const purpose = canonicalPurpose(parsed.data.purpose);
   const definition = consentPurposeRegistry[purpose];
-  if (parsed.data.status === "granted" && parsed.data.expiresAt && Date.parse(parsed.data.expiresAt) <= Date.now()) {
-    throw new HttpsError("invalid-argument", "Granted consent cannot expire in the past.");
+  const nowMillis = Date.now();
+  let effectiveExpiresAt: string | null;
+  try {
+    effectiveExpiresAt = resolveConsentExpiry({
+      status: parsed.data.status,
+      requestedExpiresAt: parsed.data.expiresAt,
+      nowMillis
+    });
+  } catch (error) {
+    throw new HttpsError(
+      "invalid-argument",
+      error instanceof Error ? error.message : "Consent expiry is invalid."
+    );
   }
 
   const recordId = consentRecordId(uid, purpose);
-  const now = new Date().toISOString();
+  const now = new Date(nowMillis).toISOString();
   const evidence = {
     uid,
     purpose,
@@ -90,7 +102,8 @@ export const setCanonicalConsent = onCall(async (request) => {
     jurisdiction: parsed.data.jurisdiction,
     noticeVersion: CANONICAL_CONSENT_NOTICE.version,
     noticeHash: CANONICAL_CONSENT_NOTICE.hash,
-    policyVersion: CONSENT_DECISION_POLICY_VERSION
+    policyVersion: CONSENT_DECISION_POLICY_VERSION,
+    expiresAt: effectiveExpiresAt
   };
   const evidenceHash = hash(evidence);
   const receipt = {
@@ -99,7 +112,7 @@ export const setCanonicalConsent = onCall(async (request) => {
     consentTier: definition.requiredTier,
     status: parsed.data.status,
     policyVersion: CONSENT_DECISION_POLICY_VERSION,
-    expiresAt: parsed.data.expiresAt ?? null,
+    expiresAt: effectiveExpiresAt,
     surface: parsed.data.surface,
     jurisdiction: parsed.data.jurisdiction,
     noticeVersion: CANONICAL_CONSENT_NOTICE.version,
@@ -157,6 +170,7 @@ export const setCanonicalConsent = onCall(async (request) => {
     status: parsed.data.status,
     consentTier: definition.requiredTier,
     policyVersion: CONSENT_DECISION_POLICY_VERSION,
+    expiresAt: effectiveExpiresAt,
     updatedAt: now,
     evidenceHash,
     receiptHash
