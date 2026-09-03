@@ -81,6 +81,23 @@ describe("subject deletion planning fence", () => {
     });
   });
 
+  it("allows only the owning request to prepare a recovery plan behind an active fence", () => {
+    expect(
+      deletionPlanningFenceBlockReason(
+        { active: true, requestId: "request-a" },
+        NOW,
+        "request-a"
+      )
+    ).toBeNull();
+    expect(
+      deletionPlanningFenceBlockReason(
+        { active: true, requestId: "request-a" },
+        NOW,
+        "request-b"
+      )
+    ).toMatchObject({ code: "failed-precondition" });
+  });
+
   it("serializes plan creation across requests for the same subject", () => {
     expect(
       deletionPlanningFenceBlockReason(
