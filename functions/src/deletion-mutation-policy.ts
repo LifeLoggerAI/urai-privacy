@@ -17,6 +17,49 @@ export type DeletionMutationLeasePatch = {
   deletionMutationLeaseBy: string;
 };
 
+export type DeletionPlanningFenceState = {
+  active?: unknown;
+  deletionPlanningLeaseToken?: unknown;
+  deletionPlanningLeaseUntil?: unknown;
+};
+
+export function deletionPlanningFenceBlockReason(
+  state: DeletionPlanningFenceState,
+  nowMillis: number
+): DeletionMutationBlock | null {
+  if (state.active === true) {
+    return {
+      code: "failed-precondition",
+      message: "Account deletion is already fenced; another request cannot create deletion-plan data."
+    };
+  }
+
+  const tokenPresent =
+    typeof state.deletionPlanningLeaseToken === "string" &&
+    state.deletionPlanningLeaseToken.trim().length > 0;
+  const leasePresent =
+    state.deletionPlanningLeaseUntil !== undefined &&
+    state.deletionPlanningLeaseUntil !== null;
+  const leaseUntil = timestampMillis(state.deletionPlanningLeaseUntil);
+
+  if (tokenPresent || leasePresent) {
+    if (!tokenPresent || leaseUntil === null) {
+      return {
+        code: "failed-precondition",
+        message: "Subject deletion-planning fence is malformed and requires recovery."
+      };
+    }
+    if (leaseUntil > nowMillis) {
+      return {
+        code: "aborted",
+        message: "Another deletion plan is already being prepared for this subject."
+      };
+    }
+  }
+
+  return null;
+}
+
 function timestampMillis(value: unknown): number | null {
   if (value instanceof Date) return value.getTime();
   if (
