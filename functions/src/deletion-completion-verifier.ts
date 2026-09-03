@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { FieldPath, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -93,11 +94,15 @@ export async function collectDeletionCompletionResiduals(
     collectionName,
     await listScopedIds(collectionName, uid)
   ] as const);
-  const storagePromise = bucket.getFiles({ prefix: `exports/${uid}/` });
+  const deletionPlanPrefix = `privacy-deletion-plans/${createHash("sha256").update(uid).digest("hex")}/`;
+  const storagePromise = Promise.all([
+    bucket.getFiles({ prefix: `exports/${uid}/` }),
+    bucket.getFiles({ prefix: deletionPlanPrefix })
+  ]);
   const authPromise = authUserExists(uid);
   const legalHoldPromise = activeLegalHold(uid);
 
-  const [userDoc, collectionEntries, [files], authExists, legalHold] = await Promise.all([
+  const [userDoc, collectionEntries, storageResults, authExists, legalHold] = await Promise.all([
     userDocPromise,
     Promise.all(collectionPromises),
     storagePromise,
@@ -109,7 +114,7 @@ export async function collectDeletionCompletionResiduals(
     users: userDoc.exists ? [uid] : [],
     ...Object.fromEntries(collectionEntries)
   };
-  const storageObjects = files.map((file) => file.name).sort();
+  const storageObjects = storageResults.flatMap(([files]) => files.map((file) => file.name)).sort();
   const firestoreCount = Object.values(firestoreTargets)
     .reduce((total, ids) => total + ids.length, 0);
   const totalResidualTargets = firestoreCount + storageObjects.length + (authExists ? 1 : 0);
