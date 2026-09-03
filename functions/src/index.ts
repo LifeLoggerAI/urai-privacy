@@ -486,15 +486,21 @@ export const createDeletionRequest = onCall(async (request) => {
   const uid = uidFrom(request);
   const { reason } = parseOrThrow(createDeletionSchema, request.data);
   const ref = db.collection("deletionRequests").doc();
-  await ref.set({
-    uid,
-    status: "pending",
-    scope: "account",
-    reason,
-    retainedData: [...retainedDeletionCollections],
-    deletedData: ["users", ...deletableUserCollections, "storage:exports", "firebaseAuth"],
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp()
+  await db.runTransaction(async (tx) => {
+    const deletionFence = await tx.get(db.collection("privacyDeletionTombstones").doc(uid));
+    if (deletionFence.data()?.active === true) {
+      throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; new deletion requests are blocked.");
+    }
+    tx.create(ref, {
+      uid,
+      status: "pending",
+      scope: "account",
+      reason,
+      retainedData: [...retainedDeletionCollections],
+      deletedData: ["users", ...deletableUserCollections, "storage:exports", "firebaseAuth"],
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    });
   });
   const auditId = await writeAudit({ actorUid: uid, actorRole: "user", action: "deletion_request_created", targetUid: uid, requestId: ref.id, source: "function" });
   return { requestId: ref.id, status: "pending", auditId };
