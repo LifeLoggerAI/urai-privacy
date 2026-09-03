@@ -44,7 +44,10 @@ describe("privacy security boundaries", () => {
     expect(functionsSource).toContain("const deletionPlanSchema");
     expect(functionsSource).toContain("targets: z.record");
     expect(functionsSource).toContain("storageObjects: z.array");
-    expect(functionsSource).toContain("approvedDeletionPlan");
+    expect(functionsSource).toContain("approvedDeletionPlanPath");
+    expect(functionsSource).toContain("writeDeletionPlanArtifact");
+    expect(functionsSource).toContain("readDeletionPlanArtifact");
+    expect(functionsSource).toContain("candidateDeletionPlan: FieldValue.delete()");
     expect(functionsSource).toContain("approvedPlanHash");
     expect(functionsSource).toContain("deletionPlanHash(approvedPlan)");
     expect(functionsSource).toContain("deletionPlanIsSubsetOfApproved");
