@@ -147,7 +147,17 @@ async function cleanupJob(document: QueryDocumentSnapshot<DocumentData>, now: nu
   const requestId = text(job.requestId);
   const jobId = document.id;
   const packageExpiresAt = resolveExportPackageExpiry(job);
-  if (!uid || !requestId || !packageExpiresAt || packageExpiresAt > now) return false;
+  if (!packageExpiresAt || packageExpiresAt > now) return false;
+  if (!uid || !requestId) {
+    await document.ref.update({
+      status: "cleanup_blocked",
+      complete: false,
+      cleanupStatus: "failed",
+      cleanupUpdatedAt: FieldValue.serverTimestamp(),
+      cleanupReason: "INVALID_EXPORT_IDENTIFIERS"
+    });
+    return false;
+  }
 
   const paths = [job.exportPackagePath, job.exportManifestPath];
   if (!paths.every((path) => validExportObjectPath({ uid, jobId, path }))) {
