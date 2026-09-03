@@ -16,7 +16,9 @@ import {
   EXPORT_CLEANUP_MAX_PAGES,
   EXPORT_CLEANUP_PAGE_SIZE,
   EXPORT_DOWNLOAD_URL_TTL_MS,
+  EXPORT_PACKAGE_TTL_MS,
   resolveExportPackageExpiry,
+  timestampMillis,
   validExportObjectPath
 } from "./export-lifecycle-contract";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
@@ -150,6 +152,8 @@ async function cleanupJob(document: QueryDocumentSnapshot<DocumentData>, now: nu
   const paths = [job.exportPackagePath, job.exportManifestPath];
   if (!paths.every((path) => validExportObjectPath({ uid, jobId, path }))) {
     await document.ref.update({
+      status: "cleanup_blocked",
+      complete: false,
       cleanupStatus: "failed",
       cleanupUpdatedAt: FieldValue.serverTimestamp(),
       cleanupReason: "INVALID_EXPORT_PATH"
@@ -269,6 +273,78 @@ async function reclaimExpiredCleanupClaim(document: QueryDocumentSnapshot<Docume
   });
 }
 
+async function backfillLegacyExportPackageExpiry(now: number) {
+  const cursorRef = db.collection("privacyMaintenance").doc("exportLifecycleLegacyMigration");
+  const cursorSnap = await cursorRef.get();
+  const lastDocumentId = text(cursorSnap.data()?.lastDocumentId);
+
+  let query = db
+    .collection("exportJobs")
+    .where("status", "==", "completed")
+    .orderBy(FieldPath.documentId())
+    .limit(EXPORT_CLEANUP_PAGE_SIZE);
+  if (lastDocumentId) query = query.startAfter(lastDocumentId);
+
+  const page = await query.get();
+  for (const document of page.docs) {
+    const result = await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(document.ref);
+      const job = fresh.data() ?? {};
+      if (!fresh.exists || job.status !== "completed" || job.packageExpiresAt) return null;
+
+      const uid = text(job.uid);
+      const requestId = text(job.requestId);
+      const paths = [job.exportPackagePath, job.exportManifestPath];
+      if (!uid || !requestId || !paths.every((path) => validExportObjectPath({ uid, jobId: document.id, path }))) {
+        tx.update(document.ref, {
+          status: "cleanup_blocked",
+          complete: false,
+          cleanupStatus: "failed",
+          cleanupReason: "INVALID_LEGACY_EXPORT",
+          cleanupUpdatedAt: FieldValue.serverTimestamp()
+        });
+        return uid && requestId
+          ? { uid, requestId, action: "export_legacy_cleanup_blocked", expiry: null }
+          : null;
+      }
+
+      const completedAt =
+        timestampMillis(job.completedAt) ??
+        timestampMillis(job.updatedAt) ??
+        timestampMillis(job.createdAt) ??
+        now;
+      const expiry = completedAt + EXPORT_PACKAGE_TTL_MS;
+      tx.update(document.ref, {
+        complete: true,
+        completedAt: Timestamp.fromMillis(completedAt),
+        packageExpiresAt: Timestamp.fromMillis(expiry),
+        lifecycleMigratedAt: FieldValue.serverTimestamp()
+      });
+      return { uid, requestId, action: "export_legacy_lifecycle_backfilled", expiry };
+    });
+
+    if (result) {
+      await writeAudit({
+        actorUid: "system",
+        actorRole: "system",
+        action: result.action,
+        targetUid: result.uid,
+        requestId: result.requestId,
+        metadata: { jobId: document.id, packageExpiresAt: result.expiry }
+      });
+    }
+  }
+
+  const last = page.docs[page.docs.length - 1];
+  await cursorRef.set({
+    lastDocumentId: page.size === EXPORT_CLEANUP_PAGE_SIZE && last
+      ? last.id
+      : FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+  return page.size;
+}
+
 export const cleanupExpiredExportPackages = onSchedule(
   {
     schedule: "every 24 hours",
@@ -281,6 +357,8 @@ export const cleanupExpiredExportPackages = onSchedule(
     let scanned = 0;
     let deleted = 0;
     const now = Date.now();
+
+    await backfillLegacyExportPackageExpiry(now);
 
     for (let pageNumber = 0; pageNumber < EXPORT_CLEANUP_MAX_PAGES; pageNumber += 1) {
       let query = db
