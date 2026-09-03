@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { FieldValue, Timestamp, getFirestore, type Transaction } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import {
   executeDeletionRequest as unguardedExecuteDeletionRequest,
@@ -239,6 +240,12 @@ async function writeCompletionVerificationFailure(args: {
   return auditRef.id;
 }
 
+async function removeDeletionPlanArtifacts(uid: string): Promise<void> {
+  const prefix = `privacy-deletion-plans/${createHash("sha256").update(uid).digest("hex")}/`;
+  const [files] = await getStorage().bucket().getFiles({ prefix });
+  await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true })));
+}
+
 async function verifyCompletedDeletion(
   requestId: string,
   actorUid: string,
@@ -254,6 +261,7 @@ async function verifyCompletedDeletion(
 
   let residuals: DeletionCompletionResiduals;
   try {
+    await removeDeletionPlanArtifacts(uid);
     residuals = await collectDeletionCompletionResiduals(uid);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "unknown";
