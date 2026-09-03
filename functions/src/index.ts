@@ -726,13 +726,17 @@ export const executeDeletionRequest = onCall(async (request) => {
     ]);
     if (!current.exists) throw new HttpsError("not-found", "Deletion request not found.");
     const state = current.data() ?? {};
-    if (timestampMillis(tombstone.data()?.exportProcessingLeaseExpiresAt) > Date.now()) {
+    const tombstoneState = tombstone.data() ?? {};
+    if (tombstoneState.active === true && tombstoneState.requestId !== requestId) {
+      throw new HttpsError("failed-precondition", "Account deletion is already fenced by another deletion request.");
+    }
+    if (timestampMillis(tombstoneState.exportProcessingLeaseExpiresAt) > Date.now()) {
       throw new HttpsError("aborted", "Deletion is blocked while an export worker holds the subject fence.");
     }
-    const planningToken = typeof tombstone.data()?.deletionPlanningLeaseToken === "string"
-      ? String(tombstone.data()?.deletionPlanningLeaseToken).trim()
+    const planningToken = typeof tombstoneState.deletionPlanningLeaseToken === "string"
+      ? String(tombstoneState.deletionPlanningLeaseToken).trim()
       : "";
-    const planningLeaseValue = tombstone.data()?.deletionPlanningLeaseUntil;
+    const planningLeaseValue = tombstoneState.deletionPlanningLeaseUntil;
     const planningLeasePresent = planningLeaseValue !== undefined && planningLeaseValue !== null;
     const planningLeaseUntil = timestampMillis(planningLeaseValue);
     if ((planningToken || planningLeasePresent) && (!planningToken || !planningLeaseUntil)) {
