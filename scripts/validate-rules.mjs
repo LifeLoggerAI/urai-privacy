@@ -27,7 +27,9 @@ const firestoreChecks = [
   "allow create, update, delete: if false"
 ];
 const storageChecks = [
-  "match /exports/{uid}/{allPaths=**}",
+  "match /exports/{uid}/{jobId}/{fileName}",
+  "activeExportPackage(uid, jobId)",
+  "packageExpiresAt > request.time",
   "match /evidence/{allPaths=**}",
   "request.auth.token.admin == true",
   "request.auth.token.role == 'admin'"
