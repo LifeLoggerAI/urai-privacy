@@ -26,6 +26,8 @@ describe("privacy security boundaries", () => {
   it("blocks owners from creating or changing privileged user fields", () => {
     expect(firestoreRules).toContain("ownerIsNotCreatingPrivilegedFields");
     expect(firestoreRules).toContain("ownerIsNotChangingPrivilegedFields");
+    expect(firestoreRules).toContain("deletionFenceIsInactive(uid)");
+    expect(firestoreRules).toContain("privacyDeletionTombstones/$(uid)");
     for (const field of ["'role'", "'admin'", "'isAdmin'", "'legalHold'", "'markedForDeletion'", "'deletionMarkedAt'"]) {
       expect(firestoreRules).toContain(field);
     }
@@ -126,6 +128,10 @@ describe("privacy security boundaries", () => {
     expect(exportRequest).toContain("artifactCleanupPendingPaths: cleanup.pendingPaths");
     expect(exportRequest).toContain("artifactCleanupFailureCount: cleanup.pendingPaths.length");
     expect(lifecycle).toContain('where("status", "==", "failed")');
+    expect(lifecycle).toContain('.where("artifactCleanupStatus", "==", "incomplete")');
+    expect(lifecycle).toContain('status: "artifact_cleanup"');
+    expect(lifecycle).toContain("artifactCleanupLeaseToken: cleanupToken");
+    expect(exportRequest).toContain('status === "artifact_cleanup"');
     expect(lifecycle).toContain("cleanupFailedJob(document)");
     expect(storageRules).toContain("activeExportPackage(uid, jobId)");
     expect(storageRules).toContain("packageExpiresAt > request.time");

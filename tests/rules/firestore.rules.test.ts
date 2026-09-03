@@ -118,6 +118,18 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { legalHold: true }));
   });
 
+  it("retains the deletion tombstone as an owner profile-write fence", async () => {
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, "privacyDeletionTombstones/user-fenced-new"), { uid: "user-fenced-new", active: true });
+      await setDoc(doc(db, "privacyDeletionTombstones/user-a"), { uid: "user-a", active: true });
+    });
+
+    await assertFails(setDoc(doc(authed("user-fenced-new"), "users/user-fenced-new"), { uid: "user-fenced-new", displayName: "Must stay deleted" }));
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { displayName: "Must stay fenced" }));
+    await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { displayName: "Authorized recovery" }));
+  });
+
   it("requires server-mediated writes for privacy workflows and evidence", async () => {
     const userDb = authed("user-a");
     const adminDb = authed("claim-admin", { admin: true });

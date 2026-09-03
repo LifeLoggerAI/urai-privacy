@@ -217,6 +217,9 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     if (status === "completed") {
       throw new HttpsError("failed-precondition", "Export job is already complete.");
     }
+    if (status === "artifact_cleanup") {
+      throw new HttpsError("failed-precondition", "Export artifacts are being cleaned up; retry after cleanup completes.");
+    }
     if (status === "processing" && processingLeaseIsActive(job.processingLeaseExpiresAt)) {
       throw new HttpsError("failed-precondition", "Export job is already processing under an active lease.");
     }
@@ -232,7 +235,9 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       updatedAt: FieldValue.serverTimestamp(),
       processingBy: adminUid,
       processingLeaseExpiresAt: Timestamp.fromMillis(Date.now() + EXPORT_PROCESSING_LEASE_MS),
-      processingAttempt: FieldValue.increment(1)
+      processingAttempt: FieldValue.increment(1),
+      artifactCleanupLeaseToken: FieldValue.delete(),
+      artifactCleanupLeaseExpiresAt: FieldValue.delete()
     });
     tx.update(requestRef, { status: "processing", updatedAt: FieldValue.serverTimestamp() });
     return { uid, requestId, requestRef };
@@ -302,7 +307,9 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         artifactCleanupStatus: cleanupStatus,
         artifactCleanupTargetCount: cleanup.targetCount,
         artifactCleanupFailureCount: cleanup.pendingPaths.length,
-        artifactCleanupPendingPaths: cleanup.pendingPaths
+        artifactCleanupPendingPaths: cleanup.pendingPaths,
+        artifactCleanupLeaseToken: FieldValue.delete(),
+        artifactCleanupLeaseExpiresAt: FieldValue.delete()
       });
       tx.update(claim.requestRef, { status: "failed", updatedAt: FieldValue.serverTimestamp() });
     });

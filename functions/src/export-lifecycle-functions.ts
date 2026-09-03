@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getApp, getApps, initializeApp } from "firebase-admin/app";
 import {
   FieldPath,
@@ -24,6 +24,8 @@ import { removeExportArtifacts } from "./export-artifact-cleanup";
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
 const bucket = getStorage(app).bucket();
+const FAILED_ARTIFACT_CLEANUP_LEASE_MS = 15 * 60 * 1000;
+
 const downloadSchema = z.object({
   jobId: z.string().trim().min(1).max(160),
   file: z.enum(["export", "manifest"]).default("export")
@@ -191,36 +193,59 @@ async function cleanupJob(document: QueryDocumentSnapshot<DocumentData>, now: nu
 }
 
 async function cleanupFailedJob(document: QueryDocumentSnapshot<DocumentData>) {
-  const job = document.data();
-  if (job.artifactCleanupStatus !== "incomplete") return false;
-  const uid = text(job.uid);
-  const requestId = text(job.requestId);
-  const pendingPaths = Array.isArray(job.artifactCleanupPendingPaths)
-    ? job.artifactCleanupPendingPaths.filter((path): path is string => typeof path === "string")
-    : [];
-  if (!uid || !requestId || pendingPaths.length === 0 || !pendingPaths.every((path) => validExportObjectPath({ uid, jobId: document.id, path }))) {
-    await document.ref.update({
-      artifactCleanupStatus: "blocked",
-      artifactCleanupFailureCount: pendingPaths.length,
+  const cleanupToken = randomUUID();
+  const claim = await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(document.ref);
+    if (!fresh.exists || fresh.data()?.status !== "failed" || fresh.data()?.artifactCleanupStatus !== "incomplete") return null;
+    const job = fresh.data() ?? {};
+    const uid = text(job.uid);
+    const requestId = text(job.requestId);
+    const pendingPaths = Array.isArray(job.artifactCleanupPendingPaths)
+      ? job.artifactCleanupPendingPaths.filter((path): path is string => typeof path === "string")
+      : [];
+    if (!uid || !requestId || pendingPaths.length === 0 || !pendingPaths.every((path) => validExportObjectPath({ uid, jobId: document.id, path }))) {
+      tx.update(document.ref, {
+        artifactCleanupStatus: "blocked",
+        artifactCleanupFailureCount: pendingPaths.length,
+        artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
+      });
+      return null;
+    }
+    tx.update(document.ref, {
+      status: "artifact_cleanup",
+      artifactCleanupStatus: "processing",
+      artifactCleanupLeaseToken: cleanupToken,
+      artifactCleanupLeaseExpiresAt: Timestamp.fromMillis(Date.now() + FAILED_ARTIFACT_CLEANUP_LEASE_MS),
       artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
     });
-    return false;
-  }
-  const cleanup = await removeExportArtifacts(pendingPaths, async (path) => {
+    return {uid, requestId, pendingPaths};
+  });
+  if (!claim) return false;
+
+  const cleanup = await removeExportArtifacts(claim.pendingPaths, async (path) => {
     await bucket.file(path).delete({ ignoreNotFound: true });
   });
-  await document.ref.update({
-    artifactCleanupStatus: cleanup.pendingPaths.length ? "incomplete" : "completed",
-    artifactCleanupPendingPaths: cleanup.pendingPaths,
-    artifactCleanupFailureCount: cleanup.pendingPaths.length,
-    artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(document.ref);
+    if (!fresh.exists || fresh.data()?.status !== "artifact_cleanup" || fresh.data()?.artifactCleanupLeaseToken !== cleanupToken) {
+      throw new Error("failed export cleanup claim changed before completion");
+    }
+    tx.update(document.ref, {
+      status: "failed",
+      artifactCleanupStatus: cleanup.pendingPaths.length ? "incomplete" : "completed",
+      artifactCleanupPendingPaths: cleanup.pendingPaths,
+      artifactCleanupFailureCount: cleanup.pendingPaths.length,
+      artifactCleanupUpdatedAt: FieldValue.serverTimestamp(),
+      artifactCleanupLeaseToken: FieldValue.delete(),
+      artifactCleanupLeaseExpiresAt: FieldValue.delete()
+    });
   });
   await writeAudit({
     actorUid: "system",
     actorRole: "system",
     action: cleanup.pendingPaths.length ? "export_artifact_cleanup_retry_incomplete" : "export_artifact_cleanup_retry_completed",
-    targetUid: uid,
-    requestId,
+    targetUid: claim.uid,
+    requestId: claim.requestId,
     metadata: { jobId: document.id, targetCount: cleanup.targetCount, pendingCount: cleanup.pendingPaths.length }
   });
   return cleanup.pendingPaths.length === 0;
@@ -277,7 +302,11 @@ export const cleanupExpiredExportPackages = onSchedule(
 
     cursor = null;
     for (let pageNumber = 0; pageNumber < EXPORT_CLEANUP_MAX_PAGES; pageNumber += 1) {
-      let query = db.collection("exportJobs").where("status", "==", "failed").orderBy(FieldPath.documentId()).limit(EXPORT_CLEANUP_PAGE_SIZE);
+      let query = db.collection("exportJobs")
+        .where("status", "==", "failed")
+        .where("artifactCleanupStatus", "==", "incomplete")
+        .orderBy(FieldPath.documentId())
+        .limit(EXPORT_CLEANUP_PAGE_SIZE);
       if (cursor) query = query.startAfter(cursor);
       const page = await query.get();
       if (page.empty) break;
