@@ -772,7 +772,7 @@ export const executeDeletionRequest = onCall(async (request) => {
     await ref.update({
       status: "processing",
       updatedAt: FieldValue.serverTimestamp(),
-      deletionPlan: result.plan,
+      deletionPlanCounts: result.plan.counts,
       planHash: result.planHash,
       deletedCounts: result.deleted,
       retainedData: [...retainedDeletionCollections],
@@ -795,7 +795,7 @@ export const executeDeletionRequest = onCall(async (request) => {
       source: "function",
       metadata: { planHash: result.planHash, deletedCounts: result.deleted, resumedFromPartialState, verificationRequired: true }
     });
-    return { requestId, status: "processing", mode, auditId, plan: result.plan, planHash: result.planHash, deletedCounts: result.deleted, verificationRequired: true };
+    return { requestId, status: "processing", mode, auditId, planCounts: result.plan.counts, planHash: result.planHash, deletedCounts: result.deleted, verificationRequired: true };
   } catch (error) {
     const isPrecondition = error instanceof HttpsError && error.code === "failed-precondition";
     await ref.update({
