@@ -684,9 +684,16 @@ export const executeDeletionRequest = onCall(async (request) => {
   }
 
   await db.runTransaction(async (tx) => {
-    const current = await tx.get(ref);
+    const tombstoneRef = db.collection("privacyDeletionTombstones").doc(uid);
+    const [current, tombstone] = await Promise.all([
+      tx.get(ref),
+      tx.get(tombstoneRef)
+    ]);
     if (!current.exists) throw new HttpsError("not-found", "Deletion request not found.");
     const state = current.data() ?? {};
+    if (timestampMillis(tombstone.data()?.exportProcessingLeaseExpiresAt) > Date.now()) {
+      throw new HttpsError("aborted", "Deletion is blocked while an export worker holds the subject fence.");
+    }
     if (["rejected", "failed", "completed"].includes(String(state.status))) {
       throw new HttpsError("failed-precondition", "Deletion request is not executable in its current status.");
     }
@@ -705,7 +712,7 @@ export const executeDeletionRequest = onCall(async (request) => {
       deletionExecutionLeaseUntil: new Date(Date.now() + DELETION_EXECUTION_LEASE_MS),
       updatedAt: FieldValue.serverTimestamp()
     });
-    tx.set(db.collection("privacyDeletionTombstones").doc(uid), {
+    tx.set(tombstoneRef, {
       uid,
       requestId,
       active: true,
