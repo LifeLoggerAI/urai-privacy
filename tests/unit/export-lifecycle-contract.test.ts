@@ -74,5 +74,6 @@ describe("expired export cleanup source boundary", () => {
     );
     expect(source).toContain('cleanupReason: "INVALID_EXPORT_IDENTIFIERS"');
     expect(source).toMatch(/if \(!uid \|\| !requestId\) \{[\s\S]*status: "cleanup_blocked"[\s\S]*complete: false/);
+    expect(source).toMatch(/catch \(error\) \{[\s\S]*artifactCleanupStatus: "incomplete"[\s\S]*artifactCleanupPendingPaths: paths/);
   });
 });
