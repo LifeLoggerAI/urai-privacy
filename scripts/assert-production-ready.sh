@@ -103,9 +103,9 @@ grep -q 'URAI_PRIVACY_EXPECTED_COMMIT_SHA' scripts/final-production-lock.sh
 echo "[assert-production-ready] Checking authenticated proof identity binding"
 grep -q 'URAI_PRIVACY_EXPECTED_COMMIT_SHA' scripts/verify-authenticated-live-proof.mjs
 grep -q 'URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT' scripts/verify-authenticated-live-proof.mjs
-grep -q 'commitSha mismatch' scripts/verify-authenticated-live-proof.mjs
-grep -q 'firebaseProjectAlias mismatch' scripts/verify-authenticated-live-proof.mjs
-grep -q 'baseUrl mismatch' scripts/verify-authenticated-live-proof.mjs
+grep -q 'Strict authenticated live proof is blocked' scripts/verify-authenticated-live-proof.mjs
+grep -q 'provider/runtime identity and workflow results must be obtained through an authenticated protected workflow or provider-issued attestation' scripts/verify-authenticated-live-proof.mjs
+grep -q 'caller-supplied proof files, digests, revisions, and status fields are not release authority' scripts/verify-authenticated-live-proof.mjs
 
 echo "[assert-production-ready] Checking rendered QA cannot pass vacuously"
 grep -q 'checked === 0' scripts/urai-qa-checks.js
