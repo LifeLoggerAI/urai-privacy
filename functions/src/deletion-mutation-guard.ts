@@ -18,7 +18,8 @@ import {
 } from "./deletion-completion-verifier";
 import {
   buildDeletionMutationLeasePatch,
-  deletionMutationBlockReason
+  deletionMutationBlockReason,
+  deletionPlanningFenceBlockReason
 } from "./deletion-mutation-policy";
 
 const db = getFirestore();
@@ -89,20 +90,38 @@ function requireCompletionAuthority(
   if (blocked) throw new HttpsError(blocked.code, blocked.message);
 }
 
-async function releaseDeletionMutationLease(requestId: string, token: string): Promise<void> {
+async function releaseDeletionMutationLease(
+  requestId: string,
+  token: string,
+  targetUid: string
+): Promise<void> {
   const ref = db.collection("deletionRequests").doc(requestId);
+  const tombstoneRef = db.collection("privacyDeletionTombstones").doc(targetUid);
   await db.runTransaction(async (tx: Transaction) => {
-    const snapshot = await tx.get(ref);
-    if (!snapshot.exists) return;
-    if (snapshot.data()?.deletionMutationLeaseToken !== token) return;
-    tx.update(ref, {
-      deletionMutationLeaseToken: FieldValue.delete(),
-      deletionMutationLeaseUntil: FieldValue.delete(),
-      deletionMutationLeaseOperation: FieldValue.delete(),
-      deletionMutationLeaseBy: FieldValue.delete(),
-      deletionMutationLeaseStartedAt: FieldValue.delete(),
-      updatedAt: FieldValue.serverTimestamp()
-    });
+    const [snapshot, tombstone] = await Promise.all([
+      tx.get(ref),
+      tx.get(tombstoneRef)
+    ]);
+    if (snapshot.exists && snapshot.data()?.deletionMutationLeaseToken === token) {
+      tx.update(ref, {
+        deletionMutationLeaseToken: FieldValue.delete(),
+        deletionMutationLeaseUntil: FieldValue.delete(),
+        deletionMutationLeaseOperation: FieldValue.delete(),
+        deletionMutationLeaseBy: FieldValue.delete(),
+        deletionMutationLeaseStartedAt: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
+    if (tombstone.exists && tombstone.data()?.deletionPlanningLeaseToken === token) {
+      tx.update(tombstoneRef, {
+        deletionPlanningLeaseToken: FieldValue.delete(),
+        deletionPlanningLeaseUntil: FieldValue.delete(),
+        deletionPlanningLeaseRequestId: FieldValue.delete(),
+        deletionPlanningLeaseOperation: FieldValue.delete(),
+        deletionPlanningLeaseBy: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
   });
 }
 
@@ -312,6 +331,7 @@ async function withDeletionMutationLease<T>(args: {
   const ref = db.collection("deletionRequests").doc(requestId);
   const token = randomUUID();
   const nowMillis = Date.now();
+  let targetUid = "";
   const lease = buildDeletionMutationLeasePatch({
     token,
     actorUid: adminUid,
@@ -324,10 +344,17 @@ async function withDeletionMutationLease<T>(args: {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) throw new HttpsError("not-found", "Deletion request not found.");
     const state = snapshot.data() ?? {};
-    const targetUid = String(state.uid ?? "");
+    targetUid = String(state.uid ?? "");
     if (!targetUid) throw new HttpsError("failed-precondition", "Deletion request is missing its subject uid.");
     const blocked = deletionMutationBlockReason(state, nowMillis);
     if (blocked) throw new HttpsError(blocked.code, blocked.message);
+
+    const tombstoneRef = db.collection("privacyDeletionTombstones").doc(targetUid);
+    const tombstone = await tx.get(tombstoneRef);
+    if (args.operation !== "execute") {
+      const planningBlocked = deletionPlanningFenceBlockReason(tombstone.data() ?? {}, nowMillis);
+      if (planningBlocked) throw new HttpsError(planningBlocked.code, planningBlocked.message);
+    }
 
     const unverifiedCompletion = isUnverifiedDeletionCompletionState(state);
     if (unverifiedCompletion && args.operation === "execute") {
@@ -361,6 +388,17 @@ async function withDeletionMutationLease<T>(args: {
         : {}),
       updatedAt: FieldValue.serverTimestamp()
     });
+    if (args.operation !== "execute") {
+      tx.set(tombstoneRef, {
+        uid: targetUid,
+        deletionPlanningLeaseToken: token,
+        deletionPlanningLeaseUntil: lease.deletionMutationLeaseUntil,
+        deletionPlanningLeaseRequestId: requestId,
+        deletionPlanningLeaseOperation: args.operation,
+        deletionPlanningLeaseBy: adminUid,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
   });
 
   try {
@@ -371,7 +409,7 @@ async function withDeletionMutationLease<T>(args: {
     return result;
   } finally {
     try {
-      await releaseDeletionMutationLease(requestId, token);
+      if (targetUid) await releaseDeletionMutationLease(requestId, token, targetUid);
     } catch (error) {
       console.error("Failed to release deletion mutation lease", {
         requestId,
