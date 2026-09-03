@@ -62,7 +62,7 @@ describe("deletion mutation lease policy", () => {
       token: "lease-1",
       actorUid: "admin-1",
       operation: "execute",
-      NOW: NOW,
+      nowMillis: NOW,
       leaseDurationMs: 60_000
     });
     expect(patch).toEqual({
