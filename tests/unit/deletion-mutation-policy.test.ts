@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDeletionMutationLeasePatch,
-  deletionMutationBlockReason
+  deletionMutationBlockReason,
+  deletionPlanningFenceBlockReason
 } from "../../functions/src/deletion-mutation-policy";
 
 const NOW = Date.parse("2026-07-11T17:15:00.000Z");
@@ -70,5 +71,43 @@ describe("deletion mutation lease policy", () => {
       deletionMutationLeaseOperation: "execute",
       deletionMutationLeaseBy: "admin-1"
     });
+  });
+});
+
+describe("subject deletion planning fence", () => {
+  it("rejects plan creation after a deletion fence becomes active", () => {
+    expect(deletionPlanningFenceBlockReason({ active: true }, nowMillis)).toMatchObject({
+      code: "failed-precondition"
+    });
+  });
+
+  it("serializes plan creation across requests for the same subject", () => {
+    expect(
+      deletionPlanningFenceBlockReason(
+        {
+          deletionPlanningLeaseToken: "other-request",
+          deletionPlanningLeaseUntil: new Date(nowMillis + 1_000)
+        },
+        nowMillis
+      )
+    ).toMatchObject({ code: "aborted" });
+  });
+
+  it("fails closed on malformed planning fences and permits expired leases", () => {
+    expect(
+      deletionPlanningFenceBlockReason(
+        { deletionPlanningLeaseToken: "orphaned-token" },
+        nowMillis
+      )
+    ).toMatchObject({ code: "failed-precondition" });
+    expect(
+      deletionPlanningFenceBlockReason(
+        {
+          deletionPlanningLeaseToken: "expired",
+          deletionPlanningLeaseUntil: new Date(nowMillis - 1)
+        },
+        nowMillis
+      )
+    ).toBeNull();
   });
 });
