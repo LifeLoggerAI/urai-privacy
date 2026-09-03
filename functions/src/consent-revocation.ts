@@ -3,6 +3,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { selectConsentRevocationSource } from "./consent-revocation-transition";
 
 const db = getFirestore();
 const REVOCATION_SCHEMA_VERSION = "consent.revoked.v1";
@@ -36,18 +37,14 @@ function boundConsumerAuthority(request: { auth?: { uid?: string; token?: Record
 export const publishConsentRevocation = onDocumentWritten("consentRecords/{recordId}", async (event) => {
   const before = event.data?.before.exists ? event.data.before.data() : null;
   const after = event.data?.after.exists ? event.data.after.data() : null;
-  const revokesExistingGrant =
-    before?.status === "granted" &&
-    after !== null &&
-    after.status !== "granted";
-  if (!after || (after.status !== "revoked" && !revokesExistingGrant)) return;
-  if (before?.status === after.status && before?.receiptHash === after.receiptHash) return;
+  const source = selectConsentRevocationSource(before, after);
+  if (!source) return;
 
-  const uid = typeof after.uid === "string" ? after.uid : "";
-  const purpose = typeof after.purpose === "string" ? after.purpose : "";
-  const consentTier = typeof after.consentTier === "string" ? after.consentTier : "";
-  const policyVersion = typeof after.policyVersion === "string" ? after.policyVersion : "";
-  const receiptHash = typeof after.receiptHash === "string" ? after.receiptHash : "";
+  const uid = typeof source.uid === "string" ? source.uid : "";
+  const purpose = typeof source.purpose === "string" ? source.purpose : "";
+  const consentTier = typeof source.consentTier === "string" ? source.consentTier : "";
+  const policyVersion = typeof source.policyVersion === "string" ? source.policyVersion : "";
+  const receiptHash = typeof source.receiptHash === "string" ? source.receiptHash : "";
   if (!uid || !purpose || !consentTier || !policyVersion || !/^[0-9a-f]{64}$/.test(receiptHash)) {
     throw new Error("Cannot publish consent revocation from an invalid canonical consent record.");
   }
