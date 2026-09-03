@@ -76,4 +76,16 @@ describe("expired export cleanup source boundary", () => {
     expect(source).toMatch(/if \(!uid \|\| !requestId\) \{[\s\S]*status: "cleanup_blocked"[\s\S]*complete: false/);
     expect(source).toMatch(/catch \(error\) \{[\s\S]*artifactCleanupStatus: "incomplete"[\s\S]*artifactCleanupPendingPaths: paths/);
   });
+
+  it("persists a rotating cursor so persistent failures cannot starve later retries", () => {
+    const source = readFileSync(
+      new URL("../../functions/src/export-lifecycle-functions.ts", import.meta.url),
+      "utf8"
+    );
+    expect(source).toContain('doc("exportFailedArtifactCleanupCursor")');
+    expect(source).toContain("failedCleanupStartAfter");
+    expect(source).toContain("lastFailedCleanupDocumentId");
+    expect(source).toContain("reachedFailedCleanupEnd");
+    expect(source).toContain("query = query.startAfter(failedCleanupStartAfter)");
+  });
 });
