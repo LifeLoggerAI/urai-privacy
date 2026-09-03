@@ -62,7 +62,7 @@ describe("deletion mutation lease policy", () => {
       token: "lease-1",
       actorUid: "admin-1",
       operation: "execute",
-      nowMillis: NOW,
+      NOW: NOW,
       leaseDurationMs: 60_000
     });
     expect(patch).toEqual({
@@ -76,7 +76,7 @@ describe("deletion mutation lease policy", () => {
 
 describe("subject deletion planning fence", () => {
   it("rejects plan creation after a deletion fence becomes active", () => {
-    expect(deletionPlanningFenceBlockReason({ active: true }, nowMillis)).toMatchObject({
+    expect(deletionPlanningFenceBlockReason({ active: true }, NOW)).toMatchObject({
       code: "failed-precondition"
     });
   });
@@ -86,9 +86,9 @@ describe("subject deletion planning fence", () => {
       deletionPlanningFenceBlockReason(
         {
           deletionPlanningLeaseToken: "other-request",
-          deletionPlanningLeaseUntil: new Date(nowMillis + 1_000)
+          deletionPlanningLeaseUntil: new Date(NOW + 1_000)
         },
-        nowMillis
+        NOW
       )
     ).toMatchObject({ code: "aborted" });
   });
@@ -97,16 +97,16 @@ describe("subject deletion planning fence", () => {
     expect(
       deletionPlanningFenceBlockReason(
         { deletionPlanningLeaseToken: "orphaned-token" },
-        nowMillis
+        NOW
       )
     ).toMatchObject({ code: "failed-precondition" });
     expect(
       deletionPlanningFenceBlockReason(
         {
           deletionPlanningLeaseToken: "expired",
-          deletionPlanningLeaseUntil: new Date(nowMillis - 1)
+          deletionPlanningLeaseUntil: new Date(NOW - 1)
         },
-        nowMillis
+        NOW
       )
     ).toBeNull();
   });
