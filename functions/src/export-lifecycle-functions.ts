@@ -391,6 +391,27 @@ export const cleanupExpiredExportPackages = onSchedule(
           const job = document.data();
           const uid = text(job.uid);
           const requestId = text(job.requestId);
+          const paths = [job.exportPackagePath, job.exportManifestPath]
+            .filter((value): value is string => typeof value === "string");
+          if (uid && requestId && paths.length > 0
+            && paths.every((value) => validExportObjectPath({ uid, jobId: document.id, path: value }))) {
+            await document.ref.update({
+              status: "failed",
+              complete: false,
+              artifactCleanupStatus: "incomplete",
+              artifactCleanupPendingPaths: paths,
+              artifactCleanupFailureCount: paths.length,
+              artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
+            });
+          } else {
+            await document.ref.update({
+              status: "cleanup_blocked",
+              complete: false,
+              cleanupStatus: "failed",
+              cleanupReason: "INVALID_EXPORT_CLEANUP_FAILURE",
+              cleanupUpdatedAt: FieldValue.serverTimestamp()
+            });
+          }
           if (uid && requestId) {
             await writeAudit({
               actorUid: "system",
