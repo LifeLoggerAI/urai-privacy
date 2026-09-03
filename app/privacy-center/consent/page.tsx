@@ -5,7 +5,6 @@ import type { User } from "firebase/auth";
 import { AuthGate } from "@/components/AuthGate";
 import { subscribeUserCollection, updateConsentPreference } from "@/lib/firebase-privacy-client";
 
-
 const consentPurposes = [
   { purpose: "memory.storage", label: "Memory storage", tier: "C1", description: "Store memories and user-created content." },
   { purpose: "behavior.passive-context", label: "Passive context", tier: "C2", description: "Use app metadata and interaction rhythms." },
