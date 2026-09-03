@@ -19,15 +19,17 @@ export type DeletionMutationLeasePatch = {
 
 export type DeletionPlanningFenceState = {
   active?: unknown;
+  requestId?: unknown;
   deletionPlanningLeaseToken?: unknown;
   deletionPlanningLeaseUntil?: unknown;
 };
 
 export function deletionPlanningFenceBlockReason(
   state: DeletionPlanningFenceState,
-  nowMillis: number
+  nowMillis: number,
+  requestId?: string
 ): DeletionMutationBlock | null {
-  if (state.active === true) {
+  if (state.active === true && (!requestId || state.requestId !== requestId)) {
     return {
       code: "failed-precondition",
       message: "Account deletion is already fenced; another request cannot create deletion-plan data."
