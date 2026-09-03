@@ -29,6 +29,7 @@ describe("canonical consent decision engine", () => {
     ["revoked", { ...grantedMemory, status: "revoked" }, "REVOKED"],
     ["expired status", { ...grantedMemory, status: "expired" }, "EXPIRED"],
     ["expired timestamp", { ...grantedMemory, expiresAt: "2026-07-06T11:59:59.000Z" }, "EXPIRED"],
+    ["missing expiry", { ...grantedMemory, expiresAt: null }, "EXPIRED"],
     ["wrong tier", { ...grantedMemory, consentTier: "C4" }, "TIER_MISMATCH"],
     ["wrong policy", { ...grantedMemory, policyVersion: "0.1.0-draft" }, "POLICY_VERSION_MISMATCH"],
     ["wrong purpose", { ...grantedMemory, purpose: "location.context" }, "PURPOSE_MISMATCH"]
