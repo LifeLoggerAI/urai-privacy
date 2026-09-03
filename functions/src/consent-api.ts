@@ -106,6 +106,10 @@ export const setCanonicalConsent = onCall(async (request) => {
   const auditRef = db.collection("auditLogs").doc();
 
   await db.runTransaction(async (transaction) => {
+    const deletionFence = await transaction.get(db.collection("privacyDeletionTombstones").doc(uid));
+    if (deletionFence.data()?.active === true) {
+      throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent changes are blocked.");
+    }
     transaction.set(recordRef, {
       ...receipt,
       receiptHash,

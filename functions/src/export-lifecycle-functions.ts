@@ -19,6 +19,7 @@ import {
   resolveExportPackageExpiry,
   validExportObjectPath
 } from "./export-lifecycle-contract";
+import { removeExportArtifacts } from "./export-artifact-cleanup";
 
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
@@ -189,6 +190,42 @@ async function cleanupJob(document: QueryDocumentSnapshot<DocumentData>, now: nu
   return true;
 }
 
+async function cleanupFailedJob(document: QueryDocumentSnapshot<DocumentData>) {
+  const job = document.data();
+  if (job.artifactCleanupStatus !== "incomplete") return false;
+  const uid = text(job.uid);
+  const requestId = text(job.requestId);
+  const pendingPaths = Array.isArray(job.artifactCleanupPendingPaths)
+    ? job.artifactCleanupPendingPaths.filter((path): path is string => typeof path === "string")
+    : [];
+  if (!uid || !requestId || pendingPaths.length === 0 || !pendingPaths.every((path) => validExportObjectPath({ uid, jobId: document.id, path }))) {
+    await document.ref.update({
+      artifactCleanupStatus: "blocked",
+      artifactCleanupFailureCount: pendingPaths.length,
+      artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
+    });
+    return false;
+  }
+  const cleanup = await removeExportArtifacts(pendingPaths, async (path) => {
+    await bucket.file(path).delete({ ignoreNotFound: true });
+  });
+  await document.ref.update({
+    artifactCleanupStatus: cleanup.pendingPaths.length ? "incomplete" : "completed",
+    artifactCleanupPendingPaths: cleanup.pendingPaths,
+    artifactCleanupFailureCount: cleanup.pendingPaths.length,
+    artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
+  });
+  await writeAudit({
+    actorUid: "system",
+    actorRole: "system",
+    action: cleanup.pendingPaths.length ? "export_artifact_cleanup_retry_incomplete" : "export_artifact_cleanup_retry_completed",
+    targetUid: uid,
+    requestId,
+    metadata: { jobId: document.id, targetCount: cleanup.targetCount, pendingCount: cleanup.pendingPaths.length }
+  });
+  return cleanup.pendingPaths.length === 0;
+}
+
 export const cleanupExpiredExportPackages = onSchedule(
   {
     schedule: "every 24 hours",
@@ -234,6 +271,23 @@ export const cleanupExpiredExportPackages = onSchedule(
         }
       }
 
+      cursor = page.docs[page.docs.length - 1] ?? null;
+      if (page.size < EXPORT_CLEANUP_PAGE_SIZE) break;
+    }
+
+    cursor = null;
+    for (let pageNumber = 0; pageNumber < EXPORT_CLEANUP_MAX_PAGES; pageNumber += 1) {
+      let query = db.collection("exportJobs").where("status", "==", "failed").orderBy(FieldPath.documentId()).limit(EXPORT_CLEANUP_PAGE_SIZE);
+      if (cursor) query = query.startAfter(cursor);
+      const page = await query.get();
+      if (page.empty) break;
+      for (const document of page.docs) {
+        try {
+          await cleanupFailedJob(document);
+        } catch (error) {
+          console.error("Failed export artifact cleanup retry", { jobId: document.id, reasonHash: digest(error) });
+        }
+      }
       cursor = page.docs[page.docs.length - 1] ?? null;
       if (page.size < EXPORT_CLEANUP_PAGE_SIZE) break;
     }

@@ -352,6 +352,10 @@ export const createExportRequest = onCall(async (request) => {
   const reqRef = db.collection("privacyRequests").doc();
   const jobRef = db.collection("exportJobs").doc();
   await db.runTransaction(async (tx) => {
+    const deletionFence = await tx.get(db.collection("privacyDeletionTombstones").doc(uid));
+    if (deletionFence.data()?.active === true) {
+      throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; new export requests are blocked.");
+    }
     tx.set(reqRef, { uid, type: "export", status: "pending", createdAt: now, updatedAt: now });
     tx.set(jobRef, { uid, requestId: reqRef.id, status: "pending", createdAt: now, updatedAt: now, recordCount: 0 });
   });

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { test } from "vitest";
 
 const proofVerifier = fileURLToPath(new URL("../../scripts/verify-authenticated-live-proof.mjs", import.meta.url));
@@ -30,7 +31,7 @@ const workflowNames = [
   "monitoring_rollback_evidence",
 ];
 
-function proof(commitSha: string, firebaseProjectAlias: string, baseUrl: string) {
+function proof(commitSha: string, firebaseProjectAlias: string, baseUrl: string, deploymentEvidenceSha256 = "c".repeat(64)) {
   return {
     commitSha,
     environment: "production",
@@ -39,6 +40,7 @@ function proof(commitSha: string, firebaseProjectAlias: string, baseUrl: string)
     operator: "release-operator",
     generatedAt: "2026-07-13T20:00:00.000Z",
     redactionStatement: "Tokens, identities, personal data, and secret values were redacted.",
+    deploymentEvidenceSha256,
     workflows: Object.fromEntries(
       workflowNames.map((name) => [
         name,
@@ -71,12 +73,19 @@ test("strict authenticated proof accepts only the exact SHA, project, and deploy
   try {
     const expectedSha = "a".repeat(40);
     const proofPath = join(dir, "proof.json");
-    writeFileSync(proofPath, JSON.stringify(proof(expectedSha, "urai-privacy-prod", "https://uraiprivacy.com/")));
+    const deploymentPath = join(dir, "provider-deployment.json");
+    const deployment = JSON.stringify({source: "provider-api", revisionId: "privacy-rev-001", sourceCommitSha: expectedSha, firebaseProjectAlias: "urai-privacy-prod", baseUrl: "https://uraiprivacy.com", observedAt: "2026-07-13T20:00:00.000Z"});
+    const deploymentDigest = createHash("sha256").update(deployment).digest("hex");
+    writeFileSync(deploymentPath, deployment);
+    writeFileSync(proofPath, JSON.stringify(proof(expectedSha, "urai-privacy-prod", "https://uraiprivacy.com/", deploymentDigest)));
 
     const success = runProofVerifier(proofPath, {
       URAI_PRIVACY_EXPECTED_COMMIT_SHA: expectedSha,
       URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT: "urai-privacy-prod",
       URAI_PRIVACY_BASE_URL: "https://uraiprivacy.com",
+      URAI_PRIVACY_DEPLOYMENT_EVIDENCE_PATH: deploymentPath,
+      URAI_PRIVACY_EXPECTED_DEPLOYMENT_EVIDENCE_SHA256: deploymentDigest,
+      URAI_PRIVACY_EXPECTED_PROVIDER_REVISION: "privacy-rev-001",
     });
     assert.equal(success.status, 0, `${success.stdout}\n${success.stderr}`);
 
@@ -84,6 +93,9 @@ test("strict authenticated proof accepts only the exact SHA, project, and deploy
       URAI_PRIVACY_EXPECTED_COMMIT_SHA: "b".repeat(40),
       URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT: "urai-privacy-prod",
       URAI_PRIVACY_BASE_URL: "https://uraiprivacy.com",
+      URAI_PRIVACY_DEPLOYMENT_EVIDENCE_PATH: deploymentPath,
+      URAI_PRIVACY_EXPECTED_DEPLOYMENT_EVIDENCE_SHA256: deploymentDigest,
+      URAI_PRIVACY_EXPECTED_PROVIDER_REVISION: "privacy-rev-001",
     });
     assert.notEqual(staleSha.status, 0);
     assert.match(`${staleSha.stdout}\n${staleSha.stderr}`, /commitSha mismatch/);
@@ -92,6 +104,9 @@ test("strict authenticated proof accepts only the exact SHA, project, and deploy
       URAI_PRIVACY_EXPECTED_COMMIT_SHA: expectedSha,
       URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT: "other-project",
       URAI_PRIVACY_BASE_URL: "https://uraiprivacy.com",
+      URAI_PRIVACY_DEPLOYMENT_EVIDENCE_PATH: deploymentPath,
+      URAI_PRIVACY_EXPECTED_DEPLOYMENT_EVIDENCE_SHA256: deploymentDigest,
+      URAI_PRIVACY_EXPECTED_PROVIDER_REVISION: "privacy-rev-001",
     });
     assert.notEqual(wrongProject.status, 0);
     assert.match(`${wrongProject.stdout}\n${wrongProject.stderr}`, /firebaseProjectAlias mismatch/);

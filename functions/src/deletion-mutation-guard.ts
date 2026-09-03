@@ -141,6 +141,7 @@ async function writeCompletionVerification(args: {
     }
     requireCompletionAuthority(snapshot.data() ?? {}, args);
     const now = new Date();
+    const tombstoneRef = db.collection("privacyDeletionTombstones").doc(args.targetUid);
     tx.update(ref, {
       ...(args.verified
         ? {
@@ -177,6 +178,13 @@ async function writeCompletionVerification(args: {
       timestamp: Timestamp.fromDate(now),
       integrityHash: sha256({ ...auditEvent, id: auditRef.id })
     });
+    tx.set(tombstoneRef, {
+      uid: args.targetUid,
+      requestId: args.requestId,
+      active: true,
+      status: args.verified ? "completed" : "verification_required",
+      updatedAt: Timestamp.fromDate(now)
+    }, { merge: true });
   });
 
   return auditRef.id;
@@ -308,6 +316,8 @@ async function withDeletionMutationLease<T>(args: {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) throw new HttpsError("not-found", "Deletion request not found.");
     const state = snapshot.data() ?? {};
+    const targetUid = String(state.uid ?? "");
+    if (!targetUid) throw new HttpsError("failed-precondition", "Deletion request is missing its subject uid.");
     const blocked = deletionMutationBlockReason(state, nowMillis);
     if (blocked) throw new HttpsError(blocked.code, blocked.message);
 
@@ -343,6 +353,16 @@ async function withDeletionMutationLease<T>(args: {
         : {}),
       updatedAt: FieldValue.serverTimestamp()
     });
+    if (args.operation === "execute") {
+      tx.set(db.collection("privacyDeletionTombstones").doc(targetUid), {
+        uid: targetUid,
+        requestId,
+        active: true,
+        status: "deletion_in_progress",
+        fencedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
   });
 
   try {

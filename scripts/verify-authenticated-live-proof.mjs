@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 const requireProof = process.env.URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF === "1";
 const proofPath = process.env.URAI_PRIVACY_AUTH_LIVE_PROOF_PATH || "release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.json";
 const expectedCommitSha = String(process.env.URAI_PRIVACY_EXPECTED_COMMIT_SHA || "").trim().toLowerCase();
 const expectedFirebaseProject = String(process.env.URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT || "").trim();
 const expectedBaseUrl = normalizeUrl(process.env.URAI_PRIVACY_BASE_URL || "");
+const deploymentEvidencePath = process.env.URAI_PRIVACY_DEPLOYMENT_EVIDENCE_PATH || "release-evidence/authenticated-live/PROVIDER_DEPLOYMENT_EVIDENCE.json";
+const expectedDeploymentEvidenceSha256 = String(process.env.URAI_PRIVACY_EXPECTED_DEPLOYMENT_EVIDENCE_SHA256 || "").trim().toLowerCase();
+const expectedProviderRevision = String(process.env.URAI_PRIVACY_EXPECTED_PROVIDER_REVISION || "").trim();
 
 const requiredWorkflows = [
   "public_route_smoke",
@@ -60,6 +64,10 @@ if (requireProof) {
   if (!/^https:\/\//.test(expectedBaseUrl)) {
     fail("URAI_PRIVACY_BASE_URL must be the exact expected HTTPS deployment URL in strict mode.");
   }
+  if (!/^[0-9a-f]{64}$/.test(expectedDeploymentEvidenceSha256)) {
+    fail("URAI_PRIVACY_EXPECTED_DEPLOYMENT_EVIDENCE_SHA256 must bind the separately obtained provider deployment evidence.");
+  }
+  if (expectedProviderRevision.length < 6) fail("URAI_PRIVACY_EXPECTED_PROVIDER_REVISION is required in strict mode.");
 }
 
 if (!existsSync(proofPath)) {
@@ -80,6 +88,7 @@ const failures = [];
 const proofCommitSha = String(proof?.commitSha || "").trim().toLowerCase();
 const proofFirebaseProject = String(proof?.firebaseProjectAlias || "").trim();
 const proofBaseUrl = normalizeUrl(proof?.baseUrl || "");
+const proofDeploymentEvidenceSha256 = String(proof?.deploymentEvidenceSha256 || "").trim().toLowerCase();
 
 if (!proof || typeof proof !== "object") failures.push("proof root must be a JSON object");
 if (!/^[0-9a-f]{40}$/.test(proofCommitSha)) failures.push("commitSha must be a full 40-character hexadecimal Git SHA");
@@ -90,6 +99,23 @@ if (!proof.operator || String(proof.operator).trim().length < 2) failures.push("
 if (!proof.generatedAt || Number.isNaN(Date.parse(String(proof.generatedAt)))) failures.push("generatedAt must be an ISO-like timestamp");
 if (!proof.redactionStatement || String(proof.redactionStatement).trim().length < 20) failures.push("redactionStatement is required and must describe redaction");
 
+let deploymentEvidence;
+if (requireProof) {
+  if (!existsSync(deploymentEvidencePath)) {
+    failures.push(`provider deployment evidence is missing at ${deploymentEvidencePath}`);
+  } else {
+    try {
+      const rawDeploymentEvidence = readFileSync(deploymentEvidencePath, "utf8");
+      const actualDigest = createHash("sha256").update(rawDeploymentEvidence).digest("hex");
+      deploymentEvidence = JSON.parse(rawDeploymentEvidence);
+      if (actualDigest !== expectedDeploymentEvidenceSha256) failures.push("provider deployment evidence digest does not match the independently supplied digest");
+      if (proofDeploymentEvidenceSha256 !== expectedDeploymentEvidenceSha256) failures.push("proof is not bound to the provider deployment evidence digest");
+    } catch (error) {
+      failures.push(`provider deployment evidence is invalid: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
 if (requireProof) {
   if (proofCommitSha !== expectedCommitSha) {
     failures.push(`commitSha mismatch: proof=${proofCommitSha || "missing"}, expected=${expectedCommitSha}`);
@@ -99,6 +125,14 @@ if (requireProof) {
   }
   if (proofBaseUrl !== expectedBaseUrl) {
     failures.push(`baseUrl mismatch: proof=${proofBaseUrl || "missing"}, expected=${expectedBaseUrl}`);
+  }
+  if (deploymentEvidence) {
+    if (deploymentEvidence.source !== "provider-api") failures.push("deployment evidence source must be provider-api");
+    if (String(deploymentEvidence.revisionId || "") !== expectedProviderRevision) failures.push("provider revision does not match the independently supplied revision");
+    if (String(deploymentEvidence.sourceCommitSha || "").toLowerCase() !== expectedCommitSha) failures.push("provider deployment source SHA does not match the exact release SHA");
+    if (String(deploymentEvidence.firebaseProjectAlias || "") !== expectedFirebaseProject) failures.push("provider deployment Firebase project does not match");
+    if (normalizeUrl(deploymentEvidence.baseUrl || "") !== expectedBaseUrl) failures.push("provider deployment URL does not match");
+    if (!deploymentEvidence.observedAt || Number.isNaN(Date.parse(String(deploymentEvidence.observedAt)))) failures.push("provider deployment observedAt is required");
   }
 }
 

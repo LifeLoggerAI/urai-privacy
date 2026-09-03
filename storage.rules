@@ -11,8 +11,22 @@ service firebase.storage {
     }
     function isCreateOrUpdate() { return request.resource != null; }
 
-    match /exports/{uid}/{allPaths=**} {
-      allow read: if isOwner(uid) || isAdmin();
+    function exportJob(jobId) {
+      return firestore.get(/databases/(default)/documents/exportJobs/$(jobId));
+    }
+    function activeExportPackage(uid, jobId) {
+      return firestore.exists(/databases/(default)/documents/exportJobs/$(jobId))
+        && exportJob(jobId).data.uid == uid
+        && exportJob(jobId).data.status == "completed"
+        && exportJob(jobId).data.complete == true
+        && exportJob(jobId).data.packageExpiresAt is timestamp
+        && exportJob(jobId).data.packageExpiresAt > request.time;
+    }
+
+    match /exports/{uid}/{jobId}/{fileName} {
+      allow read: if (isOwner(uid) || isAdmin())
+        && fileName in ["export.json", "manifest.json"]
+        && activeExportPackage(uid, jobId);
       allow write: if isAdmin() && isCreateOrUpdate();
     }
 

@@ -121,6 +121,8 @@ requireMatch("download must verify job-scoped object paths", lifecycle, /validEx
 requireMatch("expired package cleanup must be scheduled", lifecycle, /cleanupExpiredExportPackages\s*=\s*onSchedule/);
 requireMatch("cleanup must tolerate missing objects", lifecycle, /delete\(\{\s*ignoreNotFound:\s*true\s*\}\)/);
 requireMatch("cleanup must mark packages expired", lifecycle, /status:\s*["']expired["']/);
+requireMatch("failed artifact cleanup must be retried", lifecycle, /where\(["']status["'],\s*["']==["'],\s*["']failed["']\)[\s\S]*cleanupFailedJob/);
+requireMatch("completed packages must persist their expiry", processor, /packageExpiresAt:\s*Timestamp\.fromMillis\([\s\S]*EXPORT_PACKAGE_TTL_MS/);
 requireMatch("package lifetime must be bounded", lifecycleContract, /EXPORT_PACKAGE_TTL_MS\s*=\s*7\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/);
 requireMatch("path contract must reject traversal", lifecycleContract, /!args\.path\.includes\(["']\.\.["']\)/);
 

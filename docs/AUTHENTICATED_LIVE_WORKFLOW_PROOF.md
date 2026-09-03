@@ -29,10 +29,13 @@ Required strict authenticated-proof verification after the redacted evidence art
 ```bash
 URAI_PRIVACY_EXPECTED_FIREBASE_PROJECT="<expected-project-id>" \
 URAI_PRIVACY_EXPECTED_COMMIT_SHA="$(git rev-parse HEAD)" \
+URAI_PRIVACY_DEPLOYMENT_EVIDENCE_PATH="/private/path/provider-deployment.json" \
+URAI_PRIVACY_EXPECTED_DEPLOYMENT_EVIDENCE_SHA256="<sha256-from-protected-deploy-job>" \
+URAI_PRIVACY_EXPECTED_PROVIDER_REVISION="<immutable-provider-revision>" \
 URAI_PRIVACY_REQUIRE_AUTH_LIVE_PROOF=1 npm run test:live-auth-proof
 ```
 
-This strict command must remain fail-closed until the real artifact at `release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.json` contains approved, redacted evidence for every required workflow. Do not replace it with sample data or mark blocked rows complete from emulator-only evidence.
+This strict command must remain fail-closed until the real artifact at `release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.json` contains approved, redacted evidence for every required workflow and is digest-bound to separately obtained `provider-api` deployment metadata identifying the immutable provider revision and exact deployed source SHA. Do not replace it with sample data or mark blocked rows complete from emulator-only evidence.
 
 ## Required live-auth test identities
 

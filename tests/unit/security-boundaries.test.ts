@@ -11,6 +11,8 @@ const consentRevocation = readFileSync("functions/src/consent-revocation.ts", "u
 const firebaseClient = readFileSync("src/lib/firebase-privacy-client.ts", "utf8");
 const consentPage = readFileSync("app/privacy-center/consent/page.tsx", "utf8");
 const firestoreRules = readFileSync("firestore.rules", "utf8");
+const storageRules = readFileSync("storage.rules", "utf8");
+const lifecycle = readFileSync("functions/src/export-lifecycle-functions.ts", "utf8");
 
 describe("privacy security boundaries", () => {
   it("does not trust user-controlled Firestore role documents for administrator authority", () => {
@@ -123,6 +125,10 @@ describe("privacy security boundaries", () => {
     expect(exportRequest).toContain("artifactCleanupStatus: cleanupStatus");
     expect(exportRequest).toContain("artifactCleanupPendingPaths: cleanup.pendingPaths");
     expect(exportRequest).toContain("artifactCleanupFailureCount: cleanup.pendingPaths.length");
+    expect(lifecycle).toContain('where("status", "==", "failed")');
+    expect(lifecycle).toContain("cleanupFailedJob(document)");
+    expect(storageRules).toContain("activeExportPackage(uid, jobId)");
+    expect(storageRules).toContain("packageExpiresAt > request.time");
   });
 
   it("does not claim privacy certification from queue counts alone", () => {

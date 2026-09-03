@@ -5,6 +5,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
+import { EXPORT_PACKAGE_TTL_MS } from "./export-lifecycle-contract";
 
 const exportCollections = [
   "users",
@@ -254,10 +255,12 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     });
 
     await db.runTransaction(async (tx) => {
+      const completedAt = Date.now();
       tx.update(jobRef, {
         status: "completed",
         complete: true,
         completedAt: FieldValue.serverTimestamp(),
+        packageExpiresAt: Timestamp.fromMillis(completedAt + EXPORT_PACKAGE_TTL_MS),
         updatedAt: FieldValue.serverTimestamp(),
         processingBy: FieldValue.delete(),
         processingLeaseExpiresAt: FieldValue.delete(),
