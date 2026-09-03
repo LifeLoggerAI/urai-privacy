@@ -450,16 +450,28 @@ export const cleanupExpiredExportPackages = onSchedule(
       if (page.size < EXPORT_CLEANUP_PAGE_SIZE) break;
     }
 
+    const failedCleanupCursorRef = db.collection("privacyMaintenance").doc("exportFailedArtifactCleanupCursor");
+    const failedCleanupCursorSnap = await failedCleanupCursorRef.get();
+    const failedCleanupStartAfter = text(failedCleanupCursorSnap.data()?.lastDocumentId);
     cursor = null;
+    let lastFailedCleanupDocumentId = "";
+    let reachedFailedCleanupEnd = false;
     for (let pageNumber = 0; pageNumber < EXPORT_CLEANUP_MAX_PAGES; pageNumber += 1) {
       let query = db.collection("exportJobs")
         .where("status", "==", "failed")
         .where("artifactCleanupStatus", "==", "incomplete")
         .orderBy(FieldPath.documentId())
         .limit(EXPORT_CLEANUP_PAGE_SIZE);
-      if (cursor) query = query.startAfter(cursor);
+      if (cursor) {
+        query = query.startAfter(cursor);
+      } else if (failedCleanupStartAfter) {
+        query = query.startAfter(failedCleanupStartAfter);
+      }
       const page = await query.get();
-      if (page.empty) break;
+      if (page.empty) {
+        reachedFailedCleanupEnd = true;
+        break;
+      }
       for (const document of page.docs) {
         try {
           await cleanupFailedJob(document);
@@ -468,8 +480,18 @@ export const cleanupExpiredExportPackages = onSchedule(
         }
       }
       cursor = page.docs[page.docs.length - 1] ?? null;
-      if (page.size < EXPORT_CLEANUP_PAGE_SIZE) break;
+      lastFailedCleanupDocumentId = cursor?.id ?? lastFailedCleanupDocumentId;
+      if (page.size < EXPORT_CLEANUP_PAGE_SIZE) {
+        reachedFailedCleanupEnd = true;
+        break;
+      }
     }
+    await failedCleanupCursorRef.set({
+      lastDocumentId: reachedFailedCleanupEnd || !lastFailedCleanupDocumentId
+        ? FieldValue.delete()
+        : lastFailedCleanupDocumentId,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
 
     void scanned;
     void deleted;
