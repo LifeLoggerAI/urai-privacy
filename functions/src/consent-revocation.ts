@@ -35,8 +35,8 @@ function boundConsumerAuthority(request: { auth?: { uid?: string; token?: Record
 }
 
 export const publishConsentRevocation = onDocumentWritten("consentRecords/{recordId}", async (event) => {
-  const before = event.data?.before.exists ? event.data.before.data() : null;
-  const after = event.data?.after.exists ? event.data.after.data() : null;
+  const before = event.data?.before.exists ? event.data.before.data() ?? null : null;
+  const after = event.data?.after.exists ? event.data.after.data() ?? null : null;
   const source = selectConsentRevocationSource(before, after);
   if (!source) return;
 
