@@ -78,7 +78,7 @@ export function evaluateConsentDecision(args: { purpose: string; record: Consent
   if (args.record.status === "expired") return deny(args.purpose, "EXPIRED", definition.requiredTier, evaluatedAt);
   if (args.record.status !== "granted") return deny(args.purpose, "INVALID_STATUS", definition.requiredTier, evaluatedAt);
   const expiresAt = epoch(args.record.expiresAt);
-  if (expiresAt !== null && expiresAt <= now.getTime()) return deny(args.purpose, "EXPIRED", definition.requiredTier, evaluatedAt);
+  if (expiresAt === null || expiresAt <= now.getTime()) return deny(args.purpose, "EXPIRED", definition.requiredTier, evaluatedAt);
   return { allowed: true, reason: "ALLOWED", purpose: args.purpose, requiredTier: definition.requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, evaluatedAt };
 }
 
