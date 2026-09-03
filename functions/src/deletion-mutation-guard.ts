@@ -352,7 +352,7 @@ async function withDeletionMutationLease<T>(args: {
     const tombstoneRef = db.collection("privacyDeletionTombstones").doc(targetUid);
     const tombstone = await tx.get(tombstoneRef);
     if (args.operation !== "execute") {
-      const planningBlocked = deletionPlanningFenceBlockReason(tombstone.data() ?? {}, nowMillis);
+      const planningBlocked = deletionPlanningFenceBlockReason(tombstone.data() ?? {}, nowMillis, requestId);
       if (planningBlocked) throw new HttpsError(planningBlocked.code, planningBlocked.message);
     }
 
