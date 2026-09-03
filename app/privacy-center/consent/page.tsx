@@ -5,7 +5,6 @@ import type { User } from "firebase/auth";
 import { AuthGate } from "@/components/AuthGate";
 import { subscribeUserCollection, updateConsentPreference } from "@/lib/firebase-privacy-client";
 
-const CONSENT_NOTICE_VERSION = "privacy-consent-2026-07-11";
 
 const consentPurposes = [
   { purpose: "memory.storage", label: "Memory storage", tier: "C1", description: "Store memories and user-created content." },
@@ -48,8 +47,7 @@ function ConsentPanel({ user }: { user: User }) {
         purpose,
         status,
         surface: "privacy-center",
-        jurisdiction: "unknown",
-        noticeVersion: CONSENT_NOTICE_VERSION
+        jurisdiction: "unknown"
       });
       setMessage(`Consent updated: ${String(result.consentId ?? purpose)} -> ${status}`);
     } catch (error) {

@@ -91,6 +91,30 @@ describe("privacy security boundaries", () => {
     expect(consentPage).not.toContain("gps_context");
   });
 
+  it("binds consent receipts to server-owned notice metadata", () => {
+    expect(consentApi).toContain("const CANONICAL_CONSENT_NOTICE");
+    expect(consentApi).toContain("noticeVersion: CANONICAL_CONSENT_NOTICE.version");
+    expect(consentApi).toContain("noticeHash: CANONICAL_CONSENT_NOTICE.hash");
+    expect(consentApi).not.toContain("noticeVersion: z.string");
+    expect(consentApi).not.toContain("parsed.data.noticeVersion");
+    expect(consentApi).not.toContain("parsed.data.noticeHash");
+  });
+
+  it("serializes consent decisions with revocation and deletion fencing", () => {
+    expect(consentApi).toContain("const decision = await db.runTransaction");
+    expect(consentApi).toContain("transaction.get(recordRef)");
+    expect(consentApi).toContain("transaction.get(tombstoneRef)");
+    expect(consentApi).toContain("transaction.create(accessRef");
+    expect(consentApi).toContain("consent decisions are blocked");
+    expect(consentApi).not.toContain('db.collection("consentRecords").doc(recordId).get()');
+    expect(consentApi).not.toContain("await accessRef.set");
+  });
+
+  it("selects expired export packages before applying cleanup page bounds", () => {
+    expect(lifecycle).toContain('.where("packageExpiresAt", "<=", Timestamp.fromMillis(now))');
+    expect(lifecycle).toContain('.orderBy("packageExpiresAt")');
+  });
+
   it("binds revocation acknowledgements to an immutable consumer identity", () => {
     expect(consentRevocation).toContain("boundConsumerAuthority");
     expect(consentRevocation).toContain("token?.consumerId");

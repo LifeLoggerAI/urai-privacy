@@ -58,8 +58,6 @@ export function updateConsentPreference(payload: {
   status: "granted" | "denied" | "revoked";
   surface: string;
   jurisdiction: string;
-  noticeVersion: string;
-  noticeHash?: string;
   expiresAt?: string;
 }) {
   return callPrivacyFunction("setCanonicalConsent", payload);

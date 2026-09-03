@@ -286,6 +286,8 @@ export const cleanupExpiredExportPackages = onSchedule(
       let query = db
         .collection("exportJobs")
         .where("status", "==", "completed")
+        .where("packageExpiresAt", "<=", Timestamp.fromMillis(now))
+        .orderBy("packageExpiresAt")
         .orderBy(FieldPath.documentId())
         .limit(EXPORT_CLEANUP_PAGE_SIZE);
       if (cursor) query = query.startAfter(cursor);

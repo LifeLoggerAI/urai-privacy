@@ -16,9 +16,7 @@ const setConsentSchema = z.object({
   status: z.enum(["granted", "denied", "revoked"]),
   expiresAt: z.string().datetime().optional(),
   surface: z.string().trim().min(2).max(80).default("feature-gate"),
-  jurisdiction: z.string().trim().min(2).max(80).default("unknown"),
-  noticeVersion: z.string().trim().min(2).max(120),
-  noticeHash: z.string().regex(/^[0-9a-f]{64}$/).optional()
+  jurisdiction: z.string().trim().min(2).max(80).default("unknown")
 });
 
 const decisionSchema = z.object({
@@ -30,6 +28,15 @@ const decisionSchema = z.object({
 function hash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
+
+const CANONICAL_CONSENT_NOTICE = Object.freeze({
+  version: "privacy-consent-2026-07-11",
+  hash: hash({
+    noticeVersion: "privacy-consent-2026-07-11",
+    policyVersion: CONSENT_DECISION_POLICY_VERSION,
+    purposeRegistry: consentPurposeRegistry
+  })
+});
 
 function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknown> } }) {
   const uid = request.auth?.uid;
@@ -81,8 +88,8 @@ export const setCanonicalConsent = onCall(async (request) => {
     status: parsed.data.status,
     surface: parsed.data.surface,
     jurisdiction: parsed.data.jurisdiction,
-    noticeVersion: parsed.data.noticeVersion,
-    noticeHash: parsed.data.noticeHash ?? null,
+    noticeVersion: CANONICAL_CONSENT_NOTICE.version,
+    noticeHash: CANONICAL_CONSENT_NOTICE.hash,
     policyVersion: CONSENT_DECISION_POLICY_VERSION
   };
   const evidenceHash = hash(evidence);
@@ -95,8 +102,8 @@ export const setCanonicalConsent = onCall(async (request) => {
     expiresAt: parsed.data.expiresAt ?? null,
     surface: parsed.data.surface,
     jurisdiction: parsed.data.jurisdiction,
-    noticeVersion: parsed.data.noticeVersion,
-    noticeHash: parsed.data.noticeHash ?? null,
+    noticeVersion: CANONICAL_CONSENT_NOTICE.version,
+    noticeHash: CANONICAL_CONSENT_NOTICE.hash,
     evidenceHash,
     updatedAt: now
   };
@@ -169,33 +176,48 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
   }
 
   const recordId = consentRecordId(targetUid, purpose);
-  const snapshot = await db.collection("consentRecords").doc(recordId).get();
-  const decision = evaluateConsentDecision({ purpose, record: snapshot.exists ? snapshot.data() : null });
+  const recordRef = db.collection("consentRecords").doc(recordId);
+  const tombstoneRef = db.collection("privacyDeletionTombstones").doc(targetUid);
   const accessRef = db.collection("dataAccessEvents").doc();
-  await accessRef.set({
-    uid: targetUid,
-    actorUid,
-    actorRole: authority.role,
-    consumerId: authority.consumerId,
-    purpose,
-    correlationId: parsed.data.correlationId,
-    decision: decision.allowed ? "allow" : "deny",
-    reason: decision.reason,
-    requiredTier: decision.requiredTier,
-    policyVersion: decision.policyVersion,
-    evaluatedAt: FieldValue.serverTimestamp(),
-    consentRecordId: snapshot.exists ? recordId : null,
-    integrityHash: hash({
-      targetUid,
+  const decision = await db.runTransaction(async (transaction) => {
+    const [snapshot, deletionFence] = await Promise.all([
+      transaction.get(recordRef),
+      transaction.get(tombstoneRef)
+    ]);
+    if (deletionFence.data()?.active === true) {
+      throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent decisions are blocked.");
+    }
+
+    const evaluated = evaluateConsentDecision({
+      purpose,
+      record: snapshot.exists ? snapshot.data() : null
+    });
+    transaction.create(accessRef, {
+      uid: targetUid,
       actorUid,
       actorRole: authority.role,
       consumerId: authority.consumerId,
       purpose,
       correlationId: parsed.data.correlationId,
-      allowed: decision.allowed,
-      reason: decision.reason,
-      eventId: accessRef.id
-    })
+      decision: evaluated.allowed ? "allow" : "deny",
+      reason: evaluated.reason,
+      requiredTier: evaluated.requiredTier,
+      policyVersion: evaluated.policyVersion,
+      evaluatedAt: FieldValue.serverTimestamp(),
+      consentRecordId: snapshot.exists ? recordId : null,
+      integrityHash: hash({
+        targetUid,
+        actorUid,
+        actorRole: authority.role,
+        consumerId: authority.consumerId,
+        purpose,
+        correlationId: parsed.data.correlationId,
+        allowed: evaluated.allowed,
+        reason: evaluated.reason,
+        eventId: accessRef.id
+      })
+    });
+    return evaluated;
   });
 
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
