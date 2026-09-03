@@ -729,6 +729,18 @@ export const executeDeletionRequest = onCall(async (request) => {
     if (timestampMillis(tombstone.data()?.exportProcessingLeaseExpiresAt) > Date.now()) {
       throw new HttpsError("aborted", "Deletion is blocked while an export worker holds the subject fence.");
     }
+    const planningToken = typeof tombstone.data()?.deletionPlanningLeaseToken === "string"
+      ? String(tombstone.data()?.deletionPlanningLeaseToken).trim()
+      : "";
+    const planningLeaseValue = tombstone.data()?.deletionPlanningLeaseUntil;
+    const planningLeasePresent = planningLeaseValue !== undefined && planningLeaseValue !== null;
+    const planningLeaseUntil = timestampMillis(planningLeaseValue);
+    if ((planningToken || planningLeasePresent) && (!planningToken || !planningLeaseUntil)) {
+      throw new HttpsError("failed-precondition", "Subject deletion-planning fence is malformed and requires recovery.");
+    }
+    if (planningLeaseUntil > Date.now()) {
+      throw new HttpsError("aborted", "Deletion is blocked while another request prepares a subject deletion plan.");
+    }
     if (["rejected", "failed", "completed"].includes(String(state.status))) {
       throw new HttpsError("failed-precondition", "Deletion request is not executable in its current status.");
     }
