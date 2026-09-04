@@ -31,6 +31,7 @@ const DELETION_CALLABLE_OPTIONS = {
 
 const COMPLETION_VERIFIER_REQUIRED_MESSAGE =
   "Deletion completion verifier is required before destructive execution may become final.";
+const TERMINAL_DELETION_STATUSES = new Set(["completed", "rejected", "failed"]);
 
 type DeletionMutationOperation = "process" | "dryRun" | "execute";
 type DeletionCallableRequest = CallableRequest<Record<string, unknown>>;
@@ -346,6 +347,10 @@ async function withDeletionMutationLease<T>(args: {
     const state = snapshot.data() ?? {};
     targetUid = String(state.uid ?? "");
     if (!targetUid) throw new HttpsError("failed-precondition", "Deletion request is missing its subject uid.");
+    const status = String(state.status ?? "").trim().toLowerCase();
+    if (TERMINAL_DELETION_STATUSES.has(status)) {
+      throw new HttpsError("failed-precondition", `Deletion request is terminal (${status}) and cannot be mutated.`);
+    }
     const blocked = deletionMutationBlockReason(state, nowMillis);
     if (blocked) throw new HttpsError(blocked.code, blocked.message);
 
