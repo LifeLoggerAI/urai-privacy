@@ -49,9 +49,12 @@ beforeEach(async ({ skip }) => {
     await setDoc(doc(db, "users/user-a"), { uid: "user-a", role: "user" });
     await setDoc(doc(db, "users/user-b"), { uid: "user-b", role: "user" });
     await setDoc(doc(db, "privacyRequests/preq-a"), { uid: "user-a", type: "export", status: "pending" });
+    await setDoc(doc(db, "exportJobs/export-a"), { uid: "user-a", requestId: "preq-a", status: "pending" });
     await setDoc(doc(db, "deletionRequests/del-a"), { uid: "user-a", status: "pending" });
-    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
-    await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai_insights" });
+    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
+    await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
+    await setDoc(doc(db, "consentRevocationOutbox/revoke-a"), { uid: "user-a", purpose: "ai.personalization", status: "pending" });
+    await setDoc(doc(db, "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a"), { consumerId: "consumer-a", status: "acknowledged" });
     await setDoc(doc(db, "auditLogs/audit-a"), { actorUid: "admin-a", targetUid: "user-a", action: "admin_viewed_request" });
     await setDoc(doc(db, "dataAccessEvents/data-a"), { uid: "user-a", actorUid: "admin-a", outcome: "allowed" });
     await setDoc(doc(db, "legalHoldRecords/hold-a"), { uid: "user-a", status: "active", reason: "litigation" });
@@ -80,55 +83,84 @@ function anon() {
 }
 
 describe("Firestore owner/admin privacy rules", () => {
-  it("allows owners to read their own user and privacy request records", async () => {
+  it("allows owners to read their own privacy records and revocation envelope", async () => {
     await assertSucceeds(getDoc(doc(authed("user-a"), "users/user-a")));
     await assertSucceeds(getDoc(doc(authed("user-a"), "privacyRequests/preq-a")));
+    await assertSucceeds(getDoc(doc(authed("user-a"), "exportJobs/export-a")));
+    await assertSucceeds(getDoc(doc(authed("user-a"), "consentRecords/consent-a")));
+    await assertSucceeds(getDoc(doc(authed("user-a"), "consentRevocationOutbox/revoke-a")));
+    await assertFails(getDoc(doc(authed("user-a"), "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a")));
   });
 
   it("denies users reading another user's private records", async () => {
     await assertFails(getDoc(doc(authed("user-b"), "users/user-a")));
     await assertFails(getDoc(doc(authed("user-b"), "privacyRequests/preq-a")));
     await assertFails(getDoc(doc(authed("user-b"), "consentRecords/consent-a")));
+    await assertFails(getDoc(doc(authed("user-b"), "consentRevocationOutbox/revoke-a")));
   });
 
-  it("allows admin custom claim and admin role document reads", async () => {
+  it("requires trusted auth claims for administrator access", async () => {
     await assertSucceeds(getDoc(doc(authed("claim-admin", { admin: true }), "privacyRequests/preq-a")));
-    await assertSucceeds(getDoc(doc(authed("admin-a", { admin: true }), "privacyRequests/preq-a")));
+    await assertSucceeds(getDoc(doc(authed("role-claim-admin", { role: "admin" }), "privacyRequests/preq-a")));
+    await assertSucceeds(getDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a")));
+    await assertFails(getDoc(doc(authed("admin-a"), "privacyRequests/preq-a")));
   });
 
-  it("allows users to create only their own pending privacy and deletion requests", async () => {
-    await assertSucceeds(setDoc(doc(authed("user-a"), "privacyRequests/preq-new"), { uid: "user-a", type: "export", status: "pending" }));
-    await assertFails(setDoc(doc(authed("user-a"), "privacyRequests/preq-bad-owner"), { uid: "user-b", type: "export", status: "pending" }));
-    await assertFails(setDoc(doc(authed("user-a"), "privacyRequests/preq-bad-status"), { uid: "user-a", type: "export", status: "approved" }));
-    await assertSucceeds(setDoc(doc(authed("user-a"), "deletionRequests/del-new"), { uid: "user-a", status: "pending" }));
+  it("prevents owners from creating or changing privileged user fields", async () => {
+    await assertSucceeds(setDoc(doc(authed("user-new"), "users/user-new"), { uid: "user-new", displayName: "Safe profile" }));
+    await assertFails(setDoc(doc(authed("attacker"), "users/attacker"), { uid: "attacker", role: "admin" }));
+    await assertFails(setDoc(doc(authed("attacker"), "users/attacker"), { uid: "other-user", displayName: "Wrong owner" }));
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { role: "admin" }));
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { admin: true }));
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { legalHold: false }));
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { markedForDeletion: false }));
+    await assertSucceeds(updateDoc(doc(authed("user-a"), "users/user-a"), { displayName: "Updated safely" }));
+    await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { legalHold: true }));
   });
 
-  it("allows only admins to update request status", async () => {
-    await assertFails(updateDoc(doc(authed("user-a"), "privacyRequests/preq-a"), { status: "approved" }));
-    await assertSucceeds(updateDoc(doc(authed("admin-a", { admin: true }), "privacyRequests/preq-a"), { status: "approved" }));
+  it("retains the deletion tombstone as an owner profile-write fence", async () => {
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, "privacyDeletionTombstones/user-fenced-new"), { uid: "user-fenced-new", active: true });
+      await setDoc(doc(db, "privacyDeletionTombstones/user-a"), { uid: "user-a", active: true });
+    });
+
+    await assertFails(setDoc(doc(authed("user-fenced-new"), "users/user-fenced-new"), { uid: "user-fenced-new", displayName: "Must stay deleted" }));
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { displayName: "Must stay fenced" }));
+    await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { displayName: "Authorized recovery" }));
   });
 
-  it("protects legal hold records as admin-managed retained evidence", async () => {
+  it("requires server-mediated writes for privacy workflows and evidence", async () => {
+    const userDb = authed("user-a");
+    const adminDb = authed("claim-admin", { admin: true });
+
+    await assertFails(setDoc(doc(userDb, "privacyRequests/preq-new"), { uid: "user-a", type: "export", status: "pending" }));
+    await assertFails(setDoc(doc(userDb, "deletionRequests/del-new"), { uid: "user-a", status: "pending" }));
+    await assertFails(setDoc(doc(userDb, "consentRecords/consent-new"), { uid: "user-a", purpose: "analytics", status: "granted" }));
+    await assertFails(updateDoc(doc(userDb, "consentRecords/consent-a"), { status: "revoked" }));
+    await assertFails(setDoc(doc(userDb, "consentRevocationOutbox/revoke-new"), { uid: "user-a", status: "pending" }));
+    await assertFails(setDoc(doc(userDb, "consentRevocationOutbox/revoke-a/acknowledgements/consumer-new"), { status: "acknowledged" }));
+    await assertFails(updateDoc(doc(adminDb, "privacyRequests/preq-a"), { status: "approved" }));
+    await assertFails(setDoc(doc(adminDb, "auditLogs/audit-new"), { actorUid: "claim-admin", targetUid: "user-a" }));
+    await assertFails(setDoc(doc(adminDb, "legalHoldRecords/hold-new"), { uid: "user-a", status: "active" }));
+    await assertFails(setDoc(doc(adminDb, "policyVersions/v2"), { version: "0.2.0", status: "draft" }));
+    await assertFails(updateDoc(doc(adminDb, "consentRevocationOutbox/revoke-a"), { status: "delivered" }));
+  });
+
+  it("keeps retained privacy evidence readable but immutable to clients", async () => {
     await assertSucceeds(getDoc(doc(authed("user-a"), "legalHoldRecords/hold-a")));
     await assertFails(getDoc(doc(authed("user-b"), "legalHoldRecords/hold-a")));
-    await assertSucceeds(setDoc(doc(authed("admin-a", { admin: true }), "legalHoldRecords/hold-b"), { uid: "user-b", status: "active" }));
-    await assertFails(setDoc(doc(authed("user-a"), "legalHoldRecords/hold-user-created"), { uid: "user-a", status: "active" }));
-    await assertSucceeds(updateDoc(doc(authed("admin-a", { admin: true }), "legalHoldRecords/hold-a"), { status: "released" }));
-    await assertFails(deleteDoc(doc(authed("admin-a", { admin: true }), "legalHoldRecords/hold-a")));
-  });
-
-  it("protects audit logs and consent events as append-only evidence", async () => {
     await assertSucceeds(getDoc(doc(authed("user-a"), "auditLogs/audit-a")));
     await assertSucceeds(getDoc(doc(authed("user-a"), "consentEvents/consent-event-a")));
-    await assertFails(setDoc(doc(authed("user-a"), "auditLogs/audit-user-created"), { actorUid: "user-a", targetUid: "user-a" }));
-    await assertSucceeds(setDoc(doc(authed("admin-a", { admin: true }), "auditLogs/audit-admin-created"), { actorUid: "admin-a", targetUid: "user-a" }));
-    await assertFails(updateDoc(doc(authed("admin-a", { admin: true }), "auditLogs/audit-a"), { action: "tampered" }));
-    await assertFails(deleteDoc(doc(authed("admin-a", { admin: true }), "auditLogs/audit-a")));
-    await assertFails(updateDoc(doc(authed("admin-a", { admin: true }), "consentEvents/consent-event-a"), { status: "tampered" }));
+    await assertSucceeds(getDoc(doc(authed("user-a"), "consentRevocationOutbox/revoke-a")));
+    await assertFails(updateDoc(doc(authed("claim-admin", { admin: true }), "auditLogs/audit-a"), { action: "tampered" }));
+    await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "legalHoldRecords/hold-a")));
+    await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a")));
+    await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a")));
   });
 
   it("denies anonymous access and unknown collections", async () => {
     await assertFails(getDoc(doc(anon(), "users/user-a")));
-    await assertFails(setDoc(doc(authed("admin-a", { admin: true }), "unknown/private"), { value: true }));
+    await assertFails(setDoc(doc(authed("claim-admin", { admin: true }), "unknown/private"), { value: true }));
   });
 });

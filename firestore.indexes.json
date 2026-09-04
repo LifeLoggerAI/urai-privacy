@@ -7,7 +7,8 @@
     {"collectionGroup":"auditLogs","queryScope":"COLLECTION","fields":[{"fieldPath":"targetUid","order":"ASCENDING"},{"fieldPath":"action","order":"ASCENDING"},{"fieldPath":"timestamp","order":"DESCENDING"}]},
     {"collectionGroup":"adminActions","queryScope":"COLLECTION","fields":[{"fieldPath":"adminUid","order":"ASCENDING"},{"fieldPath":"action","order":"ASCENDING"},{"fieldPath":"timestamp","order":"DESCENDING"}]},
     {"collectionGroup":"retentionPolicies","queryScope":"COLLECTION","fields":[{"fieldPath":"collection","order":"ASCENDING"},{"fieldPath":"retentionClass","order":"ASCENDING"}]},
-    {"collectionGroup":"policyVersions","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"effectiveAt","order":"DESCENDING"}]}
+    {"collectionGroup":"policyVersions","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"effectiveAt","order":"DESCENDING"}]},
+    {"collectionGroup":"exportJobs","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"packageExpiresAt","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}]}
   ],
   "fieldOverrides": []
 }
