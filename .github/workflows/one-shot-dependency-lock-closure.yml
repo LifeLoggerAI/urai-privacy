@@ -1,0 +1,55 @@
+name: One-shot dependency lock closure
+
+on:
+  push:
+    branches:
+      - fix/next-16-3-4-security-20260911
+    paths:
+      - .github/workflows/one-shot-dependency-lock-closure.yml
+
+permissions:
+  contents: write
+
+jobs:
+  close-locks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/next-16-3-4-security-20260911
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+      - name: Generate only npm-supported production lock remediation
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/root-package.json
+          cp functions/package.json /tmp/functions-package.json
+          npm audit fix --package-lock-only --omit=dev
+          npm --prefix functions audit fix --package-lock-only --omit=dev
+          cmp -s package.json /tmp/root-package.json
+          cmp -s functions/package.json /tmp/functions-package.json
+      - name: Prove production audits are clean
+        run: |
+          set -euo pipefail
+          npm audit --omit=dev
+          npm --prefix functions audit --omit=dev
+      - name: Commit generated locks and self-delete
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-dependency-lock-closure.yml
+          git add package-lock.json functions/package-lock.json
+          git diff --cached --check
+          changed="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n%s\n%s\n' '.github/workflows/one-shot-dependency-lock-closure.yml' 'functions/package-lock.json' 'package-lock.json' | sort)"
+          test "$changed" = "$expected"
+          git commit -m "security: close remaining production lock advisories"
+          git push origin HEAD:fix/next-16-3-4-security-20260911
