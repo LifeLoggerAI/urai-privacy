@@ -26,30 +26,29 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             functions/package-lock.json
-      - name: Generate only npm-supported production lock remediation
+      - name: Add the narrow qs override and generate npm-supported production lock remediation
         run: |
           set -euo pipefail
           cp package.json /tmp/root-package.json
-          cp functions/package.json /tmp/functions-package.json
+          npm pkg set overrides.qs=6.16.0 --prefix functions
           npm audit fix --package-lock-only --omit=dev
           npm --prefix functions audit fix --package-lock-only --omit=dev
           cmp -s package.json /tmp/root-package.json
-          cmp -s functions/package.json /tmp/functions-package.json
       - name: Prove production audits are clean
         run: |
           set -euo pipefail
           npm audit --omit=dev
           npm --prefix functions audit --omit=dev
-      - name: Commit generated locks and self-delete
+      - name: Commit exact remediation and self-delete
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/one-shot-dependency-lock-closure.yml
-          git add package-lock.json functions/package-lock.json
+          git add package-lock.json functions/package.json functions/package-lock.json
           git diff --cached --check
           changed="$(git diff --cached --name-only | sort)"
-          expected="$(printf '%s\n%s\n%s\n' '.github/workflows/one-shot-dependency-lock-closure.yml' 'functions/package-lock.json' 'package-lock.json' | sort)"
+          expected="$(printf '%s\n%s\n%s\n%s\n' '.github/workflows/one-shot-dependency-lock-closure.yml' 'functions/package-lock.json' 'functions/package.json' 'package-lock.json' | sort)"
           test "$changed" = "$expected"
-          git commit -m "security: close remaining production lock advisories"
+          git commit -m "security: close remaining production qs advisory"
           git push origin HEAD:fix/next-16-3-4-security-20260911
