@@ -1,0 +1,38 @@
+{
+  "sampleOnly": true,
+  "publicDemoSafe": true,
+  "familyIds": ["URAI-008", "URAI-007", "URAI-020"],
+  "opportunityId": "sample-pantry-opportunity-001",
+  "sourceSignals": [
+    { "type": "synthetic_route", "label": "Near demo grocery store", "consentTier": "demo_synthetic" },
+    { "type": "synthetic_pantry", "label": "Milk and oatmeal low", "consentTier": "demo_synthetic" },
+    { "type": "synthetic_preference", "label": "User prefers short stops", "consentTier": "demo_synthetic" }
+  ],
+  "pantryNeed": {
+    "items": ["milk", "oatmeal"],
+    "urgency": "sample_medium",
+    "correctionControls": ["mark_in_stock", "delete_item", "disable_pantry_suggestions"]
+  },
+  "routeContext": {
+    "onExistingRoute": true,
+    "detourMinutes": 3,
+    "drivingSafeSuppression": "do_not_interrupt_while_driving"
+  },
+  "storeCandidate": {
+    "name": "Demo Grocery",
+    "inventoryStatus": "not_connected_sample_only",
+    "priceStatus": "not_connected_sample_only"
+  },
+  "scoreExplanation": {
+    "urgencyScore": "sample_medium",
+    "burdenScore": "sample_low",
+    "confidence": "sample_only",
+    "whyNow": "Synthetic route and pantry demo signals overlap."
+  },
+  "actionEscrowState": {
+    "status": "approval_required",
+    "allowed": ["show_card", "create_local_checklist"],
+    "blocked": ["purchase", "reserve", "message", "provider_call"]
+  },
+  "userControls": ["Approve checklist", "Dismiss", "Correct pantry", "Disable route nudges", "Delete sample"]
+}

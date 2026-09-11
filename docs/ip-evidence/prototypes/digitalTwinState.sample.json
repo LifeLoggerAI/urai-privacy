@@ -1,0 +1,50 @@
+{
+  "sampleOnly": true,
+  "publicDemoSafe": true,
+  "familyIds": ["URAI-007", "URAI-020", "URAI-030"],
+  "userFacingLabel": "Synthetic demo context",
+  "currentState": {
+    "observedFacts": [
+      {
+        "source": "synthetic_route_context",
+        "value": "User is near a grocery store on a normal route.",
+        "confidence": "sample",
+        "consentTier": "demo_synthetic"
+      },
+      {
+        "source": "synthetic_pantry_context",
+        "value": "Milk and oatmeal are marked as low in demo data.",
+        "confidence": "sample",
+        "consentTier": "demo_synthetic"
+      }
+    ],
+    "softInferences": [
+      {
+        "inference": "A grocery stop may be useful if the user is not rushed.",
+        "confidence": "low_sample",
+        "safetyBoundary": "Do not purchase or message without explicit approval."
+      }
+    ],
+    "suppressedActions": [
+      {
+        "action": "automatic_purchase",
+        "reason": "Real-world commerce requires explicit approval, payment consent, audit, and provider proof."
+      },
+      {
+        "action": "passive_location_collection",
+        "reason": "Public demo mode uses synthetic data only."
+      }
+    ]
+  },
+  "explanationObject": {
+    "whyNow": "Synthetic route and pantry data overlap in the sample state.",
+    "whyThis": "The demo shows how URAI could present a bounded opportunity without taking action.",
+    "whatData": ["synthetic route", "synthetic pantry", "synthetic user preference"],
+    "userControls": ["Approve", "Dismiss", "Disable route nudges", "Correct pantry item", "Delete sample state"]
+  },
+  "actionEscrow": {
+    "state": "requires_user_approval",
+    "allowedWithoutApproval": ["display_demo_card"],
+    "blockedWithoutApproval": ["purchase", "send_message", "schedule_event", "call_provider"]
+  }
+}
