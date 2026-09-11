@@ -13,6 +13,9 @@ const requiredFiles = [
   "src/lib/privacy-types.ts",
   "src/lib/privacy-workflows.ts",
   "functions/src/index.ts",
+  "functions/src/functions-entry.ts",
+  "functions/src/consent-api.ts",
+  "functions/src/consent-decision.ts",
   "firestore.rules",
   "storage.rules",
   "firebase.json",
@@ -53,25 +56,36 @@ for (const term of requiredPrivacyTerms) {
   }
 }
 
-const functionsSourcePath = join(root, "functions/src/index.ts");
-if (existsSync(functionsSourcePath)) {
-  const source = readFileSync(functionsSourcePath, "utf8");
+const functionsSourcePaths = [
+  "functions/src/index.ts",
+  "functions/src/functions-entry.ts",
+  "functions/src/consent-api.ts"
+].map((file) => join(root, file));
+if (functionsSourcePaths.every((path) => existsSync(path))) {
+  const source = functionsSourcePaths.map((path) => readFileSync(path, "utf8")).join("\n\n");
 
   const requiredFunctions = [
     "createExportRequest",
     "processExportRequest",
     "createDeletionRequest",
     "processDeletionRequest",
-    "updateConsent",
+    "setCanonicalConsent",
+    "evaluateCanonicalConsent",
     "writeAuditLog",
     "recordAdminAction",
     "getPrivacyHealthReport"
   ];
 
   for (const fn of requiredFunctions) {
-    if (!source.includes(`export const ${fn}`)) {
+    const locallyExported = source.includes(`export const ${fn}`);
+    const reExported = source.includes(fn) && source.includes("export {");
+    if (!locallyExported && !reExported) {
       failures.push(`Missing callable Function export: ${fn}`);
     }
+  }
+
+  if (source.includes("export const updateConsent")) {
+    failures.push("Retired updateConsent callable must not reappear; canonical consent exports are required.");
   }
 
   if (!source.includes("HttpsError")) {

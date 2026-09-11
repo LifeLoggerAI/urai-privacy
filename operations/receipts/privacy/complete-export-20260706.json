@@ -1,0 +1,28 @@
+{
+  "receiptId": "URAI-PRIVACY-EXPORT-20260706-001",
+  "recordedAt": "2026-07-06T02:00:00-05:00",
+  "classification": "IMPLEMENTED BUT NOT DEPLOYED",
+  "repository": "LifeLoggerAI/urai-privacy",
+  "branch": "privacy/consent-decision-p0-20260706",
+  "implementationHeadSha": "4daed6d858afdcd813d797cc509b8f10d980f93c",
+  "pullRequest": "#93",
+  "issue": "#85",
+  "changedFiles": [
+    "functions/src/export-contract.ts",
+    "functions/src/export-functions.ts",
+    "tests/unit/export-contract.test.ts",
+    "scripts/check-complete-export-contract.mjs",
+    "package.json",
+    ".github/workflows/consent-decision-branch-validation.yml"
+  ],
+  "validation": {
+    "testResult": "PENDING_EXACT_HEAD_GITHUB_ACTIONS",
+    "buildResult": "PENDING_EXACT_HEAD_GITHUB_ACTIONS",
+    "runtimeVerification": "NOT DEPLOYED"
+  },
+  "remainingCaveats": [
+    "Exact-head CI is pending.",
+    "Emulator and staging evidence are pending.",
+    "No production deployment occurred."
+  ]
+}

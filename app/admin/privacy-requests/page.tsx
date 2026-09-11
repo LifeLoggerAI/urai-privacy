@@ -13,7 +13,7 @@ export default function AdminPrivacyRequestsPage() {
     <section>
       <div className="eyebrow">Admin review</div>
       <h1>Privacy requests</h1>
-      <p className="lede">Admins can review live export and deletion requests. Admin access is checked through Firebase Auth custom claims or the admin role document before any data is shown.</p>
+      <p className="lede">Admins can review live export and deletion requests. Access is checked using trusted Firebase Auth custom claims before any privacy record is shown.</p>
       <AuthGate adminOnly>{() => <AdminRequestsTable />}</AuthGate>
     </section>
   );
@@ -46,7 +46,7 @@ function AdminRequestsTable() {
     setMessage("");
     try {
       const result = await executeDeletionRequest({ requestId, mode, expectedPlanHash });
-      const suffix = mode === "dryRun" ? ` Plan hash: ${String(result.planHash ?? "missing")}` : "";
+      const suffix = mode === "dryRun" ? ` Plan hash: ${String(result.planHash ?? "missing")}` : " Residual verification passed.";
       setMessage(`Deletion ${mode} completed for ${String(result.requestId ?? requestId)} -> ${String(result.status ?? "unknown")}.${suffix}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : `Deletion ${mode} failed`);
@@ -78,19 +78,28 @@ function AdminRequestsTable() {
       </article>
       <article className="card">
         <h3>Deletion requests</h3>
-        <p className="muted">Run dry-run first. Execute requires the latest plan hash and will delete supported user-scoped data while retaining audit/legal evidence.</p>
+        <p className="muted">Run dry-run first. Execute requires the latest stable plan hash. Completion is final only after an independent residual scan confirms no supported Firestore, export-object, Auth, or legal-hold target remains.</p>
         {deletionRequests.length === 0 ? <p className="muted">No deletion requests found.</p> : deletionRequests.map((request) => {
           const requestId = String(request.id);
           const planHash = typeof request.planHash === "string" ? request.planHash : undefined;
+          const rawStatus = String(request.status);
+          const completionRequired = request.deletionCompletionVerificationRequired === true;
+          const completionVerified = request.deletionCompletionVerified === true;
+          const verifiedComplete = rawStatus === "completed" && completionVerified && !completionRequired;
+          const displayStatus = rawStatus === "completed" && !verifiedComplete
+            ? "completion verification required"
+            : rawStatus;
           return (
             <div key={requestId} className="panel">
               <strong>{requestId}</strong>
-              <p className="muted">{String(request.uid)} · {String(request.status)}</p>
+              <p className="muted">{String(request.uid)} · {displayStatus}</p>
               {request.destructiveDeletionBlocked ? <p><span className="status warn">destructive deletion gated</span></p> : null}
+              {completionRequired ? <p><span className="status warn">completion is not yet verified</span></p> : null}
+              {verifiedComplete ? <p><span className="status ok">deletion completion verified</span></p> : null}
               {planHash ? <p className="muted">Plan hash: <code>{planHash}</code></p> : null}
-              {statuses.map((status) => <button className="button" type="button" disabled={busyId !== null} key={status} onClick={() => processDeletion(requestId, status)}>{status}</button>)}
-              <button className="button primary" type="button" disabled={busyId !== null} onClick={() => runDeletionExecutor(requestId, "dryRun")}>Dry run</button>
-              <button className="button" type="button" disabled={busyId !== null || !planHash || String(request.status) === "completed"} onClick={() => runDeletionExecutor(requestId, "execute", planHash)}>Execute deletion</button>
+              {statuses.map((status) => <button className="button" type="button" disabled={busyId !== null || verifiedComplete} key={status} onClick={() => processDeletion(requestId, status)}>{status}</button>)}
+              <button className="button primary" type="button" disabled={busyId !== null || verifiedComplete} onClick={() => runDeletionExecutor(requestId, "dryRun")}>Dry run</button>
+              <button className="button" type="button" disabled={busyId !== null || !planHash || rawStatus === "completed"} onClick={() => runDeletionExecutor(requestId, "execute", planHash)}>Execute deletion</button>
             </div>
           );
         })}
@@ -112,7 +121,7 @@ function ExportJobsPanel({ busyId, processExport }: { busyId: string | null; pro
         <div key={String(job.id)} className="panel">
           <strong>{String(job.id)}</strong>
           <p className="muted">{String(job.uid)} · {String(job.status)}</p>
-          <button className="button" type="button" disabled={busyId !== null || String(job.status) === "completed"} onClick={() => processExport(String(job.id))}>{String(job.status) === "completed" ? "Processed" : "Mark processed"}</button>
+          <button className="button" type="button" disabled={busyId !== null || String(job.status) === "completed"} onClick={() => processExport(String(job.id))}>{String(job.status) === "completed" ? "Processed" : "Process export"}</button>
         </div>
       ))}
     </article>

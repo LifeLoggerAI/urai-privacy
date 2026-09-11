@@ -1,0 +1,116 @@
+import { describe, expect, it } from "vitest";
+import {
+  deletionCompletionAuthorityBlockReason,
+  isUnverifiedDeletionCompletionState,
+  type DeletionCompletionAuthorityState
+} from "../../functions/src/deletion-completion-authority";
+
+const nowMillis = Date.parse("2026-07-11T19:55:00.000Z");
+const input = {
+  targetUid: "user-1",
+  actorUid: "admin-1",
+  leaseToken: "lease-token-1",
+  nowMillis
+};
+
+function state(overrides: Partial<DeletionCompletionAuthorityState> = {}): DeletionCompletionAuthorityState {
+  return {
+    uid: "user-1",
+    status: "processing",
+    deletionExecutionState: "verification_required",
+    deletionCompletionVerificationRequired: true,
+    deletionCompletionVerified: false,
+    deletionMutationLeaseToken: "lease-token-1",
+    deletionMutationLeaseUntil: new Date(nowMillis + 60_000),
+    deletionMutationLeaseOperation: "execute",
+    deletionMutationLeaseBy: "admin-1",
+    ...overrides
+  };
+}
+
+describe("deletion completion authority", () => {
+  it("allows only the exact unexpired execute lease on the non-final pending-verification state", () => {
+    expect(deletionCompletionAuthorityBlockReason(state(), input)).toBeNull();
+  });
+
+  it("rejects target UID drift", () => {
+    expect(deletionCompletionAuthorityBlockReason(state({ uid: "user-2" }), input))
+      .toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("rejects a superseded lease token", () => {
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ deletionMutationLeaseToken: "lease-token-2" }),
+      input
+    )).toMatchObject({ code: "aborted" });
+  });
+
+  it("rejects wrong operation or actor authority", () => {
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ deletionMutationLeaseOperation: "dryRun" }),
+      input
+    )).toMatchObject({ code: "aborted" });
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ deletionMutationLeaseBy: "admin-2" }),
+      input
+    )).toMatchObject({ code: "aborted" });
+  });
+
+  it("rejects an expired or malformed lease", () => {
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ deletionMutationLeaseUntil: new Date(nowMillis) }),
+      input
+    )).toMatchObject({ code: "aborted" });
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ deletionMutationLeaseUntil: "invalid" }),
+      input
+    )).toMatchObject({ code: "aborted" });
+  });
+
+  it("rejects a request that is no longer in the pending-verification mutation state", () => {
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ status: "completed" }),
+      input
+    )).toMatchObject({ code: "failed-precondition" });
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ deletionExecutionState: "completed" }),
+      input
+    )).toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("rejects verification that is no longer pending", () => {
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ deletionCompletionVerificationRequired: false }),
+      input
+    )).toMatchObject({ code: "failed-precondition" });
+    expect(deletionCompletionAuthorityBlockReason(
+      state({ deletionCompletionVerified: true }),
+      input
+    )).toMatchObject({ code: "failed-precondition" });
+  });
+});
+
+describe("unverified deletion completion recovery state", () => {
+  it("recognizes the actual processing verification_required state", () => {
+    expect(isUnverifiedDeletionCompletionState(state())).toBe(true);
+  });
+
+  it("recognizes legacy completed and verifying non-final states", () => {
+    expect(isUnverifiedDeletionCompletionState(state({ status: "completed" }))).toBe(true);
+    expect(isUnverifiedDeletionCompletionState(
+      state({ deletionExecutionState: "verifying" })
+    )).toBe(true);
+  });
+
+  it("does not block verified or pre-execution states", () => {
+    expect(isUnverifiedDeletionCompletionState(
+      state({ deletionCompletionVerified: true })
+    )).toBe(false);
+    expect(isUnverifiedDeletionCompletionState(
+      state({ deletionCompletionVerificationRequired: false })
+    )).toBe(false);
+    expect(isUnverifiedDeletionCompletionState(
+      state({ deletionExecutionState: "ready" })
+    )).toBe(false);
+  });
+});
