@@ -23,19 +23,26 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Regenerate patched dependency lock
+      - name: Regenerate only the vulnerable Next lock closure
         run: |
-          npm install --package-lock-only next@16.3.4 eslint-config-next@16.3.4
-          npm audit fix --package-lock-only
-      - name: Enforce critical audit
-        run: npm audit --audit-level=critical
+          set -euo pipefail
+          npm update next --package-lock-only
+          test -z "$(git diff -- package.json)"
+      - name: Enforce the repository's fail-closed production critical audits
+        run: |
+          set -euo pipefail
+          npm audit --audit-level=critical --omit=dev
+          npm --prefix functions audit --audit-level=critical --omit=dev
       - name: Commit generated lock and remove one-shot workflow
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/one-shot-next-security-lock.yml
-          git add package.json package-lock.json
+          git add package-lock.json
           git diff --cached --check
-          git commit -m "security: upgrade Next.js and clear critical audit"
+          changed="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n%s\n' '.github/workflows/one-shot-next-security-lock.yml' 'package-lock.json' | sort)"
+          test "$changed" = "$expected"
+          git commit -m "security: refresh patched Next.js lock closure"
           git push origin HEAD:fix/next-16-3-4-security-20260911
