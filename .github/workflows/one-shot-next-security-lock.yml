@@ -24,7 +24,9 @@ jobs:
           node-version: '22'
           cache: npm
       - name: Regenerate patched dependency lock
-        run: npm install --package-lock-only next@16.3.4 eslint-config-next@16.3.4
+        run: |
+          npm install --package-lock-only next@16.3.4 eslint-config-next@16.3.4
+          npm audit fix --package-lock-only
       - name: Enforce critical audit
         run: npm audit --audit-level=critical
       - name: Commit generated lock and remove one-shot workflow
@@ -35,5 +37,5 @@ jobs:
           git rm .github/workflows/one-shot-next-security-lock.yml
           git add package.json package-lock.json
           git diff --cached --check
-          git commit -m "security: upgrade Next.js to patched 16.3.4"
+          git commit -m "security: upgrade Next.js and clear critical audit"
           git push origin HEAD:fix/next-16-3-4-security-20260911
