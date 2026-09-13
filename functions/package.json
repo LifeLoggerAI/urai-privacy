@@ -4,7 +4,7 @@
   "private": true,
   "main": "lib/functions-entry.js",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "scripts": {
     "build": "tsc",
