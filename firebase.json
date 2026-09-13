@@ -16,7 +16,8 @@
   "functions": [
     {
       "source": "functions",
-      "codebase": "privacy"
+      "codebase": "privacy",
+      "runtime": "nodejs22"
     }
   ],
   "emulators": {
