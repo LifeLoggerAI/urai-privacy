@@ -1,0 +1,90 @@
+name: URAI Privacy Visual Proof
+
+on:
+  push:
+    branches:
+      - design/privacy-control-experience-v1
+  pull_request:
+    paths:
+      - 'website/**'
+      - '.github/workflows/privacy-visual-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  visual-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+
+      - name: Prove exact clean candidate
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Locate Chrome
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME_BIN"
+          echo "PRIVACY_CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+          "$CHROME_BIN" --version
+
+      - name: Start exact website
+        run: |
+          cd website
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/privacy-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/privacy-http.log
+          exit 1
+
+      - name: Verify public route contracts
+        run: |
+          mkdir -p /tmp/privacy-visual-proof/screens
+          for route in index.html principles.html rights.html governance.html legal.html contact.html status.html; do
+            test -f "website/$route"
+            test "$(grep -io '<h1\b' "website/$route" | wc -l | tr -d ' ')" = "1"
+            ! grep -Eiq 'href="#"|href=""' "website/$route"
+          done
+          grep -q 'See what URAI knows. Control what happens next.' website/index.html
+          grep -q 'DATA' website/index.html
+          grep -q 'AUTHORIZED SYSTEMS' website/index.html
+          grep -q 'NEVER_AUTONOMOUS' website/index.html
+          grep -q 'prefers-reduced-motion' website/control.css
+
+      - name: Capture exact-head pixels
+        run: |
+          for spec in '375,900' '430,932' '768,1024' '1024,900' '1440,1000'; do
+            width="${spec%,*}"; height="${spec#*,}"
+            "$PRIVACY_CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=1600 --window-size="$width,$height" --screenshot="/tmp/privacy-visual-proof/screens/home-${width}.png" http://127.0.0.1:4173/
+          done
+          for route in rights governance status; do
+            "$PRIVACY_CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=1600 --window-size=430,932 --screenshot="/tmp/privacy-visual-proof/screens/${route}-430.png" "http://127.0.0.1:4173/${route}.html"
+            "$PRIVACY_CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=1600 --window-size=1440,1000 --screenshot="/tmp/privacy-visual-proof/screens/${route}-1440.png" "http://127.0.0.1:4173/${route}.html"
+          done
+          "$PRIVACY_CHROME_BIN" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=1600 --window-size=430,932 --force-prefers-reduced-motion=reduce --screenshot=/tmp/privacy-visual-proof/screens/home-430-reduced-motion.png http://127.0.0.1:4173/
+          printf '{"sha":"%s","capturedAt":"%s","homeViewports":[375,430,768,1024,1440],"interiorRoutes":["rights","governance","status"],"reducedMotion":true}\n' "$CANDIDATE_SHA" "$(date -u +%FT%TZ)" > /tmp/privacy-visual-proof/manifest.json
+
+      - name: Prove tracked source remained clean
+        if: always()
+        run: test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Upload exact-head visual proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: urai-privacy-visual-proof-${{ env.CANDIDATE_SHA }}
+          path: /tmp/privacy-visual-proof/
+          if-no-files-found: error
+          retention-days: 90
