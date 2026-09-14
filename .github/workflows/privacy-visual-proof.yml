@@ -22,9 +22,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ env.CANDIDATE_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
 
       - name: Prove exact clean candidate
         run: |
@@ -82,7 +84,7 @@ jobs:
 
       - name: Upload exact-head visual proof
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: urai-privacy-visual-proof-${{ env.CANDIDATE_SHA }}
           path: /tmp/privacy-visual-proof/
