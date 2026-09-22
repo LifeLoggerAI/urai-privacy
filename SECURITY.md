@@ -4,16 +4,13 @@ URAI Privacy governs sensitive data-handling rules for the URAI ecosystem. Secur
 
 ## Reporting Security or Privacy Issues
 
-Please report security or privacy concerns to:
+The intended private URAI security/privacy mailboxes are not yet independently verified for delivery. Until a private route is activated, do not send vulnerability details, credentials, exploit payloads, private user data, biometric data, or specific privacy-rights material through public forms or public GitHub issues.
 
-- privacy@urai.app
-- security@urai.app
-
-Do not open a public GitHub issue for vulnerabilities, exposed secrets, authentication bypasses, sensitive data exposure, or privacy-impacting incidents.
+The current public security/privacy contact state is published at https://uraiprivacy.com/contact.html.
 
 ## High-Risk Report Categories
 
-Report privately if the issue involves:
+A private reporting route is required for issues involving:
 
 - unauthorized access to user data
 - admin access misuse
@@ -38,8 +35,8 @@ URAI uses the S0-S4 incident model from `docs/INCIDENT_RESPONSE.md` and `sops/IN
 
 ## Response Expectations
 
-URAI should acknowledge credible reports promptly, preserve evidence, contain affected systems, and follow the incident response lifecycle when user privacy may be affected.
+Once the private reporting route is active, URAI should acknowledge credible reports promptly, preserve evidence, contain affected systems, and follow the incident response lifecycle when user privacy may be affected.
 
 ## Public Disclosure
 
-Please do not publicly disclose vulnerabilities until URAI has had a reasonable opportunity to investigate, contain, and remediate the issue.
+Please do not publicly disclose vulnerabilities before a private reporting route is available and URAI has had a reasonable opportunity to investigate, contain, and remediate the issue.
