@@ -154,7 +154,7 @@ REQUIRED_TERMS = {
     "website/rights.html": ["User rights", "Data export", "Consent Revocation", "./styles.css"],
     "website/governance.html": ["The repo is built to be enforceable", "Policy registry", "Release gate", "./styles.css"],
     "website/legal.html": ["Legal notices", "Privacy policy", "Data-sharing notice", "qualified counsel"],
-    "website/contact.html": ["Contact", "privacy@urai.app", "security@urai.app", "Do not post sensitive data publicly"],
+    "website/contact.html": ["Contact", "pending verification", "Do not post sensitive data publicly"],
     "website/status.html": ["Status", "Operational governance draft", "Launch blockers to clear"],
     "website/404.html": ["Page not found", "Return home", "Report a broken link"],
     "website/styles.css": ["--accent", "site-header", "card-grid", "site-footer", "focus-visible", "prefers-reduced-motion"],
