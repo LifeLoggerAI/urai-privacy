@@ -6,11 +6,11 @@ This repo governs privacy, consent, data rights, retention, deletion, export, an
 
 - https://uraiprivacy.com
 
-## Primary Contacts
+## Current Contact State
 
-- Privacy: privacy@urai.app
-- Security: security@urai.app
-- General URAI: hello@urai.app
+Public mailbox delivery for the intended URAI privacy/security addresses is not yet independently verified. Do not rely on those addresses until this document is updated with provider-backed delivery evidence.
+
+For non-sensitive governance/documentation questions, use the public repository issue tracker.
 
 ## What to Open as a GitHub Issue
 
@@ -37,7 +37,7 @@ Do not open public GitHub issues for:
 - specific user-rights requests
 - sensitive operational incidents
 
-Use the private contact routes above instead.
+A private privacy/security reporting route remains a launch gate and must be published only after delivery is independently verified.
 
 ## Legal Notice
 
