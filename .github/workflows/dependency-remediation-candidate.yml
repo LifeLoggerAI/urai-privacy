@@ -150,7 +150,7 @@ jobs:
           name: urai-privacy-dependency-remediation-${{ env.TARGET_SHA }}-${{ github.run_id }}
           path: artifacts/dependency-remediation
           if-no-files-found: error
-          retention-days: 365
+          retention-days: 90
 
       - name: Remove generated remediation evidence
         if: always()
