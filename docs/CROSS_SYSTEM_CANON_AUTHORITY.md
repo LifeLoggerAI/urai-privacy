@@ -42,4 +42,4 @@ If runtime conflicts with product canon because runtime is defective, record a d
 
 ## Required adoption action
 
-After upstream PR #102 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
+After upstream PR #107 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
