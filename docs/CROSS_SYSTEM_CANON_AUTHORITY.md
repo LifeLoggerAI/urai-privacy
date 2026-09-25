@@ -8,7 +8,7 @@ Repository role: **privacy, consent and trust control plane**
 
 Cross-system canon candidate:
 - Repository: `LifeLoggerAI/urai-labs-llc`
-- PR: `#102`
+- PR: `#107`
 - Canon path: `docs/canon/`
 
 Until that PR is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider or exact-head evidence between repositories.
