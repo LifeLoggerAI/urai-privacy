@@ -1,8 +1,8 @@
 # Export Contributor Registry
 
-Registry version: `1.0.0`
+Registry version: `1.1.0`
 
-Status: implemented, not deployed.
+Status: implemented source-level registry, not deployed.
 
 The registry is defined in `functions/src/export-contributor-registry.ts`.
 
@@ -10,9 +10,22 @@ The registry is defined in `functions/src/export-contributor-registry.ts`.
 
 `urai-privacy-firestore` is the only active contributor. It covers the user profile and the user-scoped privacy collections listed by the local export contract.
 
-## Pending contributors
+## Registered pending contributor
 
-The following systems are recorded as pending and are not counted as complete:
+`urai-communications` now has a versioned source contract registered centrally.
+
+- schema version: `1.0.0`
+- source contract owner: `LifeLoggerAI/urai-communications`
+- current central status: `pending`
+- reason: `SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED`
+
+The registered source contract covers the Communications export surface currently declared by its privacy lifecycle, including users, provider connections, call records and nested scores, audit evidence, notification preferences, delivery/campaign records, job reconciliation records, legal holds, and privacy-operation records.
+
+This registration is **not** an activation or production certification. It prevents central Privacy from treating Communications as an unknown/unregistered data source while still failing closed until authenticated protected-staging and end-to-end evidence exists.
+
+## Other pending contributors
+
+The following systems remain unregistered/pending and are not counted as complete:
 
 - urai-spatial
 - urai-studio
@@ -20,9 +33,6 @@ The following systems are recorded as pending and are not counted as complete:
 - urai-content
 - urai-jobs
 - asset-factory
-- urai-communications
-
-Each pending entry uses the reason `CONTRIBUTOR_NOT_INTEGRATED`.
 
 ## Completion meaning
 
@@ -42,3 +52,5 @@ A pending contributor may become active only after it has:
 6. an explicit failure result that prevents false completion;
 7. staging and end-to-end evidence;
 8. export, deletion, retention, and revocation mappings.
+
+Communications now satisfies the first registration step only. The remaining promotion requirements are still open and must be proven with exact-head and protected-runtime receipts.
