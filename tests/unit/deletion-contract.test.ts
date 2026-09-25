@@ -20,14 +20,15 @@ function makeManifest(): DeletionManifest {
       adapterId: entry.id,
       system: entry.system,
       status: entry.status,
-      itemCount: entry.status === "active" ? 0 : null
+      itemCount: entry.status === "active" ? 0 : null,
+      reason: "reason" in entry ? entry.reason : undefined
     }))
   };
 }
 
 describe("deletion manifest safeguards", () => {
   it("uses a versioned manifest and opaque subject hash", () => {
-    expect(DELETION_MANIFEST_VERSION).toBe("1.0.0");
+    expect(DELETION_MANIFEST_VERSION).toBe("1.1.0");
     expect(deletionSubjectHash("example-user")).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -35,6 +36,19 @@ describe("deletion manifest safeguards", () => {
     const value = makeManifest();
     expect(canExecuteDeletion(value)).toBe(false);
     expect(deletionExecutionBlockers(value)).toContain("PENDING_ADAPTERS");
+  });
+
+  it("registers Communications deletion source contract without activating it", () => {
+    const communications = DELETION_ADAPTERS.find((entry) => entry.id === "urai-communications");
+    expect(communications?.status).toBe("pending");
+    expect("schemaVersion" in (communications ?? {})).toBe(true);
+    if (communications && "schemaVersion" in communications) {
+      expect(communications.schemaVersion).toBe("1.0.0");
+      expect(communications.operations).toEqual(["delete", "tenant_delete", "retention_purge"]);
+      expect(communications.reason).toBe(
+        "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
+      );
+    }
   });
 
   it("blocks under a legal hold", () => {
