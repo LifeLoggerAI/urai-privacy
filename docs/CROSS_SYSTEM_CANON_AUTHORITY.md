@@ -1,17 +1,21 @@
 # UrAi Cross-System Canon Authority
 
-Status: ADOPTION CANDIDATE — becomes binding cross-system authority only after the upstream Labs canon PR is legitimately merged.
+Status: ADOPTION CANDIDATE — becomes binding cross-system authority only after the current main-target Labs canon PR is legitimately merged.
 
 Repository role: **privacy, consent and trust control plane**
 
 ## Upstream authority
 
-Cross-system canon candidate:
+Current downstream mainline canon candidate:
 - Repository: `LifeLoggerAI/urai-labs-llc`
-- PR: `#107`
+- PR: `#102`
 - Canon path: `docs/canon/`
 
-Until that PR is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider or exact-head evidence between repositories.
+Labs #102 is the current main-target consolidated canon candidate. Labs #107 is a sibling rebase on the Labs convergence branch and does not replace #102 as downstream mainline authority.
+
+Until #102 is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider, legal, financial, Gold-Master, runtime, or exact-head evidence between repositories.
+
+Authority regression guard: closed/superseded Labs #101 or sibling #107 must not replace #102 as downstream mainline authority unless #102 is explicitly superseded by a newer main-target canon PR.
 
 ## Local invariants
 
@@ -42,4 +46,4 @@ If runtime conflicts with product canon because runtime is defective, record a d
 
 ## Required adoption action
 
-After upstream PR #107 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
+After upstream PR #102 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
