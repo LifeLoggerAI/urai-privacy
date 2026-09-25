@@ -60,9 +60,9 @@ jobs:
         shell: bash
         run: |
           set +e
-          npm audit fix --package-lock-only --omit=dev > artifacts/dependency-remediation/root-fix.log 2>&1
+          npm audit fix --package-lock-only > artifacts/dependency-remediation/root-fix.log 2>&1
           root_fix_status=$?
-          npm --prefix functions audit fix --package-lock-only --omit=dev > artifacts/dependency-remediation/functions-fix.log 2>&1
+          npm --prefix functions audit fix --package-lock-only > artifacts/dependency-remediation/functions-fix.log 2>&1
           functions_fix_status=$?
           printf '%s\n' "$root_fix_status" > artifacts/dependency-remediation/root-fix-exit.txt
           printf '%s\n' "$functions_fix_status" > artifacts/dependency-remediation/functions-fix-exit.txt
