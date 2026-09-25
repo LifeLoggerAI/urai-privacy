@@ -1,6 +1,6 @@
 import { EXPORT_SOURCES } from "./export-contract";
 
-export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.0.0";
+export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.1.0";
 
 export type ExportContributorStatus = "active" | "pending";
 
@@ -12,6 +12,26 @@ export type ExportContributor = {
   sourceCollections: readonly string[];
   reason?: string;
 };
+
+export const COMMUNICATIONS_EXPORT_SOURCE_COLLECTIONS = [
+  "users",
+  "providerConnections",
+  "rawCallEvents",
+  "calls",
+  "calls/{callId}/scores",
+  "auditEntries",
+  "notificationPreferences",
+  "deliveryLogs",
+  "deliveryStatusEvents",
+  "campaignTemplates",
+  "campaignEvents",
+  "reviewQueue",
+  "jobExecutionReceipts",
+  "jobDeliveryBindings",
+  "jobExecutionReconciliationEvents",
+  "legalHolds",
+  "privacyOperations"
+] as const;
 
 export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
   {
@@ -73,9 +93,9 @@ export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
     id: "urai-communications",
     system: "urai-communications",
     status: "pending",
-    schemaVersion: "unregistered",
-    sourceCollections: [],
-    reason: "CONTRIBUTOR_NOT_INTEGRATED"
+    schemaVersion: "1.0.0",
+    sourceCollections: COMMUNICATIONS_EXPORT_SOURCE_COLLECTIONS,
+    reason: "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
   }
 ] as const;
 
@@ -96,6 +116,8 @@ export function exportContributorSummary() {
     pendingContributors: pending.map((entry) => ({
       id: entry.id,
       system: entry.system,
+      schemaVersion: entry.schemaVersion,
+      sourceCollections: [...entry.sourceCollections],
       reason: entry.reason
     }))
   };
