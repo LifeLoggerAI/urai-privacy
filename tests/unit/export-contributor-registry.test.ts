@@ -3,12 +3,13 @@ import {
   COMMUNICATIONS_EXPORT_SOURCE_COLLECTIONS,
   EXPORT_CONTRIBUTORS,
   EXPORT_CONTRIBUTOR_REGISTRY_VERSION,
+  JOBS_DATA_RIGHTS_REQUEST_COLLECTIONS,
   exportContributorSummary
 } from "../../functions/src/export-contributor-registry";
 
 describe("export contributor registry", () => {
   it("is versioned and has one active local contributor", () => {
-    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.1.0");
+    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.2.0");
     expect(EXPORT_CONTRIBUTORS.filter((entry) => entry.status === "active")).toHaveLength(1);
     expect(EXPORT_CONTRIBUTORS.find((entry) => entry.status === "active")?.id).toBe(
       "urai-privacy-firestore"
@@ -39,5 +40,16 @@ describe("export contributor registry", () => {
     expect(communications?.sourceCollections).toEqual(COMMUNICATIONS_EXPORT_SOURCE_COLLECTIONS);
     expect(communications?.sourceCollections).toContain("calls/{callId}/scores");
     expect(communications?.sourceCollections).toContain("privacyOperations");
+  });
+
+  it("registers Jobs request-control-plane contract without claiming export execution", () => {
+    const jobs = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-jobs");
+    expect(jobs?.status).toBe("pending");
+    expect(jobs?.schemaVersion).toBe("1.0.0");
+    expect(jobs?.reason).toBe(
+      "REQUEST_CONTROL_PLANE_REGISTERED_EXPORT_DELETE_EXECUTION_HARD_OFF"
+    );
+    expect(jobs?.sourceCollections).toEqual(JOBS_DATA_RIGHTS_REQUEST_COLLECTIONS);
+    expect(jobs?.sourceCollections).toContain("dataRightsRequests");
   });
 });
