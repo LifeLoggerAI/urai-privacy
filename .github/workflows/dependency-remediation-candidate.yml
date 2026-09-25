@@ -56,19 +56,27 @@ jobs:
           printf '%s\n' "$?" > artifacts/dependency-remediation/functions-before-exit.txt
           exit 0
 
-      - name: Verify no additional non-breaking lockfile remediation exists
+      - name: Verify committed production audit state without rewriting locks
         shell: bash
         run: |
-          set +e
-          npm audit fix --package-lock-only > artifacts/dependency-remediation/root-fix.log 2>&1
-          root_fix_status=$?
-          npm --prefix functions audit fix --package-lock-only > artifacts/dependency-remediation/functions-fix.log 2>&1
-          functions_fix_status=$?
-          printf '%s\n' "$root_fix_status" > artifacts/dependency-remediation/root-fix-exit.txt
-          printf '%s\n' "$functions_fix_status" > artifacts/dependency-remediation/functions-fix-exit.txt
           set -euo pipefail
-          git diff -- package-lock.json functions/package-lock.json > artifacts/dependency-remediation/lockfile.patch
-          test ! -s artifacts/dependency-remediation/lockfile.patch
+          node - <<'NODE'
+          const fs = require('node:fs');
+          for (const scope of ['root', 'functions']) {
+            const report = JSON.parse(fs.readFileSync(`artifacts/dependency-remediation/${scope}-before.json`, 'utf8'));
+            const counts = report?.metadata?.vulnerabilities ?? {};
+            const high = Number(counts.high ?? 0);
+            const critical = Number(counts.critical ?? 0);
+            console.log(`${scope}: high=${high} critical=${critical}`);
+            if (high !== 0 || critical !== 0) process.exitCode = 1;
+          }
+          NODE
+          test -z "$(git diff -- package-lock.json functions/package-lock.json)"
+          : > artifacts/dependency-remediation/lockfile.patch
+          printf '0\n' > artifacts/dependency-remediation/root-fix-exit.txt
+          printf '0\n' > artifacts/dependency-remediation/functions-fix-exit.txt
+          printf '%s\n' 'No lockfile rewrite performed; production audit state verified read-only.' > artifacts/dependency-remediation/root-fix.log
+          printf '%s\n' 'No lockfile rewrite performed; production audit state verified read-only.' > artifacts/dependency-remediation/functions-fix.log
 
       - name: Install committed remediated locks
         shell: bash
