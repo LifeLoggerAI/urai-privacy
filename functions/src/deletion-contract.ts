@@ -43,7 +43,8 @@ export const DELETION_ADAPTERS = [
   { id: "urai-content", system: "urai-content", status: "pending" },
   { id: "urai-jobs", system: "urai-jobs", status: "pending" },
   { id: "asset-factory", system: "asset-factory", status: "pending" },
-  { id: "urai-communications", system: "urai-communications", status: "pending" }
+  { id: "urai-communications", system: "urai-communications", status: "pending" },
+  { id: "b2b-portal", system: "b2b-portal", status: "pending" }
 ] as const;
 
 export function deletionSubjectHash(uid: string) {
