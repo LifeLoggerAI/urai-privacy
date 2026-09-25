@@ -42,4 +42,4 @@ If URAI offers user participation, revenue, or benefit tracking, the system shou
 
 ## Contact
 
-Privacy contact: privacy@urai.app
+Private privacy contact route: pending independent delivery verification. Do not submit sensitive material through public channels until activated.

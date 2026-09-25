@@ -2,69 +2,66 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>URAI Privacy</title>
-  <meta name="description" content="URAI Privacy is the public governance layer for privacy, consent, data rights, and data-use enforcement across the URAI ecosystem." />
-  <meta property="og:title" content="URAI Privacy" />
-  <meta property="og:description" content="Privacy rules the whole URAI ecosystem must obey." />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>URAI Privacy — See what URAI knows. Control what happens next.</title>
+  <meta name="description" content="Inspect data, purpose, authorized systems, retention, provider use, exports, and deletion from one human-readable control surface." />
+  <meta property="og:title" content="URAI Privacy — See what URAI knows. Control what happens next." />
+  <meta property="og:description" content="Data, purpose, systems, retention, providers, and user control made legible." />
   <meta property="og:url" content="https://uraiprivacy.com/" />
   <meta property="og:type" content="website" />
   <link rel="canonical" href="https://uraiprivacy.com/" />
   <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./control.css" />
 </head>
-<body>
+<body class="privacy-control-home">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <nav class="nav" aria-label="Primary navigation">
       <a class="brand" href="./index.html"><span class="brand-mark" aria-hidden="true"></span><span>URAI Privacy</span></a>
-      <div class="nav-links">
-        <a href="./principles.html">Principles</a>
-        <a href="./rights.html">User rights</a>
-        <a href="./governance.html">Governance</a>
-        <a href="./legal.html">Legal</a>
-        <a href="./contact.html">Contact</a>
-        <a href="./status.html">Status</a>
-      </div>
+      <div class="nav-links"><a href="./principles.html">Principles</a><a href="./rights.html">User rights</a><a href="./governance.html">Governance</a><a href="./legal.html">Legal</a><a href="./contact.html">Contact</a><a href="./status.html">Status</a></div>
     </nav>
   </header>
   <main id="main">
-    <section class="hero">
-      <div class="eyebrow">URAI Privacy</div>
-      <h1>Privacy rules the whole URAI ecosystem must obey.</h1>
-      <p class="lede">URAI Privacy is the public governance layer for consent, data classification, retention, deletion, export, anonymization, audit logging, incident response, and data-sharing enforcement across URAI.</p>
-      <div class="actions">
-        <a class="button primary" href="https://github.com/LifeLoggerAI/urai-privacy">View governance repo</a>
-        <a class="button" href="./governance.html">How governance works</a>
-        <a class="button" href="./rights.html">User rights</a>
+    <section class="privacy-hero" aria-labelledby="privacy-title">
+      <div>
+        <div class="eyebrow">Privacy · consent · control</div>
+        <h1 id="privacy-title">See what URAI knows. Control what happens next.</h1>
+        <p class="lede">Inspect data, purpose, authorized systems, retention, provider use, exports, and deletion from one human-readable control surface.</p>
+        <div class="trust-actions"><a class="button primary" href="./rights.html">Understand your rights</a><a class="button" href="./governance.html">How enforcement works</a><a class="button" href="./status.html">Current status</a></div>
+        <p class="privacy-role"><strong>Privacy rules the whole URAI ecosystem must obey.</strong> URAI Privacy governs consent, data use, retention, export, deletion, and enforcement. The in-app Privacy Controls surface remains the place where an authenticated person changes their own settings.</p>
+      </div>
+      <div class="control-map" aria-label="Data-use control path">
+        <div class="control-step"><span>01</span><div><strong>DATA</strong><small>What category of information is involved?</small></div><em>CLASSIFY</em></div>
+        <div class="control-step"><span>02</span><div><strong>PURPOSE</strong><small>Why is this information being used?</small></div><em>EXPLAIN</em></div>
+        <div class="control-step"><span>03</span><div><strong>AUTHORIZED SYSTEMS</strong><small>Which registered systems may use it for that purpose?</small></div><em>LIMIT</em></div>
+        <div class="control-step"><span>04</span><div><strong>RETENTION</strong><small>How long may the information or derived result remain?</small></div><em>BOUND</em></div>
+        <div class="control-step"><span>05</span><div><strong>PROVIDERS</strong><small>Does an external processor receive any part of it?</small></div><em>DISCLOSE</em></div>
+        <div class="control-step"><span>06</span><div><strong>USER CONTROL</strong><small>Inspect, revoke, export, delete, or understand the consequence.</small></div><em>CONTROL</em></div>
       </div>
     </section>
-    <section class="card-grid" aria-label="Privacy governance pillars">
-      <div class="card"><h3>Consent first</h3><p>Granular, revocable consent tiers for sensitive inference, biometrics, personalization, location, and anonymized data-sharing.</p></div>
-      <div class="card"><h3>User rights</h3><p>Export, deletion, revocation, explanation, and privacy-history controls are treated as product requirements.</p></div>
-      <div class="card"><h3>Enforceable policy</h3><p>Machine-readable registries, JSON Schemas, and CI checks define data classes, consent tiers, retention classes, audit events, and blocked uses.</p></div>
-      <div class="card"><h3>No silent escalation</h3><p>URAI features must not expand collection, inference, sharing, monetization, or retention without renewed review and consent.</p></div>
-    </section>
-    <section class="section">
-      <div class="kicker">What this repo contains</div>
-      <h2>A public operating layer for privacy.</h2>
-      <div class="card-grid">
-        <div class="card"><h3>Policy registries</h3><p>Canonical data classes, consent tiers, retention classes, audit events, and blocked data uses.</p></div>
-        <div class="card"><h3>Implementation contracts</h3><p>Firestore schema, API contract, adoption JSON Schemas, examples, and reusable validation scripts.</p></div>
-        <div class="card"><h3>Operating playbooks</h3><p>Lifecycle diagrams and SOPs for consent, deletion, export, incident response, admin access, and audits.</p></div>
-        <div class="card"><h3>Public notices</h3><p>Legal notice templates for privacy policy, biometrics, AI inference, data-sharing, minors, cookies, and user rights.</p></div>
+
+    <section class="privacy-section" aria-labelledby="controls-title">
+      <div class="kicker">Human-readable controls</div><h2 id="controls-title">A permission is not meaningful unless you can understand its consequence.</h2>
+      <div class="privacy-grid">
+        <article class="privacy-card"><span>CONSENT</span><h3>What did I agree to?</h3><p>Consent is granular, purpose-bound, revocable where applicable, and separate from vague acceptance of a whole ecosystem.</p></article>
+        <article class="privacy-card"><span>ACCESS</span><h3>Which systems can use it?</h3><p>Authorized systems should be named by role and purpose instead of hidden behind a generic “partners” label.</p></article>
+        <article class="privacy-card"><span>RETENTION</span><h3>How long does it remain?</h3><p>Retention classes and deletion behavior are explicit enough to explain what ends immediately and what requires durable processing.</p></article>
+        <article class="privacy-card"><span>EXPORT</span><h3>Can I take my information with me?</h3><p>Export is treated as a real product right with request, processing, completion, expiration, and failure states.</p></article>
+        <article class="privacy-card"><span>DELETE</span><h3>What disappears if I delete?</h3><p>Destructive flows explain scope, downstream consequences, irreversible boundaries, and any legally required retained records before confirmation.</p></article>
+        <article class="privacy-card"><span>EVIDENCE</span><h3>How do I know the control worked?</h3><p>Privacy-relevant actions produce inspectable status and audit evidence rather than disappearing behind a success toast.</p></article>
       </div>
     </section>
-    <section class="section warning callout">
-      <h2>Operational draft status</h2>
-      <p>URAI Privacy is built as a governance and enforcement package. Public legal templates and regulatory mappings still require qualified legal review before production launch.</p>
-      <p><a class="button" href="./status.html">Review launch status</a></p>
-    </section>
+
+    <section class="privacy-band"><div class="privacy-section" aria-labelledby="permission-title"><div class="kicker">Permission classes</div><h2 id="permission-title">Automation changes its behavior as consequence rises.</h2><div class="permission-table" role="list">
+      <div class="permission-row" role="listitem"><strong>SILENT_AUTO</strong><span>Low-risk processing already covered by an explicit valid grant. Activity remains inspectable where appropriate.</span></div>
+      <div class="permission-row" role="listitem"><strong>REVERSIBLE_AUTO</strong><span>Automation may proceed only with a clear undo, cancellation, or rollback path.</span></div>
+      <div class="permission-row" role="listitem"><strong>ASK_FIRST</strong><span>The action waits for explicit confirmation with purpose and consequence explained.</span></div>
+      <div class="permission-row" role="listitem"><strong>STRONG_CONFIRMATION</strong><span>Consequential action requires higher-friction confirmation and a clear description of what cannot be undone.</span></div>
+      <div class="permission-row" role="listitem"><strong>NEVER_AUTONOMOUS</strong><span>URAI may prepare or explain, but execution remains with the authorized human.</span></div>
+    </div></div></section>
+
+    <section class="privacy-section" aria-labelledby="rights-title"><div class="kicker">Rights and enforcement</div><h2 id="rights-title">Control has to survive the happy path.</h2><p class="lede">Revoked grants, delayed exports, deletion failures, provider outages, stale evidence, and policy blocks are privacy states—not generic errors. The governance package defines the rules; product surfaces must expose truthful status without silently escalating access.</p><div class="trust-actions"><a class="button primary" href="./rights.html">Review user rights</a><a class="button" href="./principles.html">Privacy principles</a><a class="button" href="https://github.com/LifeLoggerAI/urai-privacy">Inspect governance source</a></div><div class="status-boundary"><strong>Release boundary.</strong> Public legal templates and regulatory mappings still require qualified legal review before production launch. Source implementation and source-green checks do not by themselves prove protected deployment or legal sufficiency.</div></section>
   </main>
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <span>uraiprivacy.com · Repository: LifeLoggerAI/urai-privacy</span>
-      <a href="https://github.com/LifeLoggerAI/urai-privacy/blob/main/docs/GOVERNANCE_INDEX.md">Governance index</a>
-    </div>
-  </footer>
+  <footer class="site-footer"><div class="footer-inner"><span>uraiprivacy.com · Privacy governance and enforcement for URAI</span><a href="https://github.com/LifeLoggerAI/urai-privacy/blob/main/docs/GOVERNANCE_INDEX.md">Governance index</a></div></footer>
 </body>
 </html>

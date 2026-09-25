@@ -2,7 +2,7 @@
 
 Status: `RETAINED PREVIEW SOURCE — NOT ACTIVE — NOT DEPLOYED`
 
-Manifest version: `1.0.0`
+Manifest version: `1.2.0`
 
 ## Authority boundary
 
@@ -25,11 +25,27 @@ The retained dry-run implementation:
 
 Its execute mode requires a current dry-run hash and still fails closed. The local destructive executor is source-only and has no active callable path.
 
-## Registered adapters
+## Registered downstream boundaries
 
-Local definitions exist for URAI Privacy Firestore, URAI Privacy Storage, and Firebase Auth.
+### urai-communications
 
-The following adapters remain pending and therefore block execution:
+`urai-communications` has a centrally registered deletion-source contract at schema version `1.0.0` for `delete`, `tenant_delete`, and `retention_purge`.
+
+It remains **pending** with reason `SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED`.
+
+### urai-jobs
+
+`urai-jobs` now has a centrally registered data-rights request/control-plane contract at schema version `1.0.0`.
+
+The currently registered deletion operation is only `request_delete`.
+
+It remains **pending** with reason `REQUEST_CONTROL_PLANE_REGISTERED_DELETE_EXECUTION_HARD_OFF`.
+
+Jobs can accept and track an authenticated deletion request, but central Privacy must continue treating actual downstream deletion/anonymization execution as unavailable until the governed worker, retention/legal rules, provider propagation, protected staging E2E, and recovery/deployment receipts exist.
+
+## Pending execution blockers
+
+The following adapters remain pending and therefore block complete ecosystem deletion execution:
 
 - urai-spatial;
 - urai-studio;
