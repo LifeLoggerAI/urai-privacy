@@ -11,6 +11,8 @@ Cross-system canon candidate:
 - PR: `#107`
 - Canon path: `docs/canon/`
 
+Labs #102 targets `main` and is the current downstream mainline canon candidate. Labs #107 is a sibling rebase onto the Labs convergence branch and does not replace #102 as downstream authority.
+
 Until that PR is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider or exact-head evidence between repositories.
 
 ## Local invariants
@@ -42,4 +44,4 @@ If runtime conflicts with product canon because runtime is defective, record a d
 
 ## Required adoption action
 
-After upstream PR #107 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
+After upstream PR #102 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
