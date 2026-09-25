@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.1.0";
+export const DELETION_MANIFEST_VERSION = "1.2.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -41,7 +41,14 @@ export const DELETION_ADAPTERS = [
   { id: "urai-studio", system: "urai-studio", status: "pending" },
   { id: "urai-analytics", system: "urai-analytics", status: "pending" },
   { id: "urai-content", system: "urai-content", status: "pending" },
-  { id: "urai-jobs", system: "urai-jobs", status: "pending" },
+  {
+    id: "urai-jobs",
+    system: "urai-jobs",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["request_delete"] as const,
+    reason: "REQUEST_CONTROL_PLANE_REGISTERED_DELETE_EXECUTION_HARD_OFF"
+  },
   { id: "asset-factory", system: "asset-factory", status: "pending" },
   {
     id: "urai-communications",
