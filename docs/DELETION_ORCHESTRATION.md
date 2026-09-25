@@ -2,7 +2,7 @@
 
 Status: `RETAINED PREVIEW SOURCE — NOT ACTIVE — NOT DEPLOYED`
 
-Manifest version: `1.0.0`
+Manifest version: `1.1.0`
 
 ## Authority boundary
 
@@ -28,6 +28,10 @@ Its execute mode requires a current dry-run hash and still fails closed. The loc
 ## Registered adapters
 
 Local definitions exist for URAI Privacy Firestore, URAI Privacy Storage, and Firebase Auth.
+
+`urai-communications` now has a centrally registered deletion-source contract at schema version `1.0.0` for the Communications lifecycle operations `delete`, `tenant_delete`, and `retention_purge`.
+
+It remains **pending** with reason `SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED`. Registration means Privacy can identify the downstream contract; it does not mean deletion is active, deployed, or certified.
 
 The following adapters remain pending and therefore block execution:
 
