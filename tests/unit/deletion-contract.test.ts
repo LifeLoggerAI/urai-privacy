@@ -28,7 +28,7 @@ function makeManifest(): DeletionManifest {
 
 describe("deletion manifest safeguards", () => {
   it("uses a versioned manifest and opaque subject hash", () => {
-    expect(DELETION_MANIFEST_VERSION).toBe("1.1.0");
+    expect(DELETION_MANIFEST_VERSION).toBe("1.2.0");
     expect(deletionSubjectHash("example-user")).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -47,6 +47,19 @@ describe("deletion manifest safeguards", () => {
       expect(communications.operations).toEqual(["delete", "tenant_delete", "retention_purge"]);
       expect(communications.reason).toBe(
         "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
+      );
+    }
+  });
+
+  it("registers Jobs deletion request intake while execution stays hard-off", () => {
+    const jobs = DELETION_ADAPTERS.find((entry) => entry.id === "urai-jobs");
+    expect(jobs?.status).toBe("pending");
+    expect("schemaVersion" in (jobs ?? {})).toBe(true);
+    if (jobs && "schemaVersion" in jobs) {
+      expect(jobs.schemaVersion).toBe("1.0.0");
+      expect(jobs.operations).toEqual(["request_delete"]);
+      expect(jobs.reason).toBe(
+        "REQUEST_CONTROL_PLANE_REGISTERED_DELETE_EXECUTION_HARD_OFF"
       );
     }
   });
