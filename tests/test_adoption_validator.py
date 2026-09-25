@@ -53,6 +53,41 @@ class AdoptionValidatorIntegrationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("L4 requires C4", result.stdout)
 
+    def test_additional_known_consent_purposes_are_allowed_without_weakening_primary_class_tier(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            product_repo = self.make_product_repo(Path(tmpdir))
+            manifest = product_repo / "privacy" / "feature-manifests" / "mood-weather.privacy.yaml"
+            text = manifest.read_text(encoding="utf-8")
+            text = text.replace(
+                "consentTier: C2\n      retentionClass: R1",
+                "consentTier: C2\n      requiredConsentPurposes:\n        - location.context\n      retentionClass: R1",
+                1,
+            )
+            manifest.write_text(text, encoding="utf-8")
+            result = self.run_validator(product_repo)
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("[repo-privacy] OK", result.stdout)
+
+    def test_unknown_additional_consent_purpose_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            product_repo = self.make_product_repo(Path(tmpdir))
+            manifest = product_repo / "privacy" / "feature-manifests" / "mood-weather.privacy.yaml"
+            text = manifest.read_text(encoding="utf-8")
+            text = text.replace(
+                "consentTier: C2\n      retentionClass: R1",
+                "consentTier: C2\n      requiredConsentPurposes:\n        - location.magic\n      retentionClass: R1",
+                1,
+            )
+            manifest.write_text(text, encoding="utf-8")
+            result = self.run_validator(product_repo)
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertTrue(
+            "not one of" in result.stdout or "unknown requiredConsentPurposes" in result.stdout,
+            result.stdout,
+        )
+
     def test_missing_privacy_version_fails_fast(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             product_repo = self.make_product_repo(Path(tmpdir))
