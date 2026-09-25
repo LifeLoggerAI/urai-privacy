@@ -76,6 +76,14 @@ export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
     schemaVersion: "unregistered",
     sourceCollections: [],
     reason: "CONTRIBUTOR_NOT_INTEGRATED"
+  },
+  {
+    id: "b2b-portal",
+    system: "b2b-portal",
+    status: "pending",
+    schemaVersion: "unregistered",
+    sourceCollections: [],
+    reason: "CONTRIBUTOR_NOT_INTEGRATED"
   }
 ] as const;
 
