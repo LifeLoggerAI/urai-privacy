@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.1.0`
+Registry version: `1.2.0`
 
 Status: implemented source-level registry, not deployed.
 
@@ -10,9 +10,11 @@ The registry is defined in `functions/src/export-contributor-registry.ts`.
 
 `urai-privacy-firestore` is the only active contributor. It covers the user profile and the user-scoped privacy collections listed by the local export contract.
 
-## Registered pending contributor
+## Registered pending contributors
 
-`urai-communications` now has a versioned source contract registered centrally.
+### urai-communications
+
+`urai-communications` has a versioned source contract registered centrally.
 
 - schema version: `1.0.0`
 - source contract owner: `LifeLoggerAI/urai-communications`
@@ -21,7 +23,21 @@ The registry is defined in `functions/src/export-contributor-registry.ts`.
 
 The registered source contract covers the Communications export surface currently declared by its privacy lifecycle, including users, provider connections, call records and nested scores, audit evidence, notification preferences, delivery/campaign records, job reconciliation records, legal holds, and privacy-operation records.
 
-This registration is **not** an activation or production certification. It prevents central Privacy from treating Communications as an unknown/unregistered data source while still failing closed until authenticated protected-staging and end-to-end evidence exists.
+This registration is **not** activation or production certification.
+
+### urai-jobs
+
+`urai-jobs` now has a versioned request/control-plane contract registered centrally.
+
+- schema version: `1.0.0`
+- source contract owner: `LifeLoggerAI/urai-jobs`
+- current central status: `pending`
+- reason: `REQUEST_CONTROL_PLANE_REGISTERED_EXPORT_DELETE_EXECUTION_HARD_OFF`
+- registered request records: `dataRightsRequests` and request audit subcollections
+
+Jobs currently proves authenticated export/deletion request intake, owner-scoped request readback, admin/operator listing, server-only request/audit records, and an explicit `HARD_OFF_PENDING_GOVERNED_WORKER` execution state.
+
+This is deliberately **not** treated as an active export contributor. Export package generation, governed delete/anonymize execution, provider propagation, protected staging E2E, recovery evidence, legal/privacy review, and deployment/rollback receipts remain required.
 
 ## Other pending contributors
 
@@ -31,7 +47,6 @@ The following systems remain unregistered/pending and are not counted as complet
 - urai-studio
 - urai-analytics
 - urai-content
-- urai-jobs
 - asset-factory
 
 ## Completion meaning
@@ -53,4 +68,4 @@ A pending contributor may become active only after it has:
 7. staging and end-to-end evidence;
 8. export, deletion, retention, and revocation mappings.
 
-Communications now satisfies the first registration step only. The remaining promotion requirements are still open and must be proven with exact-head and protected-runtime receipts.
+Communications has central source-contract registration but still requires runtime proof. Jobs currently has only a request/control-plane contract and remains hard-off for export/delete execution.
