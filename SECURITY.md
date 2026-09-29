@@ -4,13 +4,19 @@ URAI Privacy governs sensitive data-handling rules for the URAI ecosystem. Secur
 
 ## Reporting Security or Privacy Issues
 
-The intended private URAI security/privacy mailboxes are not yet independently verified for delivery. Until a private route is activated, do not send vulnerability details, credentials, exploit payloads, private user data, biometric data, or specific privacy-rights material through public forms or public GitHub issues.
+Verified private routing is available through the URAI Labs mail domain:
 
-The current public security/privacy contact state is published at https://uraiprivacy.com/contact.html.
+- Security: security@urailabs.com
+- Privacy / user rights: privacy@urailabs.com
+- General account support: support@urailabs.com
+
+Routing was verified by controlled mailbox canary on 2026-09-29. The equivalent `@urai.app` role addresses are not launch-authoritative until separately proven.
+
+Do not send credentials, raw exploit payloads, private user datasets, biometric material, or other unnecessary sensitive content in an initial report. Provide the minimum information needed to establish the issue and coordinate a safer evidence-transfer path if required.
 
 ## High-Risk Report Categories
 
-A private reporting route is required for issues involving:
+Use the private reporting route for issues involving:
 
 - unauthorized access to user data
 - admin access misuse
@@ -35,8 +41,8 @@ URAI uses the S0-S4 incident model from `docs/INCIDENT_RESPONSE.md` and `sops/IN
 
 ## Response Expectations
 
-Once the private reporting route is active, URAI should acknowledge credible reports promptly, preserve evidence, contain affected systems, and follow the incident response lifecycle when user privacy may be affected.
+Mailbox delivery verification does not certify an SLA. Credible reports should be acknowledged promptly, evidence preserved, affected systems contained, and the incident response lifecycle followed when user privacy may be affected.
 
 ## Public Disclosure
 
-Please do not publicly disclose vulnerabilities before a private reporting route is available and URAI has had a reasonable opportunity to investigate, contain, and remediate the issue.
+Please do not publicly disclose vulnerabilities before URAI has had a reasonable opportunity to investigate, contain, and remediate the issue.
