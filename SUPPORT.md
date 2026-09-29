@@ -6,11 +6,20 @@ This repo governs privacy, consent, data rights, retention, deletion, export, an
 
 - https://uraiprivacy.com
 
-## Current Contact State
+## Verified Private Contact Routes
 
-Public mailbox delivery for the intended URAI privacy/security addresses is not yet independently verified. Do not rely on those addresses until this document is updated with provider-backed delivery evidence.
+Current internal routing canaries on 2026-09-29 were delivered to the monitored URAI Labs mailbox for:
 
-For non-sensitive governance/documentation questions, use the public repository issue tracker.
+- Privacy: privacy@urailabs.com
+- Security: security@urailabs.com
+- General support: support@urailabs.com
+- Accessibility: accessibility@urailabs.com
+- Press: press@urailabs.com
+- Investors: investors@urailabs.com
+
+The equivalent `@urai.app` role addresses are not launch-authoritative and must not be advertised until their routing is separately proven.
+
+Delivery proves mailbox routing only. It does not by itself certify response-time SLAs, legal sufficiency, incident-response maturity, or independent privacy approval.
 
 ## What to Open as a GitHub Issue
 
@@ -37,7 +46,7 @@ Do not open public GitHub issues for:
 - specific user-rights requests
 - sensitive operational incidents
 
-A private privacy/security reporting route remains a launch gate and must be published only after delivery is independently verified.
+Use the verified private mailboxes above for sensitive privacy/security contact. Never include secrets or unnecessary sensitive personal data in an initial report.
 
 ## Legal Notice
 
