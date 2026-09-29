@@ -8,7 +8,9 @@ This repo governs privacy, consent, data rights, retention, deletion, export, an
 
 ## Current Contact State
 
-Public mailbox delivery for the intended URAI privacy/security addresses is not yet independently verified. Do not rely on those addresses until this document is updated with provider-backed delivery evidence.
+Fresh controlled delivery canaries on 2026-09-29 verified the Labs-domain launch routes `privacy@urailabs.com` and `security@urailabs.com`. Equivalent `@urai.app` role aliases are not launch authority until they receive their own provider-backed delivery receipt.
+
+Use `privacy@urailabs.com` for private privacy-rights intake and `security@urailabs.com` for private vulnerability or incident reporting. Delivery verification proves routing only; ownership, escalation, response-time commitments, identity verification, and request completion remain separate controls.
 
 For non-sensitive governance/documentation questions, use the public repository issue tracker.
 
@@ -37,7 +39,7 @@ Do not open public GitHub issues for:
 - specific user-rights requests
 - sensitive operational incidents
 
-A private privacy/security reporting route remains a launch gate and must be published only after delivery is independently verified.
+Private privacy/security reporting is now published through the verified Labs-domain role mailboxes. Do not publish or rely on replacement aliases until equivalent delivery and ownership evidence exists.
 
 ## Legal Notice
 
