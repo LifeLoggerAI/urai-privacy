@@ -6,9 +6,9 @@ This repo governs privacy, consent, data rights, retention, deletion, export, an
 
 - https://uraiprivacy.com
 
-## Verified Private Contact Routes
+## Operational Private Contact Routes
 
-Current internal routing canaries on 2026-09-29 were delivered to the monitored URAI Labs mailbox for:
+Controlled routing canaries were sent on 2026-09-29 to these URAI Labs role addresses, and no matching delivery-failure notice was found after the routing repair:
 
 - Privacy: privacy@urailabs.com
 - Security: security@urailabs.com
@@ -19,7 +19,7 @@ Current internal routing canaries on 2026-09-29 were delivered to the monitored 
 
 The equivalent `@urai.app` role addresses are not launch-authoritative and must not be advertised until their routing is separately proven.
 
-Delivery proves mailbox routing only. It does not by itself certify response-time SLAs, legal sufficiency, incident-response maturity, or independent privacy approval.
+The canary evidence proves that the post-repair sends did not generate a matching failure notice in the connected mailbox; the connector does not expose Delivered-To/INBOX evidence for those canary copies, so independent inbound delivery is not claimed. This also does not certify response-time SLAs, legal sufficiency, incident-response maturity, or independent privacy approval.
 
 ## What to Open as a GitHub Issue
 
@@ -46,7 +46,7 @@ Do not open public GitHub issues for:
 - specific user-rights requests
 - sensitive operational incidents
 
-Use the verified private mailboxes above for sensitive privacy/security contact. Never include secrets or unnecessary sensitive personal data in an initial report.
+Use the private routes above for sensitive privacy/security contact, and require an acknowledgement before treating a report as received. Never include secrets or unnecessary sensitive personal data in an initial report.
 
 ## Legal Notice
 
