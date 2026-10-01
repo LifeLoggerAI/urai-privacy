@@ -49,4 +49,4 @@ Summarize changes to privacy governance, consent tiers, retention rules, website
 
 ## Contact
 
-Private privacy contact route: pending independent delivery verification. Do not submit sensitive material through public channels until activated.
+Verified private privacy contact: privacy@urailabs.com. For security issues use security@urailabs.com. Send only the minimum sensitive detail needed in the initial report.
