@@ -34,4 +34,4 @@ Users should be able to manage non-essential storage choices, revoke applicable 
 
 ## Contact
 
-Private privacy contact route: pending independent delivery verification. Do not submit sensitive material through public channels until activated.
+Verified private privacy contact: privacy@urailabs.com. For security issues use security@urailabs.com. Send only the minimum sensitive detail needed in the initial report.
