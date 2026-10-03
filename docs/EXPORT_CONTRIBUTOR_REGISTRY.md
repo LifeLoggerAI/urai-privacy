@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.2.0`
+Registry version: `1.3.0`
 
 Status: implemented source-level registry, not deployed.
 
@@ -39,6 +39,21 @@ Jobs currently proves authenticated export/deletion request intake, owner-scoped
 
 This is deliberately **not** treated as an active export contributor. Export package generation, governed delete/anonymize execution, provider propagation, protected staging E2E, recovery evidence, legal/privacy review, and deployment/rollback receipts remain required.
 
+### asset-factory
+
+`asset-factory` now has a versioned source/control-plane contract registered centrally.
+
+- schema version: `1.0.0`
+- source contract owner: `LifeLoggerAI/asset-factory`
+- export collections: `assetFactoryJobs`, `assetFactoryAssets`, `assetFactoryUsage`
+- deletion boundary: authenticated tenant-admin request recorded as `account.deletion_requested`
+- current central status: `pending`
+- reason: `EXPORT_REGISTERED_DELETE_REQUEST_ONLY_PROTECTED_STAGING_E2E_REQUIRED`
+
+Asset Factory's protected account export is real and tenant-scoped. Its deletion route records a request for operator review and intentionally does not destroy tenant data automatically. It therefore remains pending until governed destructive execution, retention/legal checks, and protected staging E2E evidence exist.
+
+This registration is **not** destructive-delete certification.
+
 ## Other pending contributors
 
 The following systems remain unregistered/pending and are not counted as complete:
@@ -47,7 +62,6 @@ The following systems remain unregistered/pending and are not counted as complet
 - urai-studio
 - urai-analytics
 - urai-content
-- asset-factory
 
 ## Completion meaning
 
