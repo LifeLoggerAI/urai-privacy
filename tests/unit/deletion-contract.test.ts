@@ -28,7 +28,7 @@ function makeManifest(): DeletionManifest {
 
 describe("deletion manifest safeguards", () => {
   it("uses a versioned manifest and opaque subject hash", () => {
-    expect(DELETION_MANIFEST_VERSION).toBe("1.2.0");
+    expect(DELETION_MANIFEST_VERSION).toBe("1.3.0");
     expect(deletionSubjectHash("example-user")).toMatch(/^[a-f0-9]{64}$/);
   });
 
