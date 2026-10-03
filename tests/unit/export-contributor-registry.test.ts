@@ -14,7 +14,7 @@ import {
 
 describe("export contributor registry", () => {
   it("is versioned and has one active local contributor", () => {
-    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.5.0");
+    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.6.0");
     expect(EXPORT_CONTRIBUTORS.filter((entry) => entry.status === "active")).toHaveLength(1);
     expect(EXPORT_CONTRIBUTORS.find((entry) => entry.status === "active")?.id).toBe(
       "urai-privacy-firestore"
@@ -97,7 +97,7 @@ describe("export contributor registry", () => {
 
     const analytics = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-analytics");
     expect(analytics?.status).toBe("pending");
-    expect(analytics?.reason).toBe("COLLECTION_CONTRACT_REGISTERED_LIFECYCLE_PROPAGATION_NOT_IMPLEMENTED");
+    expect(analytics?.reason).toBe("SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED");
     expect(analytics?.sourceCollections).toEqual(ANALYTICS_EXPORT_SOURCE_COLLECTIONS);
   });
 });
