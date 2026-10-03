@@ -31,6 +31,7 @@ SCHEMA_DIR = ROOT / "schemas"
 DATA_CLASSES = {"L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7"}
 CONSENT_TIERS = {"C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"}
 RETENTION_CLASSES = {"R0", "R1", "R2", "R3", "R4", "R5", "R6"}
+CONSENT_PURPOSES = {"memory.storage", "behavior.passive-context", "location.context", "inference.sensitive", "biometric.identity", "ai.personalization", "data.export", "data.monetization.anonymized"}
 GOVERNANCE_VERSION = "0.1.0-draft"
 
 
@@ -73,6 +74,7 @@ def validate_field(path: Path, field: dict) -> list[str]:
     data_class = field.get("dataClass")
     consent_tier = field.get("consentTier")
     retention_class = field.get("retentionClass")
+    required_purposes = field.get("requiredConsentPurposes") or []
 
     if data_class not in DATA_CLASSES:
         errors.append(f"{path}: {name} has unknown dataClass {data_class}")
@@ -80,6 +82,12 @@ def validate_field(path: Path, field: dict) -> list[str]:
         errors.append(f"{path}: {name} has unknown consentTier {consent_tier}")
     if retention_class not in RETENTION_CLASSES:
         errors.append(f"{path}: {name} has unknown retentionClass {retention_class}")
+    if not isinstance(required_purposes, list):
+        errors.append(f"{path}: {name} requiredConsentPurposes must be a list")
+    else:
+        unknown_purposes = sorted(set(required_purposes) - CONSENT_PURPOSES)
+        if unknown_purposes:
+            errors.append(f"{path}: {name} has unknown requiredConsentPurposes {unknown_purposes}")
 
     required_by_class = {
         "L1": "C0",
