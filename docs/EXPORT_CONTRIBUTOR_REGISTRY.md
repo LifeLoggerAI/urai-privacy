@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.5.0`
+Registry version: `1.6.0`
 
 Status: implemented source-level registry, not deployed.
 
@@ -35,7 +35,7 @@ This registration is **not** activation or production certification.
 
 ### urai-analytics
 
-`urai-analytics` declares user-scoped collection contracts for passive signals and derived outputs, but its exact candidate still states that retention, deletion, consent-revocation, and export propagation are not implemented. The registry therefore records the inventory while keeping Analytics pending for implementation, not merely staging proof.
+`urai-analytics` now implements signed service-only export/delete endpoints over its declared user-scoped collections, with deterministic export checksums, exact-snapshot deletion confirmation, legal-hold blocking, allowlisted deletion, post-delete verification, and deletion receipts. Privacy now has a signed contributor adapter; export packaging can include Analytics records/checksum, and deletion dry-run inventory can bind the Analytics checksum/count. Analytics remains pending until protected staging proves the configured service identity, transport, Firestore execution, receipt readback, and central deletion execution boundary.
 
 ### urai-content
 
