@@ -1,6 +1,6 @@
 import { EXPORT_SOURCES } from "./export-contract";
 
-export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.3.0";
+export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.4.0";
 
 export type ExportContributorStatus = "active" | "pending";
 
@@ -44,6 +44,21 @@ export const ASSET_FACTORY_EXPORT_SOURCE_COLLECTIONS = [
   "assetFactoryUsage"
 ] as const;
 
+export const CONTENT_EXPORT_SOURCE_COLLECTIONS = [
+  "contentItems",
+  "contentVersions",
+  "moderationQueue",
+  "publishingReleases",
+  "telemetryEvents",
+  "userContentEntitlements",
+  "narratorPrompts",
+  "storyTemplates",
+  "ritualTemplates",
+  "marketplaceItems",
+  "creatorSubmissions",
+  "exportTemplates"
+] as const;
+
 export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
   {
     id: "urai-privacy-firestore",
@@ -80,9 +95,9 @@ export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
     id: "urai-content",
     system: "urai-content",
     status: "pending",
-    schemaVersion: "unregistered",
-    sourceCollections: [],
-    reason: "CONTRIBUTOR_NOT_INTEGRATED"
+    schemaVersion: "1.0.0",
+    sourceCollections: CONTENT_EXPORT_SOURCE_COLLECTIONS,
+    reason: "SOURCE_LIFECYCLE_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
   },
   {
     id: "urai-jobs",
