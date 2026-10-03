@@ -3,6 +3,7 @@ import {
   canExecuteDeletion,
   DELETION_ADAPTERS,
   DELETION_MANIFEST_VERSION,
+  deletionAdapterSummary,
   deletionExecutionBlockers,
   deletionManifestHash,
   deletionSubjectHash,
@@ -92,5 +93,20 @@ describe("deletion manifest safeguards", () => {
   it("changes failure state at the configured attempt ceiling", () => {
     expect(nextDeletionFailureState(1)).toBe("retry_wait");
     expect(nextDeletionFailureState(5)).toBe("dead_letter");
+  });
+  it("reports pending adapter readiness without promoting request-only deletion", () => {
+    const summary = deletionAdapterSummary();
+    expect(summary.manifestVersion).toBe("1.3.0");
+    expect(summary.executableCrossSystemDelete).toBe(false);
+    expect(summary.pendingAdapters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "asset-factory",
+        reason: "DELETE_REQUEST_RECORDED_MANUAL_REVIEW_EXECUTION_PENDING"
+      }),
+      expect.objectContaining({
+        id: "urai-communications",
+        reason: "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
+      })
+    ]));
   });
 });
