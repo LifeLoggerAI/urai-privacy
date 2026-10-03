@@ -42,4 +42,4 @@ If URAI offers user participation, revenue, or benefit tracking, the system shou
 
 ## Contact
 
-Private privacy contact route: pending independent delivery verification. Do not submit sensitive material through public channels until activated.
+Operational private privacy contact: privacy@urailabs.com. For security issues use security@urailabs.com. Post-repair canaries produced no matching delivery-failure notice, but independent inbound delivery is not claimed; require acknowledgement and send only the minimum sensitive detail needed in the initial report.

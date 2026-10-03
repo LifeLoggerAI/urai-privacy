@@ -14,12 +14,44 @@ const grantedMemory = {
   expiresAt: "2026-08-06T12:00:00.000Z"
 };
 
+const grantedPublicGood = {
+  purpose: "research.public-good.aggregate",
+  consentTier: "C8",
+  status: "granted",
+  policyVersion: CONSENT_DECISION_POLICY_VERSION,
+  expiresAt: "2026-08-06T12:00:00.000Z"
+};
+
 describe("canonical consent decision engine", () => {
   it("allows only an exact current grant", () => {
     expect(evaluateConsentDecision({ purpose: "memory.storage", record: grantedMemory, now })).toMatchObject({
       allowed: true,
       reason: "ALLOWED",
       requiredTier: "C1"
+    });
+  });
+
+  it("allows explicit public-good aggregate research consent", () => {
+    expect(evaluateConsentDecision({
+      purpose: "research.public-good.aggregate",
+      record: grantedPublicGood,
+      now
+    })).toMatchObject({
+      allowed: true,
+      reason: "ALLOWED",
+      requiredTier: "C8"
+    });
+  });
+
+  it("does not let public-good research consent authorize anonymized monetization", () => {
+    expect(evaluateConsentDecision({
+      purpose: "data.monetization.anonymized",
+      record: grantedPublicGood,
+      now
+    })).toMatchObject({
+      allowed: false,
+      reason: "PURPOSE_MISMATCH",
+      requiredTier: "C8"
     });
   });
 
