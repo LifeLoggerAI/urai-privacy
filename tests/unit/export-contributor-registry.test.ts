@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ASSET_FACTORY_EXPORT_SOURCE_COLLECTIONS,
   COMMUNICATIONS_EXPORT_SOURCE_COLLECTIONS,
   EXPORT_CONTRIBUTORS,
   EXPORT_CONTRIBUTOR_REGISTRY_VERSION,
@@ -9,7 +10,7 @@ import {
 
 describe("export contributor registry", () => {
   it("is versioned and has one active local contributor", () => {
-    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.2.0");
+    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.3.0");
     expect(EXPORT_CONTRIBUTORS.filter((entry) => entry.status === "active")).toHaveLength(1);
     expect(EXPORT_CONTRIBUTORS.find((entry) => entry.status === "active")?.id).toBe(
       "urai-privacy-firestore"
@@ -51,5 +52,19 @@ describe("export contributor registry", () => {
     );
     expect(jobs?.sourceCollections).toEqual(JOBS_DATA_RIGHTS_REQUEST_COLLECTIONS);
     expect(jobs?.sourceCollections).toContain("dataRightsRequests");
+  });
+  it("registers Asset Factory export and deletion-request control plane without claiming destructive execution", () => {
+    const assetFactory = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "asset-factory");
+    expect(assetFactory?.status).toBe("pending");
+    expect(assetFactory?.schemaVersion).toBe("1.0.0");
+    expect(assetFactory?.reason).toBe(
+      "EXPORT_REGISTERED_DELETE_REQUEST_ONLY_PROTECTED_STAGING_E2E_REQUIRED"
+    );
+    expect(assetFactory?.sourceCollections).toEqual(ASSET_FACTORY_EXPORT_SOURCE_COLLECTIONS);
+    expect(assetFactory?.sourceCollections).toEqual([
+      "assetFactoryJobs",
+      "assetFactoryAssets",
+      "assetFactoryUsage"
+    ]);
   });
 });
