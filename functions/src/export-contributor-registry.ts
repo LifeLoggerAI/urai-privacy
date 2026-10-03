@@ -1,6 +1,6 @@
 import { EXPORT_SOURCES } from "./export-contract";
 
-export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.5.0";
+export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.6.0";
 
 export type ExportContributorStatus = "active" | "pending";
 
@@ -123,7 +123,7 @@ export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
     status: "pending",
     schemaVersion: "system-of-systems-v1",
     sourceCollections: ANALYTICS_EXPORT_SOURCE_COLLECTIONS,
-    reason: "COLLECTION_CONTRACT_REGISTERED_LIFECYCLE_PROPAGATION_NOT_IMPLEMENTED"
+    reason: "SIGNED_DATA_RIGHTS_ADAPTER_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
   },
   {
     id: "urai-content",
