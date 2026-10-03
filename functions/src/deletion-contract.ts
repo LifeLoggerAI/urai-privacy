@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.2.0";
+export const DELETION_MANIFEST_VERSION = "1.3.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -49,7 +49,14 @@ export const DELETION_ADAPTERS = [
     operations: ["request_delete"] as const,
     reason: "REQUEST_CONTROL_PLANE_REGISTERED_DELETE_EXECUTION_HARD_OFF"
   },
-  { id: "asset-factory", system: "asset-factory", status: "pending" },
+  {
+    id: "asset-factory",
+    system: "asset-factory",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["request_delete"] as const,
+    reason: "DELETE_REQUEST_RECORDED_MANUAL_REVIEW_EXECUTION_PENDING"
+  },
   {
     id: "urai-communications",
     system: "urai-communications",
