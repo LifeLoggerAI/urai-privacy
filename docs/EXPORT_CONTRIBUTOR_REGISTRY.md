@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.6.0`
+Registry version: `1.7.0`
 
 Status: implemented source-level registry, not deployed.
 
@@ -31,7 +31,17 @@ This registration is **not** activation or production certification.
 
 ### urai-studio
 
-`urai-studio` has a versioned `0.1.0` tenant-scoped runtime contract with `studioProjects`, `studioBriefs`, `studioJobs`, `studioAssets`, and `studioExports`, plus consent/retention requirements and Passport flags for data export/deletion. It remains pending because a complete export/delete execution lifecycle is not proven.
+`urai-studio` now has a green exact-head governed data-rights successor.
+
+- schema version: `data-rights-v1`
+- source contract owner: `LifeLoggerAI/urai-studio` PR #138
+- export scope includes the owner profile plus Studio projects/scenes/assets/jobs/collections/scrolls/scripts/subtitles/voiceover/export/audit/XR/VR and tenant-runtime records
+- source lifecycle includes private checksum-bound export packages, owner request readback, a bounded restore/cancel window, admin legal-hold guard, verified deletion backup, admin-only purge execution, immutable purge receipt, and server-only control-plane collections
+- Firebase Auth deletion remains owned by central Privacy
+- current central status: `pending`
+- reason: `SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED`
+
+This is **source-lifecycle completion, not production deletion certification**. Protected staging execution, private artifact readback, rollback/recovery evidence, central orchestration, and production authorization remain required before activation.
 
 ### urai-analytics
 
