@@ -106,3 +106,19 @@ export function canExecuteDeletion(value: DeletionManifest) {
 export function nextDeletionFailureState(attempt: number): DeletionExecutionState {
   return attempt >= DELETION_MAX_ATTEMPTS ? "dead_letter" : "retry_wait";
 }
+
+
+export function deletionAdapterSummary() {
+  const active = DELETION_ADAPTERS.filter((adapter) => adapter.status === "active");
+  const pending = DELETION_ADAPTERS.filter((adapter) => adapter.status === "pending");
+  return {
+    manifestVersion: DELETION_MANIFEST_VERSION,
+    activeAdapters: active.map((adapter) => ({ id: adapter.id, system: adapter.system })),
+    pendingAdapters: pending.map((adapter) => ({
+      id: adapter.id,
+      system: adapter.system,
+      reason: "reason" in adapter ? adapter.reason : "CONTRIBUTOR_NOT_INTEGRATED"
+    })),
+    executableCrossSystemDelete: pending.length === 0
+  };
+}
