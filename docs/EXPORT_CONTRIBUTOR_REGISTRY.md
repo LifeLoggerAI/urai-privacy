@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.5.0`
+Registry version: `1.6.0`
 
 Status: implemented source-level registry, not deployed.
 
@@ -35,7 +35,7 @@ This registration is **not** activation or production certification.
 
 ### urai-analytics
 
-`urai-analytics` declares user-scoped collection contracts for passive signals and derived outputs, but its exact candidate still states that retention, deletion, consent-revocation, and export propagation are not implemented. The registry therefore records the inventory while keeping Analytics pending for implementation, not merely staging proof.
+`urai-analytics` now has a green exact-head data-rights successor with owner-scoped export/delete over its declared collections, deterministic export/deletion checksums, exact-snapshot confirmation, allowlisted deletion, legal-hold fail-closed behavior, post-delete verification, and explicit service scopes. The central registry therefore records the source lifecycle as implemented while keeping Analytics pending until protected staging/live execution, central orchestration, and production-lock evidence exist.
 
 ### urai-content
 
