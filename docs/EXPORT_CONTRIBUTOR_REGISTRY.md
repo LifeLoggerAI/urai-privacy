@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.4.0`
+Registry version: `1.5.0`
 
 Status: implemented source-level registry, not deployed.
 
@@ -24,6 +24,18 @@ The registry is defined in `functions/src/export-contributor-registry.ts`.
 The registered source contract covers the Communications export surface currently declared by its privacy lifecycle, including users, provider connections, call records and nested scores, audit evidence, notification preferences, delivery/campaign records, job reconciliation records, legal holds, and privacy-operation records.
 
 This registration is **not** activation or production certification.
+
+### urai-spatial
+
+`urai-spatial` has a deterministic source planner for export, account-linked deletion, and biometric/voice deletion across its mapped user-data collections. The central registry records that collection contract but keeps Spatial pending until a protected worker actually executes the plan with idempotency, retries, partial-failure handling, audit receipts, and staging E2E.
+
+### urai-studio
+
+`urai-studio` has a versioned `0.1.0` tenant-scoped runtime contract with `studioProjects`, `studioBriefs`, `studioJobs`, `studioAssets`, and `studioExports`, plus consent/retention requirements and Passport flags for data export/deletion. It remains pending because a complete export/delete execution lifecycle is not proven.
+
+### urai-analytics
+
+`urai-analytics` declares user-scoped collection contracts for passive signals and derived outputs, but its exact candidate still states that retention, deletion, consent-revocation, and export propagation are not implemented. The registry therefore records the inventory while keeping Analytics pending for implementation, not merely staging proof.
 
 ### urai-content
 
@@ -71,9 +83,6 @@ This registration is **not** destructive-delete certification.
 
 The following systems remain unregistered/pending and are not counted as complete:
 
-- urai-spatial
-- urai-studio
-- urai-analytics
 
 ## Completion meaning
 

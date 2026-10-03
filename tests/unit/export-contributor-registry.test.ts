@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   ASSET_FACTORY_EXPORT_SOURCE_COLLECTIONS,
+  ANALYTICS_EXPORT_SOURCE_COLLECTIONS,
   CONTENT_EXPORT_SOURCE_COLLECTIONS,
+  SPATIAL_EXPORT_SOURCE_COLLECTIONS,
+  STUDIO_EXPORT_SOURCE_COLLECTIONS,
   COMMUNICATIONS_EXPORT_SOURCE_COLLECTIONS,
   EXPORT_CONTRIBUTORS,
   EXPORT_CONTRIBUTOR_REGISTRY_VERSION,
@@ -11,7 +14,7 @@ import {
 
 describe("export contributor registry", () => {
   it("is versioned and has one active local contributor", () => {
-    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.4.0");
+    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.5.0");
     expect(EXPORT_CONTRIBUTORS.filter((entry) => entry.status === "active")).toHaveLength(1);
     expect(EXPORT_CONTRIBUTORS.find((entry) => entry.status === "active")?.id).toBe(
       "urai-privacy-firestore"
@@ -77,5 +80,24 @@ describe("export contributor registry", () => {
     expect(content?.sourceCollections).toContain("contentItems");
     expect(content?.sourceCollections).toContain("creatorSubmissions");
     expect(content?.sourceCollections).toContain("exportTemplates");
+  });
+  it("registers Spatial Studio and Analytics source contracts without claiming runtime completion", () => {
+    const spatial = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-spatial");
+    expect(spatial?.status).toBe("pending");
+    expect(spatial?.reason).toBe("SOURCE_JOB_PLANNER_REGISTERED_PRODUCTION_WORKER_E2E_REQUIRED");
+    expect(spatial?.sourceCollections).toEqual(SPATIAL_EXPORT_SOURCE_COLLECTIONS);
+    expect(spatial?.sourceCollections).toContain("voiceEvents");
+    expect(spatial?.sourceCollections).toContain("companionState");
+
+    const studio = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-studio");
+    expect(studio?.status).toBe("pending");
+    expect(studio?.schemaVersion).toBe("0.1.0");
+    expect(studio?.reason).toBe("TENANT_RUNTIME_COLLECTIONS_REGISTERED_EXPORT_DELETE_EXECUTION_NOT_PROVEN");
+    expect(studio?.sourceCollections).toEqual(STUDIO_EXPORT_SOURCE_COLLECTIONS);
+
+    const analytics = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-analytics");
+    expect(analytics?.status).toBe("pending");
+    expect(analytics?.reason).toBe("COLLECTION_CONTRACT_REGISTERED_LIFECYCLE_PROPAGATION_NOT_IMPLEMENTED");
+    expect(analytics?.sourceCollections).toEqual(ANALYTICS_EXPORT_SOURCE_COLLECTIONS);
   });
 });

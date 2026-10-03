@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.4.0";
+export const DELETION_MANIFEST_VERSION = "1.5.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -37,9 +37,28 @@ export const DELETION_ADAPTERS = [
   { id: "urai-privacy-firestore", system: "urai-privacy", status: "active" },
   { id: "urai-privacy-storage", system: "urai-privacy", status: "active" },
   { id: "firebase-auth", system: "firebase-auth", status: "active" },
-  { id: "urai-spatial", system: "urai-spatial", status: "pending" },
-  { id: "urai-studio", system: "urai-studio", status: "pending" },
-  { id: "urai-analytics", system: "urai-analytics", status: "pending" },
+  {
+    id: "urai-spatial",
+    system: "urai-spatial",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["source_plan_delete", "source_plan_delete_biometric"] as const,
+    reason: "DETERMINISTIC_DELETE_PLANNER_REGISTERED_PRODUCTION_WORKER_E2E_REQUIRED"
+  },
+  {
+    id: "urai-studio",
+    system: "urai-studio",
+    status: "pending",
+    schemaVersion: "0.1.0",
+    reason: "DELETION_FLOW_FLAG_REGISTERED_EXECUTION_NOT_PROVEN"
+  },
+  {
+    id: "urai-analytics",
+    system: "urai-analytics",
+    status: "pending",
+    schemaVersion: "system-of-systems-v1",
+    reason: "RETENTION_DELETION_EXPORT_PROPAGATION_NOT_IMPLEMENTED"
+  },
   {
     id: "urai-content",
     system: "urai-content",

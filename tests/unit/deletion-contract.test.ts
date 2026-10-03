@@ -29,7 +29,7 @@ function makeManifest(): DeletionManifest {
 
 describe("deletion manifest safeguards", () => {
   it("uses a versioned manifest and opaque subject hash", () => {
-    expect(DELETION_MANIFEST_VERSION).toBe("1.4.0");
+    expect(DELETION_MANIFEST_VERSION).toBe("1.5.0");
     expect(deletionSubjectHash("example-user")).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -96,7 +96,7 @@ describe("deletion manifest safeguards", () => {
   });
   it("reports pending adapter readiness without promoting request-only deletion", () => {
     const summary = deletionAdapterSummary();
-    expect(summary.manifestVersion).toBe("1.4.0");
+    expect(summary.manifestVersion).toBe("1.5.0");
     expect(summary.executableCrossSystemDelete).toBe(false);
     expect(summary.pendingAdapters).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -106,6 +106,18 @@ describe("deletion manifest safeguards", () => {
       expect.objectContaining({
         id: "urai-content",
         reason: "TOMBSTONE_RESTORE_PROVIDER_RECEIPT_PURGE_SOURCE_REGISTERED_RUNTIME_E2E_PENDING"
+      }),
+      expect.objectContaining({
+        id: "urai-spatial",
+        reason: "DETERMINISTIC_DELETE_PLANNER_REGISTERED_PRODUCTION_WORKER_E2E_REQUIRED"
+      }),
+      expect.objectContaining({
+        id: "urai-studio",
+        reason: "DELETION_FLOW_FLAG_REGISTERED_EXECUTION_NOT_PROVEN"
+      }),
+      expect.objectContaining({
+        id: "urai-analytics",
+        reason: "RETENTION_DELETION_EXPORT_PROPAGATION_NOT_IMPLEMENTED"
       }),
       expect.objectContaining({
         id: "urai-communications",
