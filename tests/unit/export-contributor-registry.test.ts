@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ASSET_FACTORY_EXPORT_SOURCE_COLLECTIONS,
+  CONTENT_EXPORT_SOURCE_COLLECTIONS,
   COMMUNICATIONS_EXPORT_SOURCE_COLLECTIONS,
   EXPORT_CONTRIBUTORS,
   EXPORT_CONTRIBUTOR_REGISTRY_VERSION,
@@ -10,7 +11,7 @@ import {
 
 describe("export contributor registry", () => {
   it("is versioned and has one active local contributor", () => {
-    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.3.0");
+    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.4.0");
     expect(EXPORT_CONTRIBUTORS.filter((entry) => entry.status === "active")).toHaveLength(1);
     expect(EXPORT_CONTRIBUTORS.find((entry) => entry.status === "active")?.id).toBe(
       "urai-privacy-firestore"
@@ -66,5 +67,15 @@ describe("export contributor registry", () => {
       "assetFactoryAssets",
       "assetFactoryUsage"
     ]);
+  });
+  it("registers Content source lifecycle without claiming deployed cross-system execution", () => {
+    const content = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-content");
+    expect(content?.status).toBe("pending");
+    expect(content?.schemaVersion).toBe("1.0.0");
+    expect(content?.reason).toBe("SOURCE_LIFECYCLE_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED");
+    expect(content?.sourceCollections).toEqual(CONTENT_EXPORT_SOURCE_COLLECTIONS);
+    expect(content?.sourceCollections).toContain("contentItems");
+    expect(content?.sourceCollections).toContain("creatorSubmissions");
+    expect(content?.sourceCollections).toContain("exportTemplates");
   });
 });

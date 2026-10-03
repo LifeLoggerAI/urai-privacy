@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.3.0`
+Registry version: `1.4.0`
 
 Status: implemented source-level registry, not deployed.
 
@@ -24,6 +24,19 @@ The registry is defined in `functions/src/export-contributor-registry.ts`.
 The registered source contract covers the Communications export surface currently declared by its privacy lifecycle, including users, provider connections, call records and nested scores, audit evidence, notification preferences, delivery/campaign records, job reconciliation records, legal holds, and privacy-operation records.
 
 This registration is **not** activation or production certification.
+
+### urai-content
+
+`urai-content` now has a versioned source/lifecycle contract registered centrally from the exact green Content successor.
+
+- schema version: `1.0.0`
+- source contract owner: `LifeLoggerAI/urai-content`
+- registered collections: `contentItems`, `contentVersions`, `moderationQueue`, `publishingReleases`, `telemetryEvents`, `userContentEntitlements`, `narratorPrompts`, `storyTemplates`, `ritualTemplates`, `marketplaceItems`, `creatorSubmissions`, `exportTemplates`
+- deletion lifecycle source: bounded tombstone/restore window, verified backup receipt, provider-deletion receipts, purge readiness, immutable purge receipt
+- current central status: `pending`
+- reason: `SOURCE_LIFECYCLE_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED`
+
+This is **not** a claim that a deployed cross-system Content deletion worker, provider propagation callback, or protected staging purge run has completed. Those runtime receipts remain required before activation.
 
 ### urai-jobs
 
@@ -61,7 +74,6 @@ The following systems remain unregistered/pending and are not counted as complet
 - urai-spatial
 - urai-studio
 - urai-analytics
-- urai-content
 
 ## Completion meaning
 
