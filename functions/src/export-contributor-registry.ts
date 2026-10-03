@@ -1,6 +1,6 @@
 import { EXPORT_SOURCES } from "./export-contract";
 
-export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.6.0";
+export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.7.0";
 
 export type ExportContributorStatus = "active" | "pending";
 
@@ -78,10 +78,22 @@ export const SPATIAL_EXPORT_SOURCE_COLLECTIONS = [
 ] as const;
 
 export const STUDIO_EXPORT_SOURCE_COLLECTIONS = [
+  "users",
   "studioProjects",
+  "studioScenes",
+  "studioAssets",
+  "assetJobs",
+  "assetCollections",
+  "studioScrolls",
+  "narratorScripts",
+  "subtitles",
+  "voiceoverJobs",
+  "exportJobs",
+  "studioEvents",
+  "xrSessions",
+  "vrSessions",
   "studioBriefs",
   "studioJobs",
-  "studioAssets",
   "studioExports"
 ] as const;
 
@@ -113,9 +125,9 @@ export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
     id: "urai-studio",
     system: "urai-studio",
     status: "pending",
-    schemaVersion: "0.1.0",
+    schemaVersion: "data-rights-v1",
     sourceCollections: STUDIO_EXPORT_SOURCE_COLLECTIONS,
-    reason: "TENANT_RUNTIME_COLLECTIONS_REGISTERED_EXPORT_DELETE_EXECUTION_NOT_PROVEN"
+    reason: "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
   },
   {
     id: "urai-analytics",
