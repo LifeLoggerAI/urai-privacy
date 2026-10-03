@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.6.0";
+export const DELETION_MANIFEST_VERSION = "1.7.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -49,8 +49,9 @@ export const DELETION_ADAPTERS = [
     id: "urai-studio",
     system: "urai-studio",
     status: "pending",
-    schemaVersion: "0.1.0",
-    reason: "DELETION_FLOW_FLAG_REGISTERED_EXECUTION_NOT_PROVEN"
+    schemaVersion: "data-rights-v1",
+    operations: ["export", "delete", "restore_cancel", "legal_hold_guard", "verified_backup", "purge_receipt"] as const,
+    reason: "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
   },
   {
     id: "urai-analytics",
