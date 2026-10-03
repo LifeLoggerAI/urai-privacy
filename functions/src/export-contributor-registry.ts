@@ -1,6 +1,6 @@
 import { EXPORT_SOURCES } from "./export-contract";
 
-export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.2.0";
+export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.3.0";
 
 export type ExportContributorStatus = "active" | "pending";
 
@@ -36,6 +36,12 @@ export const COMMUNICATIONS_EXPORT_SOURCE_COLLECTIONS = [
 export const JOBS_DATA_RIGHTS_REQUEST_COLLECTIONS = [
   "dataRightsRequests",
   "dataRightsRequests/{requestId}/audit"
+] as const;
+
+export const ASSET_FACTORY_EXPORT_SOURCE_COLLECTIONS = [
+  "assetFactoryJobs",
+  "assetFactoryAssets",
+  "assetFactoryUsage"
 ] as const;
 
 export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
@@ -90,9 +96,9 @@ export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
     id: "asset-factory",
     system: "asset-factory",
     status: "pending",
-    schemaVersion: "unregistered",
-    sourceCollections: [],
-    reason: "CONTRIBUTOR_NOT_INTEGRATED"
+    schemaVersion: "1.0.0",
+    sourceCollections: ASSET_FACTORY_EXPORT_SOURCE_COLLECTIONS,
+    reason: "EXPORT_REGISTERED_DELETE_REQUEST_ONLY_PROTECTED_STAGING_E2E_REQUIRED"
   },
   {
     id: "urai-communications",
