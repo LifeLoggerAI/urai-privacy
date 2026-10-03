@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.3.0";
+export const DELETION_MANIFEST_VERSION = "1.4.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -40,7 +40,14 @@ export const DELETION_ADAPTERS = [
   { id: "urai-spatial", system: "urai-spatial", status: "pending" },
   { id: "urai-studio", system: "urai-studio", status: "pending" },
   { id: "urai-analytics", system: "urai-analytics", status: "pending" },
-  { id: "urai-content", system: "urai-content", status: "pending" },
+  {
+    id: "urai-content",
+    system: "urai-content",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["source_lifecycle_only"] as const,
+    reason: "TOMBSTONE_RESTORE_PROVIDER_RECEIPT_PURGE_SOURCE_REGISTERED_RUNTIME_E2E_PENDING"
+  },
   {
     id: "urai-jobs",
     system: "urai-jobs",
