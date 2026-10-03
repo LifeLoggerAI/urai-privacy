@@ -29,7 +29,7 @@ function makeManifest(): DeletionManifest {
 
 describe("deletion manifest safeguards", () => {
   it("uses a versioned manifest and opaque subject hash", () => {
-    expect(DELETION_MANIFEST_VERSION).toBe("1.3.0");
+    expect(DELETION_MANIFEST_VERSION).toBe("1.4.0");
     expect(deletionSubjectHash("example-user")).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -96,12 +96,16 @@ describe("deletion manifest safeguards", () => {
   });
   it("reports pending adapter readiness without promoting request-only deletion", () => {
     const summary = deletionAdapterSummary();
-    expect(summary.manifestVersion).toBe("1.3.0");
+    expect(summary.manifestVersion).toBe("1.4.0");
     expect(summary.executableCrossSystemDelete).toBe(false);
     expect(summary.pendingAdapters).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: "asset-factory",
         reason: "DELETE_REQUEST_RECORDED_MANUAL_REVIEW_EXECUTION_PENDING"
+      }),
+      expect.objectContaining({
+        id: "urai-content",
+        reason: "TOMBSTONE_RESTORE_PROVIDER_RECEIPT_PURGE_SOURCE_REGISTERED_RUNTIME_E2E_PENDING"
       }),
       expect.objectContaining({
         id: "urai-communications",
