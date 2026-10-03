@@ -14,7 +14,7 @@ import {
 
 describe("export contributor registry", () => {
   it("is versioned and has one active local contributor", () => {
-    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.6.0");
+    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.7.0");
     expect(EXPORT_CONTRIBUTORS.filter((entry) => entry.status === "active")).toHaveLength(1);
     expect(EXPORT_CONTRIBUTORS.find((entry) => entry.status === "active")?.id).toBe(
       "urai-privacy-firestore"
@@ -91,9 +91,14 @@ describe("export contributor registry", () => {
 
     const studio = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-studio");
     expect(studio?.status).toBe("pending");
-    expect(studio?.schemaVersion).toBe("0.1.0");
-    expect(studio?.reason).toBe("TENANT_RUNTIME_COLLECTIONS_REGISTERED_EXPORT_DELETE_EXECUTION_NOT_PROVEN");
+    expect(studio?.schemaVersion).toBe("data-rights-v1");
+    expect(studio?.reason).toBe("SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED");
     expect(studio?.sourceCollections).toEqual(STUDIO_EXPORT_SOURCE_COLLECTIONS);
+    expect(studio?.sourceCollections).toContain("users");
+    expect(studio?.sourceCollections).toContain("voiceoverJobs");
+    expect(studio?.sourceCollections).toContain("studioEvents");
+    expect(studio?.sourceCollections).toContain("xrSessions");
+    expect(studio?.sourceCollections).toContain("studioExports");
 
     const analytics = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-analytics");
     expect(analytics?.status).toBe("pending");
