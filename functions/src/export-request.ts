@@ -6,6 +6,7 @@ import { z } from "zod";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 import { EXPORT_PACKAGE_TTL_MS } from "./export-lifecycle-contract";
+import { analyticsContributorConfig, requestAnalyticsExport } from "./analytics-contributor";
 
 const exportCollections = [
   "users",
@@ -269,13 +270,60 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
 
   try {
     const exportData = await collectUserExport(claim.uid);
-    const exportFile = await writeJson(exportPath, { uid: claim.uid, requestId: claim.requestId, jobId, generatedAt: new Date().toISOString(), data: exportData.collections });
+    const analyticsConfig = analyticsContributorConfig();
+    const analytics = analyticsConfig
+      ? await requestAnalyticsExport({
+          config: analyticsConfig,
+          requestId: claim.requestId,
+          uid: claim.uid,
+          policyVersion: "urai-privacy-export-v1"
+        })
+      : null;
+    const includedContributors = analytics ? ["urai-analytics"] : [];
+    const pendingContributors = analytics ? [] : ["urai-analytics"];
+    const ecosystemComplete = pendingContributors.length === 0;
+    const contributorRecordCount = analytics?.records.length ?? 0;
+    const totalRecordCount = exportData.recordCount + contributorRecordCount;
+
+    const exportFile = await writeJson(exportPath, {
+      uid: claim.uid,
+      requestId: claim.requestId,
+      jobId,
+      generatedAt: new Date().toISOString(),
+      data: exportData.collections,
+      contributors: analytics
+        ? {
+            "urai-analytics": {
+              schemaVersion: analytics.schemaVersion,
+              exportChecksum: analytics.exportChecksum,
+              collectionCounts: analytics.collectionCounts,
+              records: analytics.records,
+              retention: analytics.retention
+            }
+          }
+        : {},
+      contributorCoverage: {
+        includedContributors,
+        pendingContributors,
+        ecosystemComplete
+      }
+    });
     const manifestFile = await writeJson(manifestPath, {
       uid: claim.uid,
       requestId: claim.requestId,
       jobId,
       generatedAt: new Date().toISOString(),
-      recordCount: exportData.recordCount,
+      recordCount: totalRecordCount,
+      localRecordCount: exportData.recordCount,
+      contributorRecordCount,
+      contributorCoverage: {
+        includedContributors,
+        pendingContributors,
+        ecosystemComplete
+      },
+      contributorReceipts: analytics
+        ? { "urai-analytics": { exportChecksum: analytics.exportChecksum, schemaVersion: analytics.schemaVersion } }
+        : {},
       files: [exportFile],
       excludedFieldMarkers: [...sensitiveFieldMarkers]
     });
@@ -301,7 +349,13 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         processingLeaseExpiresAt: FieldValue.delete(),
         exportManifestPath: manifestPath,
         exportPackagePath: exportPath,
-        recordCount: exportData.recordCount,
+        recordCount: totalRecordCount,
+        localRecordCount: exportData.recordCount,
+        contributorRecordCount,
+        includedContributors,
+        pendingContributors,
+        ecosystemComplete,
+        analyticsExportChecksum: analytics?.exportChecksum ?? null,
         manifestSha256: manifestFile.sha256,
         exportSha256: exportFile.sha256,
         artifactCleanupStatus: FieldValue.delete(),
@@ -325,9 +379,29 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       targetUid: claim.uid,
       requestId: claim.requestId,
       source: "function",
-      metadata: { jobId, recordCount: exportData.recordCount, manifestPath, exportPath }
+      metadata: {
+        jobId,
+        recordCount: totalRecordCount,
+        localRecordCount: exportData.recordCount,
+        contributorRecordCount,
+        includedContributors,
+        pendingContributors,
+        ecosystemComplete,
+        manifestPath,
+        exportPath
+      }
     });
-    return { jobId, status: "completed", auditId, manifestPath, exportPath, recordCount: exportData.recordCount };
+    return {
+      jobId,
+      status: "completed",
+      auditId,
+      manifestPath,
+      exportPath,
+      recordCount: totalRecordCount,
+      includedContributors,
+      pendingContributors,
+      ecosystemComplete
+    };
   } catch (error) {
     const cleanup = await removeExportArtifacts([exportPath, manifestPath], deleteExportArtifact);
     const cleanupStatus = cleanup.pendingPaths.length > 0 ? "incomplete" : "completed";
