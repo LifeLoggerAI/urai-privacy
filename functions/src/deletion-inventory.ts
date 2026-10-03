@@ -13,6 +13,7 @@ import {
   DELETION_RETENTION_RULES,
   deletionStoragePaths
 } from "./deletion-source-registry";
+import { analyticsContributorConfig, requestAnalyticsExport } from "./analytics-contributor";
 
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
@@ -71,9 +72,18 @@ export async function inventoryDeletionSubject(uid: string, requestId: string) {
       })
     )
   ) as Record<string, number>;
-  const [authExists, legalHold] = await Promise.all([
+  const analyticsConfig = analyticsContributorConfig();
+  const [authExists, legalHold, analyticsExport] = await Promise.all([
     authAccountExists(uid),
-    legalHoldStatus(uid)
+    legalHoldStatus(uid),
+    analyticsConfig
+      ? requestAnalyticsExport({
+          config: analyticsConfig,
+          requestId,
+          uid,
+          policyVersion: "urai-privacy-deletion-plan-v1"
+        })
+      : Promise.resolve(null)
   ]);
 
   const firestoreItemCount =
@@ -102,7 +112,9 @@ export async function inventoryDeletionSubject(uid: string, requestId: string) {
               ? authExists
                 ? 1
                 : 0
-              : null,
+              : adapter.id === "urai-analytics"
+                ? analyticsExport?.records.length ?? null
+                : null,
       reason: adapter.status === "pending" ? "ADAPTER_NOT_INTEGRATED" : undefined
     }))
   };
@@ -114,7 +126,22 @@ export async function inventoryDeletionSubject(uid: string, requestId: string) {
       userDocumentExists,
       storageCounts,
       authAccountExists: authExists,
-      retentionRules: DELETION_RETENTION_RULES
+      retentionRules: DELETION_RETENTION_RULES,
+      contributors: {
+        "urai-analytics": analyticsExport
+          ? {
+              configured: true,
+              recordCount: analyticsExport.records.length,
+              exportChecksum: analyticsExport.exportChecksum,
+              schemaVersion: analyticsExport.schemaVersion
+            }
+          : {
+              configured: false,
+              recordCount: null,
+              exportChecksum: null,
+              schemaVersion: null
+            }
+      }
     }
   };
 }
