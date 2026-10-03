@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.5.0";
+export const DELETION_MANIFEST_VERSION = "1.6.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -56,8 +56,9 @@ export const DELETION_ADAPTERS = [
     id: "urai-analytics",
     system: "urai-analytics",
     status: "pending",
-    schemaVersion: "system-of-systems-v1",
-    reason: "RETENTION_DELETION_EXPORT_PROPAGATION_NOT_IMPLEMENTED"
+    schemaVersion: "data-rights-v1",
+    operations: ["export", "delete", "retention_guard", "legal_hold_guard"] as const,
+    reason: "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
   },
   {
     id: "urai-content",
