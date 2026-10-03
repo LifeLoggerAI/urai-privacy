@@ -1,6 +1,6 @@
 import { EXPORT_SOURCES } from "./export-contract";
 
-export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.4.0";
+export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.5.0";
 
 export type ExportContributorStatus = "active" | "pending";
 
@@ -59,6 +59,40 @@ export const CONTENT_EXPORT_SOURCE_COLLECTIONS = [
   "exportTemplates"
 ] as const;
 
+export const SPATIAL_EXPORT_SOURCE_COLLECTIONS = [
+  "users",
+  "memories",
+  "stars",
+  "insights",
+  "clusters",
+  "replays",
+  "emotionLogs",
+  "voiceEvents",
+  "behaviorSignals",
+  "locations",
+  "relationships",
+  "rituals",
+  "dreamLogs",
+  "notifications",
+  "companionState"
+] as const;
+
+export const STUDIO_EXPORT_SOURCE_COLLECTIONS = [
+  "studioProjects",
+  "studioBriefs",
+  "studioJobs",
+  "studioAssets",
+  "studioExports"
+] as const;
+
+export const ANALYTICS_EXPORT_SOURCE_COLLECTIONS = [
+  "passiveSignals",
+  "ecosystemOutputs",
+  "mentalLoadSnapshots",
+  "moodForecasts",
+  "auditLogs"
+] as const;
+
 export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
   {
     id: "urai-privacy-firestore",
@@ -71,25 +105,25 @@ export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
     id: "urai-spatial",
     system: "urai-spatial",
     status: "pending",
-    schemaVersion: "unregistered",
-    sourceCollections: [],
-    reason: "CONTRIBUTOR_NOT_INTEGRATED"
+    schemaVersion: "1.0.0",
+    sourceCollections: SPATIAL_EXPORT_SOURCE_COLLECTIONS,
+    reason: "SOURCE_JOB_PLANNER_REGISTERED_PRODUCTION_WORKER_E2E_REQUIRED"
   },
   {
     id: "urai-studio",
     system: "urai-studio",
     status: "pending",
-    schemaVersion: "unregistered",
-    sourceCollections: [],
-    reason: "CONTRIBUTOR_NOT_INTEGRATED"
+    schemaVersion: "0.1.0",
+    sourceCollections: STUDIO_EXPORT_SOURCE_COLLECTIONS,
+    reason: "TENANT_RUNTIME_COLLECTIONS_REGISTERED_EXPORT_DELETE_EXECUTION_NOT_PROVEN"
   },
   {
     id: "urai-analytics",
     system: "urai-analytics",
     status: "pending",
-    schemaVersion: "unregistered",
-    sourceCollections: [],
-    reason: "CONTRIBUTOR_NOT_INTEGRATED"
+    schemaVersion: "system-of-systems-v1",
+    sourceCollections: ANALYTICS_EXPORT_SOURCE_COLLECTIONS,
+    reason: "COLLECTION_CONTRACT_REGISTERED_LIFECYCLE_PROPAGATION_NOT_IMPLEMENTED"
   },
   {
     id: "urai-content",
