@@ -52,10 +52,14 @@ describe("export contributor registry", () => {
     expect(jobs?.status).toBe("pending");
     expect(jobs?.schemaVersion).toBe("1.0.0");
     expect(jobs?.reason).toBe(
-      "REQUEST_CONTROL_PLANE_REGISTERED_EXPORT_DELETE_EXECUTION_HARD_OFF"
+      "SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
     );
     expect(jobs?.sourceCollections).toEqual(JOBS_DATA_RIGHTS_REQUEST_COLLECTIONS);
     expect(jobs?.sourceCollections).toContain("dataRightsRequests");
+    expect(jobs?.sourceCollections).toContain("users");
+    expect(jobs?.sourceCollections).toContain("jobs");
+    expect(jobs?.sourceCollections).toContain("jobs/{jobId}/logs");
+    expect(jobs?.sourceCollections).toContain("jobQueue");
   });
   it("registers Asset Factory export and deletion-request control plane without claiming destructive execution", () => {
     const assetFactory = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "asset-factory");
