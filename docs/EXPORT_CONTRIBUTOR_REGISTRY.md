@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.7.0`
+Registry version: `1.8.0`
 
 Status: implemented source-level registry, not deployed.
 
@@ -27,7 +27,9 @@ This registration is **not** activation or production certification.
 
 ### urai-spatial
 
-`urai-spatial` has a deterministic source planner for export, account-linked deletion, and biometric/voice deletion across its mapped user-data collections. The central registry records that collection contract but keeps Spatial pending until a protected worker actually executes the plan with idempotency, retries, partial-failure handling, audit receipts, and staging E2E.
+urai-spatial now has source-level operational export/deletion authority across its current user-owned runtime graph, including core memories, Life Model/person-world state, Captured Reality bindings, spatial/passive state, Possible Futures Scenario trees, and the AI activity ledger. The central registry includes nested Scenario basis/branch/comparison/outcome/calibration collections instead of treating only top-level Scenario documents as portable.
+
+Spatial remains pending. Source implementation and exact-head CI do not substitute for protected-staging export artifact readback, scoped deletion execution, recovery/rollback evidence, and central orchestration proof.
 
 ### urai-studio
 
