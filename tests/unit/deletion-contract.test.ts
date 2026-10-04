@@ -29,7 +29,7 @@ function makeManifest(): DeletionManifest {
 
 describe("deletion manifest safeguards", () => {
   it("uses a versioned manifest and opaque subject hash", () => {
-    expect(DELETION_MANIFEST_VERSION).toBe("1.7.0");
+    expect(DELETION_MANIFEST_VERSION).toBe("1.8.0");
     expect(deletionSubjectHash("example-user")).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -52,15 +52,15 @@ describe("deletion manifest safeguards", () => {
     }
   });
 
-  it("registers Jobs deletion request intake while execution stays hard-off", () => {
+  it("registers the Jobs governed protected-staging deletion executor without activating it", () => {
     const jobs = DELETION_ADAPTERS.find((entry) => entry.id === "urai-jobs");
     expect(jobs?.status).toBe("pending");
     expect("schemaVersion" in (jobs ?? {})).toBe(true);
     if (jobs && "schemaVersion" in jobs) {
       expect(jobs.schemaVersion).toBe("1.0.0");
-      expect(jobs.operations).toEqual(["request_delete"]);
+      expect(jobs.operations).toEqual(["request_delete", "protected_staging_delete_anonymize"]);
       expect(jobs.reason).toBe(
-        "REQUEST_CONTROL_PLANE_REGISTERED_DELETE_EXECUTION_HARD_OFF"
+        "SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
       );
     }
   });
@@ -109,7 +109,7 @@ describe("deletion manifest safeguards", () => {
   });
   it("reports pending adapter readiness without promoting request-only deletion", () => {
     const summary = deletionAdapterSummary();
-    expect(summary.manifestVersion).toBe("1.7.0");
+    expect(summary.manifestVersion).toBe("1.8.0");
     expect(summary.executableCrossSystemDelete).toBe(false);
     expect(summary.pendingAdapters).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -131,6 +131,10 @@ describe("deletion manifest safeguards", () => {
       expect.objectContaining({
         id: "urai-analytics",
         reason: "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+      }),
+      expect.objectContaining({
+        id: "urai-jobs",
+        reason: "SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
       }),
       expect.objectContaining({
         id: "urai-communications",
