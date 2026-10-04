@@ -14,7 +14,7 @@ import {
 
 describe("export contributor registry", () => {
   it("is versioned and has one active local contributor", () => {
-    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.8.0");
+    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.9.0");
     expect(EXPORT_CONTRIBUTORS.filter((entry) => entry.status === "active")).toHaveLength(1);
     expect(EXPORT_CONTRIBUTORS.find((entry) => entry.status === "active")?.id).toBe(
       "urai-privacy-firestore"
