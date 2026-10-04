@@ -2,7 +2,7 @@
 
 Status: `RETAINED PREVIEW SOURCE — NOT ACTIVE — NOT DEPLOYED`
 
-Manifest version: `1.2.0`
+Manifest version: `1.8.0`
 
 ## Authority boundary
 
@@ -35,13 +35,13 @@ It remains **pending** with reason `SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING
 
 ### urai-jobs
 
-`urai-jobs` now has a centrally registered data-rights request/control-plane contract at schema version `1.0.0`.
+`urai-jobs` has a centrally registered data-rights contract at schema version `1.0.0`.
 
-The currently registered deletion operation is only `request_delete`.
+The registered deletion operations are `request_delete` and `protected_staging_delete_anonymize`. The governed executor source is wired into the Jobs Functions entrypoint and canonical verification, but its declared runtime state remains `PROTECTED_STAGING_EXECUTOR_SOURCE_READY_HARD_OFF`.
 
-It remains **pending** with reason `REQUEST_CONTROL_PLANE_REGISTERED_DELETE_EXECUTION_HARD_OFF`.
+It remains **pending** with reason `SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED`.
 
-Jobs can accept and track an authenticated deletion request, but central Privacy must continue treating actual downstream deletion/anonymization execution as unavailable until the governed worker, retention/legal rules, provider propagation, protected staging E2E, and recovery/deployment receipts exist.
+Jobs can accept and track an authenticated deletion request and has bounded Jobs-scope deletion/anonymization source for explicitly approved requests, but central Privacy must continue treating downstream execution as inactive until exact protected-staging admission/E2E evidence, retention/legal review, provider propagation, recovery/backup proof, and deployment/rollback receipts exist. Jobs-scope execution must never be interpreted as complete ecosystem deletion.
 
 ## Pending execution blockers
 
