@@ -78,7 +78,7 @@ jobs:
           name: privacy-source-verification-${{ env.TARGET_SHA }}-${{ github.run_id }}
           path: artifacts/verification
           if-no-files-found: error
-          retention-days: 365
+          retention-days: 90
 
       - name: Enforce typecheck and tests
         shell: bash
@@ -113,7 +113,7 @@ jobs:
           name: privacy-rendered-qa-${{ env.TARGET_SHA }}-${{ github.run_id }}
           path: artifacts/rendered-qa
           if-no-files-found: error
-          retention-days: 365
+          retention-days: 90
 
       - name: Enforce rendered QA
         shell: bash

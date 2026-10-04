@@ -14,7 +14,21 @@ URAI consent must be granular, revocable, logged, and understandable.
 | C5 | Biometric Identity | voiceprints, face embeddings, speaker identity, gaze/face inference | separate biometric consent |
 | C6 | Personalization / AI Learning | trainable companion memory, tone adaptation, long-term model personalization | explicit opt-in and reset control |
 | C7 | Data Export / Portability | structured export of records and consent history | authenticated request |
-| C8 | Anonymized Data Monetization | cohort-level, de-identified, non-user-linked pattern products | separate opt-in, revenue ledger, revocation |
+| C8 | External De-identified Aggregate Use | separately approved public-good research or anonymized monetization purposes | separate purpose-specific opt-in, cohort/privacy controls, revocation |
+
+## C8 remains purpose-specific
+
+C8 is a sensitivity/handling tier, not bundled permission.
+
+A user may grant:
+
+- `research.public-good.aggregate` for privacy-protected public-interest aggregate research;
+
+while separately denying or revoking:
+
+- `data.monetization.anonymized`.
+
+Granting one C8 purpose does not authorize the other.
 
 ## Consent Event Requirements
 
@@ -41,7 +55,7 @@ When consent is revoked:
 
 ## No Bundled Consent
 
-Sensitive inference, biometric identity, AI personalization, and monetization must never be bundled into one all-or-nothing consent prompt.
+Sensitive inference, biometric identity, AI personalization, public-good aggregate research, and monetization must never be bundled into one all-or-nothing consent prompt.
 
 ## Renewal Triggers
 

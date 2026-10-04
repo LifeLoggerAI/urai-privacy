@@ -65,7 +65,7 @@ jobs:
           name: privacy-website-${{ env.TARGET_SHA }}-${{ github.run_id }}
           path: ${{ runner.temp }}/privacy-website-validation
           if-no-files-found: error
-          retention-days: 365
+          retention-days: 90
 
       - name: Prove final clean head
         if: always()

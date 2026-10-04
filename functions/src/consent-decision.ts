@@ -8,7 +8,11 @@ export const consentPurposeRegistry = {
   "biometric.identity": { requiredTier: "C5", dataCategories: ["biometric-identity"] },
   "ai.personalization": { requiredTier: "C6", dataCategories: ["companion-memory", "personalization"] },
   "data.export": { requiredTier: "C7", dataCategories: ["structured-records", "consent-history"] },
-  "data.monetization.anonymized": { requiredTier: "C8", dataCategories: ["de-identified-patterns"] }
+  "research.public-good.aggregate": {
+    requiredTier: "C8",
+    dataCategories: ["de-identified-patterns", "public-good-research"]
+  },
+  "data.monetization.anonymized": { requiredTier: "C8", dataCategories: ["de-identified-patterns", "monetization"] }
 } as const;
 
 export type ConsentPurpose = keyof typeof consentPurposeRegistry;

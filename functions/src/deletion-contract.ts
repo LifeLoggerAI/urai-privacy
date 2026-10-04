@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.0.0";
+export const DELETION_MANIFEST_VERSION = "1.8.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -37,13 +37,62 @@ export const DELETION_ADAPTERS = [
   { id: "urai-privacy-firestore", system: "urai-privacy", status: "active" },
   { id: "urai-privacy-storage", system: "urai-privacy", status: "active" },
   { id: "firebase-auth", system: "firebase-auth", status: "active" },
-  { id: "urai-spatial", system: "urai-spatial", status: "pending" },
-  { id: "urai-studio", system: "urai-studio", status: "pending" },
-  { id: "urai-analytics", system: "urai-analytics", status: "pending" },
-  { id: "urai-content", system: "urai-content", status: "pending" },
-  { id: "urai-jobs", system: "urai-jobs", status: "pending" },
-  { id: "asset-factory", system: "asset-factory", status: "pending" },
-  { id: "urai-communications", system: "urai-communications", status: "pending" }
+  {
+    id: "urai-spatial",
+    system: "urai-spatial",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["source_plan_delete", "source_plan_delete_biometric"] as const,
+    reason: "DETERMINISTIC_DELETE_PLANNER_REGISTERED_PRODUCTION_WORKER_E2E_REQUIRED"
+  },
+  {
+    id: "urai-studio",
+    system: "urai-studio",
+    status: "pending",
+    schemaVersion: "data-rights-v1",
+    operations: ["export", "delete", "restore_cancel", "legal_hold_guard", "verified_backup", "purge_receipt"] as const,
+    reason: "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+  },
+  {
+    id: "urai-analytics",
+    system: "urai-analytics",
+    status: "pending",
+    schemaVersion: "data-rights-v1",
+    operations: ["export", "delete", "retention_guard", "legal_hold_guard"] as const,
+    reason: "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+  },
+  {
+    id: "urai-content",
+    system: "urai-content",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["source_lifecycle_only"] as const,
+    reason: "TOMBSTONE_RESTORE_PROVIDER_RECEIPT_PURGE_SOURCE_REGISTERED_RUNTIME_E2E_PENDING"
+  },
+  {
+    id: "urai-jobs",
+    system: "urai-jobs",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["request_delete", "protected_staging_delete_anonymize"] as const,
+    reason: "SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+  },
+  {
+    id: "asset-factory",
+    system: "asset-factory",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["request_delete"] as const,
+    reason: "DELETE_REQUEST_RECORDED_MANUAL_REVIEW_EXECUTION_PENDING"
+  },
+  {
+    id: "urai-communications",
+    system: "urai-communications",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["delete", "tenant_delete", "retention_purge"] as const,
+    reason: "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
+  }
 ] as const;
 
 export function deletionSubjectHash(uid: string) {
@@ -84,4 +133,20 @@ export function canExecuteDeletion(value: DeletionManifest) {
 
 export function nextDeletionFailureState(attempt: number): DeletionExecutionState {
   return attempt >= DELETION_MAX_ATTEMPTS ? "dead_letter" : "retry_wait";
+}
+
+
+export function deletionAdapterSummary() {
+  const active = DELETION_ADAPTERS.filter((adapter) => adapter.status === "active");
+  const pending = DELETION_ADAPTERS.filter((adapter) => adapter.status === "pending");
+  return {
+    manifestVersion: DELETION_MANIFEST_VERSION,
+    activeAdapters: active.map((adapter) => ({ id: adapter.id, system: adapter.system })),
+    pendingAdapters: pending.map((adapter) => ({
+      id: adapter.id,
+      system: adapter.system,
+      reason: "reason" in adapter ? adapter.reason : "CONTRIBUTOR_NOT_INTEGRATED"
+    })),
+    executableCrossSystemDelete: pending.length === 0
+  };
 }

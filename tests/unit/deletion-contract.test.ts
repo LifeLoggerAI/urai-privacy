@@ -3,6 +3,7 @@ import {
   canExecuteDeletion,
   DELETION_ADAPTERS,
   DELETION_MANIFEST_VERSION,
+  deletionAdapterSummary,
   deletionExecutionBlockers,
   deletionManifestHash,
   deletionSubjectHash,
@@ -20,14 +21,15 @@ function makeManifest(): DeletionManifest {
       adapterId: entry.id,
       system: entry.system,
       status: entry.status,
-      itemCount: entry.status === "active" ? 0 : null
+      itemCount: entry.status === "active" ? 0 : null,
+      reason: "reason" in entry ? entry.reason : undefined
     }))
   };
 }
 
 describe("deletion manifest safeguards", () => {
   it("uses a versioned manifest and opaque subject hash", () => {
-    expect(DELETION_MANIFEST_VERSION).toBe("1.0.0");
+    expect(DELETION_MANIFEST_VERSION).toBe("1.8.0");
     expect(deletionSubjectHash("example-user")).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -35,6 +37,45 @@ describe("deletion manifest safeguards", () => {
     const value = makeManifest();
     expect(canExecuteDeletion(value)).toBe(false);
     expect(deletionExecutionBlockers(value)).toContain("PENDING_ADAPTERS");
+  });
+
+  it("registers Communications deletion source contract without activating it", () => {
+    const communications = DELETION_ADAPTERS.find((entry) => entry.id === "urai-communications");
+    expect(communications?.status).toBe("pending");
+    expect("schemaVersion" in (communications ?? {})).toBe(true);
+    if (communications && "schemaVersion" in communications) {
+      expect(communications.schemaVersion).toBe("1.0.0");
+      expect(communications.operations).toEqual(["delete", "tenant_delete", "retention_purge"]);
+      expect(communications.reason).toBe(
+        "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
+      );
+    }
+  });
+
+  it("registers the Jobs governed protected-staging deletion executor without activating it", () => {
+    const jobs = DELETION_ADAPTERS.find((entry) => entry.id === "urai-jobs");
+    expect(jobs?.status).toBe("pending");
+    expect("schemaVersion" in (jobs ?? {})).toBe(true);
+    if (jobs && "schemaVersion" in jobs) {
+      expect(jobs.schemaVersion).toBe("1.0.0");
+      expect(jobs.operations).toEqual(["request_delete", "protected_staging_delete_anonymize"]);
+      expect(jobs.reason).toBe(
+        "SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+      );
+    }
+  });
+
+  it("registers Studio governed source lifecycle without activating production execution", () => {
+    const studio = DELETION_ADAPTERS.find((entry) => entry.id === "urai-studio");
+    expect(studio?.status).toBe("pending");
+    expect("schemaVersion" in (studio ?? {})).toBe(true);
+    if (studio && "schemaVersion" in studio) {
+      expect(studio.schemaVersion).toBe("data-rights-v1");
+      expect(studio.operations).toEqual(["export", "delete", "restore_cancel", "legal_hold_guard", "verified_backup", "purge_receipt"]);
+      expect(studio.reason).toBe(
+        "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+      );
+    }
   });
 
   it("blocks under a legal hold", () => {
@@ -65,5 +106,40 @@ describe("deletion manifest safeguards", () => {
   it("changes failure state at the configured attempt ceiling", () => {
     expect(nextDeletionFailureState(1)).toBe("retry_wait");
     expect(nextDeletionFailureState(5)).toBe("dead_letter");
+  });
+  it("reports pending adapter readiness without promoting request-only deletion", () => {
+    const summary = deletionAdapterSummary();
+    expect(summary.manifestVersion).toBe("1.8.0");
+    expect(summary.executableCrossSystemDelete).toBe(false);
+    expect(summary.pendingAdapters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "asset-factory",
+        reason: "DELETE_REQUEST_RECORDED_MANUAL_REVIEW_EXECUTION_PENDING"
+      }),
+      expect.objectContaining({
+        id: "urai-content",
+        reason: "TOMBSTONE_RESTORE_PROVIDER_RECEIPT_PURGE_SOURCE_REGISTERED_RUNTIME_E2E_PENDING"
+      }),
+      expect.objectContaining({
+        id: "urai-spatial",
+        reason: "DETERMINISTIC_DELETE_PLANNER_REGISTERED_PRODUCTION_WORKER_E2E_REQUIRED"
+      }),
+      expect.objectContaining({
+        id: "urai-studio",
+        reason: "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+      }),
+      expect.objectContaining({
+        id: "urai-analytics",
+        reason: "SOURCE_DATA_RIGHTS_LIFECYCLE_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+      }),
+      expect.objectContaining({
+        id: "urai-jobs",
+        reason: "SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
+      }),
+      expect.objectContaining({
+        id: "urai-communications",
+        reason: "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
+      })
+    ]));
   });
 });

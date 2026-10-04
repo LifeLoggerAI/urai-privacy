@@ -2,7 +2,7 @@
 
 Status: `RETAINED PREVIEW SOURCE — NOT ACTIVE — NOT DEPLOYED`
 
-Manifest version: `1.0.0`
+Manifest version: `1.8.0`
 
 ## Authority boundary
 
@@ -25,11 +25,27 @@ The retained dry-run implementation:
 
 Its execute mode requires a current dry-run hash and still fails closed. The local destructive executor is source-only and has no active callable path.
 
-## Registered adapters
+## Registered downstream boundaries
 
-Local definitions exist for URAI Privacy Firestore, URAI Privacy Storage, and Firebase Auth.
+### urai-communications
 
-The following adapters remain pending and therefore block execution:
+`urai-communications` has a centrally registered deletion-source contract at schema version `1.0.0` for `delete`, `tenant_delete`, and `retention_purge`.
+
+It remains **pending** with reason `SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED`.
+
+### urai-jobs
+
+`urai-jobs` has a centrally registered data-rights contract at schema version `1.0.0`.
+
+The registered deletion operations are `request_delete` and `protected_staging_delete_anonymize`. The governed executor source is wired into the Jobs Functions entrypoint and canonical verification, but its declared runtime state remains `PROTECTED_STAGING_EXECUTOR_SOURCE_READY_HARD_OFF`.
+
+It remains **pending** with reason `SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED`.
+
+Jobs can accept and track an authenticated deletion request and has bounded Jobs-scope deletion/anonymization source for explicitly approved requests, but central Privacy must continue treating downstream execution as inactive until exact protected-staging admission/E2E evidence, retention/legal review, provider propagation, recovery/backup proof, and deployment/rollback receipts exist. Jobs-scope execution must never be interpreted as complete ecosystem deletion.
+
+## Pending execution blockers
+
+The following adapters remain pending and therefore block complete ecosystem deletion execution:
 
 - urai-spatial;
 - urai-studio;
