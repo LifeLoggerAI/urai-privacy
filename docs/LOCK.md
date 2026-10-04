@@ -2,7 +2,7 @@
 
 Status: **LOCKED FOR URAI PRIVACY PRODUCTION CONTROL-PLANE DEPLOYMENT**
 Branch: `main`
-Last updated: 2026-05-19
+Last updated: 2026-10-04
 
 This file records the production release evidence for `LifeLoggerAI/urai-privacy` as the URAI privacy control plane and system-of-systems contract hub.
 
@@ -31,17 +31,17 @@ Current status: **URAI Privacy is the central control plane. Downstream systems 
 
 ## Tier-One cross-repo adoption rows
 
-These rows are intentionally explicit because `npm run audit:privacy` requires every Tier-One system to appear in this release lock. The source of truth for controls, data domains, and release obligations remains `privacy/system-of-systems/registry.json`.
+These rows are intentionally explicit because `npm run audit:privacy` requires every current Tier-One privacy system to appear in this release lock. The source of truth for controls, data domains, and release obligations remains `privacy/system-of-systems/registry.json`. Legacy `LifeLoggerAI/UrAi`, `LifeLoggerAI/UrAiProd`, and `LifeLoggerAI/UrAi-Dev` are quarantined and are not current launch privacy authorities.
 
 | Repo | Current status | Required release evidence |
 | --- | --- | --- |
-| `LifeLoggerAI/UrAi` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
-| `LifeLoggerAI/UrAiProd` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
+| `LifeLoggerAI/urai-spatial` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
+| `LifeLoggerAI/urai-jobs` | `control-plane-contract-mapped` | Must preserve governed private-source/Life-Model and data-rights execution boundaries; protected-staging proof remains required. |
+| `LifeLoggerAI/urai-content` | `control-plane-contract-mapped` | Must preserve governed content export, tombstone/restore, provider-deletion, purge-readiness, and immutable purge-receipt lifecycle evidence. |
 | `LifeLoggerAI/urai-admin` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/urai-analytics` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/urai-communications` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/urai-studio` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
-| `LifeLoggerAI/urai-spatial` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/urai-foundation` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/B2Bportal` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/asset-factory` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
