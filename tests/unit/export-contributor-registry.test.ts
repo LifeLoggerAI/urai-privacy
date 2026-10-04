@@ -14,7 +14,7 @@ import {
 
 describe("export contributor registry", () => {
   it("is versioned and has one active local contributor", () => {
-    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.7.0");
+    expect(EXPORT_CONTRIBUTOR_REGISTRY_VERSION).toBe("1.8.0");
     expect(EXPORT_CONTRIBUTORS.filter((entry) => entry.status === "active")).toHaveLength(1);
     expect(EXPORT_CONTRIBUTORS.find((entry) => entry.status === "active")?.id).toBe(
       "urai-privacy-firestore"
@@ -84,10 +84,16 @@ describe("export contributor registry", () => {
   it("registers Spatial Studio and Analytics source contracts without claiming runtime completion", () => {
     const spatial = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-spatial");
     expect(spatial?.status).toBe("pending");
-    expect(spatial?.reason).toBe("SOURCE_JOB_PLANNER_REGISTERED_PRODUCTION_WORKER_E2E_REQUIRED");
+    expect(spatial?.reason).toBe("SOURCE_OPERATIONAL_DATA_RIGHTS_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED");
     expect(spatial?.sourceCollections).toEqual(SPATIAL_EXPORT_SOURCE_COLLECTIONS);
     expect(spatial?.sourceCollections).toContain("voiceEvents");
-    expect(spatial?.sourceCollections).toContain("companionState");
+    expect(spatial?.sourceCollections).toContain("scenarios");
+    expect(spatial?.sourceCollections).toContain("scenarios/{scenarioId}/basis");
+    expect(spatial?.sourceCollections).toContain("scenarios/{scenarioId}/branches");
+    expect(spatial?.sourceCollections).toContain("scenarios/{scenarioId}/outcomeObservations");
+    expect(spatial?.sourceCollections).toContain("aiLedger");
+    expect(spatial?.sourceCollections).toContain("lifeCausalEdges");
+    expect(spatial?.sourceCollections).toContain("capturedRealityAssets");
 
     const studio = EXPORT_CONTRIBUTORS.find((entry) => entry.id === "urai-studio");
     expect(studio?.status).toBe("pending");
