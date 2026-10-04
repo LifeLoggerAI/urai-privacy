@@ -64,17 +64,17 @@ This is **not** a claim that a deployed cross-system Content deletion worker, pr
 
 ### urai-jobs
 
-`urai-jobs` now has a versioned request/control-plane contract registered centrally.
+`urai-jobs` now has a versioned request/control-plane contract plus a source-implemented governed executor.
 
 - schema version: `1.0.0`
-- source contract owner: `LifeLoggerAI/urai-jobs`
+- source contract owner: `LifeLoggerAI/urai-jobs` PR #139
 - current central status: `pending`
-- reason: `REQUEST_CONTROL_PLANE_REGISTERED_EXPORT_DELETE_EXECUTION_HARD_OFF`
-- registered request records: `dataRightsRequests` and request audit subcollections
+- reason: `SOURCE_GOVERNED_EXECUTOR_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED`
+- registered control-plane/runtime scope: `dataRightsRequests`, request audit, `users`, `jobs`, `jobs/{jobId}/logs`, and `jobQueue`
 
-Jobs currently proves authenticated export/deletion request intake, owner-scoped request readback, admin/operator listing, server-only request/audit records, and an explicit `HARD_OFF_PENDING_GOVERNED_WORKER` execution state.
+The executor is admin/operator-only, requires an explicitly APPROVED request plus retention decision receipt, is admitted only to one exact protected-staging project, rejects production authorization, generates bounded private GCS export artifacts, applies bounded Jobs-scope deletion/anonymization, records retryable execution receipts, and never marks the ecosystem request globally complete.
 
-This is deliberately **not** treated as an active export contributor. Export package generation, governed delete/anonymize execution, provider propagation, protected staging E2E, recovery evidence, legal/privacy review, and deployment/rollback receipts remain required.
+This remains **pending**, not active. Protected-staging E2E, artifact readback, central Privacy orchestration/final completion, provider-side propagation where applicable, recovery evidence, legal/privacy review, and deployment/rollback receipts are still required.
 
 ### asset-factory
 
@@ -115,4 +115,4 @@ A pending contributor may become active only after it has:
 7. staging and end-to-end evidence;
 8. export, deletion, retention, and revocation mappings.
 
-Communications has central source-contract registration but still requires runtime proof. Jobs currently has only a request/control-plane contract and remains hard-off for export/delete execution.
+Communications has central source-contract registration but still requires runtime proof. Jobs has a governed protected-staging executor in source but remains inactive until exact staging and central-Privacy orchestration evidence exist.
