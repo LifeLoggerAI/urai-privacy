@@ -1,6 +1,6 @@
 # Export Contributor Registry
 
-Registry version: `1.8.0`
+Registry version: `1.9.0`
 
 Status: implemented source-level registry, not deployed.
 
