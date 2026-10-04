@@ -1,6 +1,6 @@
 import { EXPORT_SOURCES } from "./export-contract";
 
-export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.8.0";
+export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.9.0";
 
 export type ExportContributorStatus = "active" | "pending";
 
