@@ -4,16 +4,19 @@ URAI Privacy governs sensitive data-handling rules for the URAI ecosystem. Secur
 
 ## Reporting Security or Privacy Issues
 
-Please report security or privacy concerns to:
+Operational private routing is configured through the URAI Labs mail domain:
 
-- privacy@urai.app
-- security@urai.app
+- Security: security@urailabs.com
+- Privacy / user rights: privacy@urailabs.com
+- General account support: support@urailabs.com
 
-Do not open a public GitHub issue for vulnerabilities, exposed secrets, authentication bypasses, sensitive data exposure, or privacy-impacting incidents.
+Controlled canaries were sent on 2026-09-29 and no matching delivery-failure notice was found after the routing repair. The connected mailbox surface does not expose Delivered-To/INBOX proof for those canary copies, so independent inbound delivery is not claimed. The equivalent `@urai.app` role addresses are not launch-authoritative until separately proven.
+
+Do not send credentials, raw exploit payloads, private user datasets, biometric material, or other unnecessary sensitive content in an initial report. Provide the minimum information needed to establish the issue and coordinate a safer evidence-transfer path if required.
 
 ## High-Risk Report Categories
 
-Report privately if the issue involves:
+Use the private reporting route for issues involving:
 
 - unauthorized access to user data
 - admin access misuse
@@ -38,8 +41,8 @@ URAI uses the S0-S4 incident model from `docs/INCIDENT_RESPONSE.md` and `sops/IN
 
 ## Response Expectations
 
-URAI should acknowledge credible reports promptly, preserve evidence, contain affected systems, and follow the incident response lifecycle when user privacy may be affected.
+Routing-canary evidence does not certify an SLA or independent inbound delivery. Credible reports should be acknowledged promptly, evidence preserved, affected systems contained, and the incident response lifecycle followed when user privacy may be affected.
 
 ## Public Disclosure
 
-Please do not publicly disclose vulnerabilities until URAI has had a reasonable opportunity to investigate, contain, and remediate the issue.
+Please do not publicly disclose vulnerabilities before URAI has had a reasonable opportunity to investigate, contain, and remediate the issue.

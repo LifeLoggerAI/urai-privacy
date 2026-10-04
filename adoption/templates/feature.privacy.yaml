@@ -17,6 +17,7 @@ dataProcessing:
       source: user | device | system | model | admin | partner
       purpose: REPLACE_WITH_PURPOSE
       consentTier: C0 | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8
+      requiredConsentPurposes: []
       retentionClass: R0 | R1 | R2 | R3 | R4 | R5 | R6
       exportable: true
       deletable: true
@@ -28,6 +29,7 @@ dataProcessing:
         - REPLACE_WITH_SOURCE_FIELD
       purpose: REPLACE_WITH_PURPOSE
       consentTier: C0 | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8
+      requiredConsentPurposes: []
       retentionClass: R0 | R1 | R2 | R3 | R4 | R5 | R6
       explainabilityRequired: true
 

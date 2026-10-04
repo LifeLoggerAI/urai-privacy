@@ -6,16 +6,22 @@ const registryPath = join(root, 'privacy/system-of-systems/registry.json');
 const lockPath = join(root, 'docs/LOCK.md');
 
 const expectedRepos = [
-  'LifeLoggerAI/UrAi',
-  'LifeLoggerAI/UrAiProd',
-  'LifeLoggerAI/urai-admin',
-  'LifeLoggerAI/urai-analytics',
-  'LifeLoggerAI/urai-communications',
-  'LifeLoggerAI/urai-studio',
   'LifeLoggerAI/urai-spatial',
+  'LifeLoggerAI/urai-jobs',
+  'LifeLoggerAI/urai-studio',
+  'LifeLoggerAI/urai-communications',
+  'LifeLoggerAI/urai-analytics',
+  'LifeLoggerAI/urai-content',
+  'LifeLoggerAI/urai-admin',
   'LifeLoggerAI/urai-foundation',
   'LifeLoggerAI/B2Bportal',
   'LifeLoggerAI/asset-factory'
+];
+
+const forbiddenLegacyRepos = [
+  'LifeLoggerAI/UrAi',
+  'LifeLoggerAI/UrAiProd',
+  'LifeLoggerAI/UrAi-Dev'
 ];
 
 const requiredControls = [
@@ -45,7 +51,9 @@ const requiredCallables = [
   'processExportRequest',
   'createDeletionRequest',
   'processDeletionRequest',
-  'updateConsent',
+  'setCanonicalConsent',
+  'evaluateCanonicalConsent',
+  'writeAuditLog',
   'recordAdminAction',
   'getPrivacyHealthReport'
 ];
@@ -75,7 +83,7 @@ if (!existsSync(registryPath)) {
   }
 
   if (registry) {
-    if (registry.schemaVersion !== '2026-05-17.system-of-systems.v1') {
+    if (registry.schemaVersion !== '2026-10-04.system-of-systems.v2') {
       fail('Unexpected registry schemaVersion; update audit before changing schema.');
     }
 
@@ -94,6 +102,12 @@ if (!existsSync(registryPath)) {
 
     const repos = new Set();
     const ids = new Set();
+
+    for (const forbiddenRepo of forbiddenLegacyRepos) {
+      if (systems.some((system) => system?.repo === forbiddenRepo)) {
+        fail(`Legacy/quarantined repo must not appear as current Tier-One privacy authority: ${forbiddenRepo}`);
+      }
+    }
 
     for (const system of systems) {
       if (!system || typeof system !== 'object') {

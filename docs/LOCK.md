@@ -1,12 +1,15 @@
 # URAI Privacy Production Release Evidence Lock
 
-Status: **LOCKED FOR URAI PRIVACY PRODUCTION CONTROL-PLANE DEPLOYMENT**
-Branch: `main`
-Last updated: 2026-05-19
+Status: **HISTORICAL PRODUCTION LOCK / CURRENT SUCCESSOR PRE-REVIEW**
+Historical deployed branch: `main`
+Current source successor: PR `#146` (`privacy/reconcile-spatial-possible-futures-20261003`), not yet production-authorized
+Last updated: 2026-10-04
 
 This file records the production release evidence for `LifeLoggerAI/urai-privacy` as the URAI privacy control plane and system-of-systems contract hub.
 
-## Release candidate
+## Historical deployed baseline
+
+The identifiers below are retained as historical deployment evidence. They are **not** the current Gold Master successor and must not be used to transfer production certification to PR #146 or any later exact head.
 
 - Repository: `LifeLoggerAI/urai-privacy`
 - Branch: `main`
@@ -27,21 +30,21 @@ Contract status definitions:
 - `live-adopted`: the downstream repo has implemented and verified the contract in code, staging, production, and release evidence.
 - `waived`: an owner-approved dated exception exists with mitigation.
 
-Current status: **URAI Privacy is the central control plane. Downstream systems are contract-mapped and must record live-adopted evidence in their own repos or through future lock updates before being treated as fully live-adopted.**
+Current status: **URAI Privacy is the central control plane. The current PR #146 source successor is pre-review and not production-certified. Downstream systems are contract-mapped and must record protected-staging/live adoption evidence before being treated as fully live-adopted. Historical deployment evidence does not transfer across changed exact heads.**
 
 ## Tier-One cross-repo adoption rows
 
-These rows are intentionally explicit because `npm run audit:privacy` requires every Tier-One system to appear in this release lock. The source of truth for controls, data domains, and release obligations remains `privacy/system-of-systems/registry.json`.
+These rows are intentionally explicit because `npm run audit:privacy` requires every current Tier-One privacy system to appear in this release lock. The source of truth for controls, data domains, and release obligations remains `privacy/system-of-systems/registry.json`. Legacy `LifeLoggerAI/UrAi`, `LifeLoggerAI/UrAiProd`, and `LifeLoggerAI/UrAi-Dev` are quarantined and are not current launch privacy authorities.
 
 | Repo | Current status | Required release evidence |
 | --- | --- | --- |
-| `LifeLoggerAI/UrAi` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
-| `LifeLoggerAI/UrAiProd` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
+| `LifeLoggerAI/urai-spatial` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
+| `LifeLoggerAI/urai-jobs` | `control-plane-contract-mapped` | Must preserve governed private-source/Life-Model and data-rights execution boundaries; protected-staging proof remains required. |
+| `LifeLoggerAI/urai-content` | `control-plane-contract-mapped` | Must preserve governed content export, tombstone/restore, provider-deletion, purge-readiness, and immutable purge-receipt lifecycle evidence. |
 | `LifeLoggerAI/urai-admin` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/urai-analytics` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/urai-communications` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/urai-studio` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
-| `LifeLoggerAI/urai-spatial` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/urai-foundation` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/B2Bportal` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
 | `LifeLoggerAI/asset-factory` | `control-plane-contract-mapped` | Must satisfy consent, export, deletion, retention, audit, admin access, data minimization, and incident response adoption evidence before live-adopted status. |
