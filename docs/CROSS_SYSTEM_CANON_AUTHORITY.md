@@ -1,21 +1,22 @@
 # UrAi Cross-System Canon Authority
 
-Status: ADOPTION CANDIDATE — becomes binding cross-system authority only after the current main-target Labs canon PR is legitimately merged.
+Status: PRE-REVIEW ADOPTION CANDIDATE — does not become binding release authority until the current Labs Gold Master candidate is frozen, independently approved, and legitimately promoted.
 
 Repository role: **privacy, consent and trust control plane**
 
 ## Upstream authority
 
-Current downstream mainline canon candidate:
+Current Gold Master governance candidate:
 - Repository: `LifeLoggerAI/urai-labs-llc`
-- PR: `#102`
-- Canon path: `docs/canon/`
+- PR: `#131`
+- Candidate manifest: `governance/system-candidate-20261003.json`
+- State: working pre-review candidate; component successors remain fail-closed until exact-head proof is terminal
 
-Labs #102 is the current main-target consolidated canon candidate. Labs #107 is a sibling rebase on the Labs convergence branch and does not replace #102 as downstream mainline authority.
+Labs #131 is the current pre-review governance envelope. It does **not** transfer production certification or independent approval into Privacy, and it must not be treated as immutable while Spatial, Privacy, Jobs, or Staging successor heads remain unproven.
 
-Until #102 is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider, legal, financial, Gold-Master, runtime, or exact-head evidence between repositories.
+Until the final Gold Master is frozen and independently approved, this repository's current exact-head source/runtime contracts remain authoritative for Privacy implementation facts. This adoption file does not transfer certification, review, deployment, provider, legal, financial, Gold-Master, runtime, or exact-head evidence between repositories.
 
-Authority regression guard: closed/superseded Labs #101 or sibling #107 must not replace #102 as downstream mainline authority unless #102 is explicitly superseded by a newer main-target canon PR.
+Authority regression guard: historical Labs canon PRs (#101/#102/#107 and other superseded candidates) are provenance only and must not replace the current #131 pre-review authority unless #131 is explicitly superseded by a newer main-target Gold Master PR.
 
 ## Local invariants
 
@@ -46,4 +47,4 @@ If runtime conflicts with product canon because runtime is defective, record a d
 
 ## Required adoption action
 
-After upstream PR #102 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
+After the final Labs Gold Master successor is frozen and legitimately promoted, reconcile this repository's local docs/contracts against that exact approved candidate and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.

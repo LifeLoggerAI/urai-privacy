@@ -1,12 +1,15 @@
 # URAI Privacy Production Release Evidence Lock
 
-Status: **LOCKED FOR URAI PRIVACY PRODUCTION CONTROL-PLANE DEPLOYMENT**
-Branch: `main`
+Status: **HISTORICAL PRODUCTION LOCK / CURRENT SUCCESSOR PRE-REVIEW**
+Historical deployed branch: `main`
+Current source successor: PR `#146` (`privacy/reconcile-spatial-possible-futures-20261003`), not yet production-authorized
 Last updated: 2026-10-04
 
 This file records the production release evidence for `LifeLoggerAI/urai-privacy` as the URAI privacy control plane and system-of-systems contract hub.
 
-## Release candidate
+## Historical deployed baseline
+
+The identifiers below are retained as historical deployment evidence. They are **not** the current Gold Master successor and must not be used to transfer production certification to PR #146 or any later exact head.
 
 - Repository: `LifeLoggerAI/urai-privacy`
 - Branch: `main`
@@ -27,7 +30,7 @@ Contract status definitions:
 - `live-adopted`: the downstream repo has implemented and verified the contract in code, staging, production, and release evidence.
 - `waived`: an owner-approved dated exception exists with mitigation.
 
-Current status: **URAI Privacy is the central control plane. Downstream systems are contract-mapped and must record live-adopted evidence in their own repos or through future lock updates before being treated as fully live-adopted.**
+Current status: **URAI Privacy is the central control plane. The current PR #146 source successor is pre-review and not production-certified. Downstream systems are contract-mapped and must record protected-staging/live adoption evidence before being treated as fully live-adopted. Historical deployment evidence does not transfer across changed exact heads.**
 
 ## Tier-One cross-repo adoption rows
 
