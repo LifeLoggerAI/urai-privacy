@@ -1,6 +1,6 @@
 import { EXPORT_SOURCES } from "./export-contract";
 
-export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.7.0";
+export const EXPORT_CONTRIBUTOR_REGISTRY_VERSION = "1.8.0";
 
 export type ExportContributorStatus = "active" | "pending";
 
@@ -61,20 +61,52 @@ export const CONTENT_EXPORT_SOURCE_COLLECTIONS = [
 
 export const SPATIAL_EXPORT_SOURCE_COLLECTIONS = [
   "users",
+  "privacyPolicy",
+  "privacyRuntime",
+  "privacyReceipts",
+  "exportJobs",
+  "deletionJobs",
   "memories",
-  "stars",
-  "insights",
-  "clusters",
-  "replays",
-  "emotionLogs",
-  "voiceEvents",
+  "replayEvents",
+  "spatialMemories",
+  "lifeEntities",
+  "lifeEntityStates",
+  "lifeClaims",
+  "lifeRelationships",
+  "lifeEvents",
+  "lifeCausalEdges",
+  "lifeGraphSnapshots",
+  "lifeCorrections",
+  "lifeConflicts",
+  "knowledgeGaps",
+  "personModelBundles",
+  "personRenderBindings",
+  "sceneTruthPackets",
+  "renderManifests",
+  "simulationSessions",
+  "lifeModelReceipts",
+  "homeWorld",
+  "homeWorldExplainability",
+  "focusStates",
+  "transitionStates",
+  "bodyBiometricSnapshots",
+  "orbCompanionEvents",
+  "spatialAnchors",
+  "userSpatialPreferences",
+  "spatialSessions",
   "behaviorSignals",
+  "voiceEvents",
   "locations",
-  "relationships",
-  "rituals",
-  "dreamLogs",
-  "notifications",
-  "companionState"
+  "capturedRealityAssets",
+  "capturedRealityReplayBindings",
+  "providerConnections",
+  "scenarios",
+  "scenarios/{scenarioId}/basis",
+  "scenarios/{scenarioId}/branches",
+  "scenarios/{scenarioId}/comparisons",
+  "scenarios/{scenarioId}/outcomeObservations",
+  "scenarios/{scenarioId}/calibration",
+  "aiLedger"
 ] as const;
 
 export const STUDIO_EXPORT_SOURCE_COLLECTIONS = [
@@ -119,7 +151,7 @@ export const EXPORT_CONTRIBUTORS: readonly ExportContributor[] = [
     status: "pending",
     schemaVersion: "1.0.0",
     sourceCollections: SPATIAL_EXPORT_SOURCE_COLLECTIONS,
-    reason: "SOURCE_JOB_PLANNER_REGISTERED_PRODUCTION_WORKER_E2E_REQUIRED"
+    reason: "SOURCE_OPERATIONAL_DATA_RIGHTS_IMPLEMENTED_PROTECTED_STAGING_E2E_REQUIRED"
   },
   {
     id: "urai-studio",
