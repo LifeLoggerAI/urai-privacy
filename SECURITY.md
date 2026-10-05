@@ -10,7 +10,7 @@ Operational private routing is configured through the URAI Labs mail domain:
 - Privacy / user rights: privacy@urailabs.com
 - General account support: support@urailabs.com
 
-Controlled canaries were sent on 2026-09-29 and no matching delivery-failure notice was found after the routing repair. The connected mailbox surface does not expose Delivered-To/INBOX proof for those canary copies, so independent inbound delivery is not claimed. The equivalent `@urai.app` role addresses are not launch-authoritative until separately proven.
+Controlled public-role canaries were sent again on 2026-10-04. The connected adam@urailabs.com mailbox records the support, legal, privacy, security, accessibility, press, and investors canaries with both SENT and INBOX labels, and no matching post-repair delivery-failure notice was found. This proves the current Google Workspace role routing into the connected mailbox; it does not prove SendGrid transport, external-recipient deliverability, response-time SLAs, or provider approval. The equivalent `@urai.app` role addresses are not launch-authoritative until separately proven.
 
 Do not send credentials, raw exploit payloads, private user datasets, biometric material, or other unnecessary sensitive content in an initial report. Provide the minimum information needed to establish the issue and coordinate a safer evidence-transfer path if required.
 
