@@ -7,6 +7,10 @@ const runner = hasPnpm ? 'pnpm' : 'npm';
 const commands = [];
 
 if (hasPackage) {
+  // Root typechecks/tests import Functions sources; match standalone CI setup.
+  if (existsSync('functions/package.json')) {
+    commands.push(['npm', ['ci', '--prefix', 'functions']]);
+  }
   // pnpm forwards options after a script name to the script itself.
   // Handle optional scripts on the package-manager side for both runners.
   for (const script of ['typecheck', 'test', 'build', 'urai:qa']) {
