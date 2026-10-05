@@ -11,7 +11,8 @@ The public site lives in `website/` and includes:
 - `rights.html` - user rights overview
 - `governance.html` - governance/enforcement model
 - `legal.html` - legal notice template index
-- `contact.html` - privacy/security/support contact routing
+- `contact.html` - privacy/security/support/accessibility contact routing
+- `accessibility.html` - accessibility commitments and reporting route
 - `404.html` - not found page
 - `styles.css` - shared styling
 - `robots.txt` - crawler guidance
@@ -45,6 +46,7 @@ Point `uraiprivacy.com` to the chosen host. For GitHub Pages, configure DNS acco
 - [ ] All nav links work.
 - [ ] Legal draft status is visible.
 - [ ] Contact routes are correct.
+- [ ] Accessibility route and 48px target contract are present.
 - [ ] `python tools/validate_privacy_package.py` passes.
 
 ## Legal Status
