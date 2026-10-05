@@ -19,7 +19,7 @@ Controlled routing canaries were sent on 2026-09-29 to these URAI Labs role addr
 
 The equivalent `@urai.app` role addresses are not launch-authoritative and must not be advertised until their routing is separately proven.
 
-The canary evidence proves that the post-repair sends did not generate a matching failure notice in the connected mailbox; the connector does not expose Delivered-To/INBOX evidence for those canary copies, so independent inbound delivery is not claimed. This also does not certify response-time SLAs, legal sufficiency, incident-response maturity, or independent privacy approval.
+Fresh 2026-10-04 public-role canaries for support, legal, privacy, security, accessibility, press, and investors are present in the connected adam@urailabs.com mailbox with both SENT and INBOX labels, with no matching post-repair delivery-failure notice. This proves current Google Workspace role routing into that mailbox; it does not prove SendGrid transport or external-recipient deliverability. This also does not certify response-time SLAs, legal sufficiency, incident-response maturity, or independent privacy approval.
 
 ## What to Open as a GitHub Issue
 
