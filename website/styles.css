@@ -13,7 +13,7 @@
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 body {
   margin: 0;
@@ -78,6 +78,7 @@ a:focus-visible,
 
 .brand {
   display: flex;
+  min-height: 48px;
   align-items: center;
   gap: 10px;
   text-decoration: none;
@@ -102,7 +103,7 @@ a:focus-visible,
   font-size: 14px;
 }
 
-.nav-links a { text-decoration: none; }
+.nav-links a { text-decoration: none; display: inline-flex; align-items: center; min-height: 48px; padding: 8px 4px; }
 .nav-links a:hover { color: var(--text); }
 
 main {
@@ -166,7 +167,7 @@ p, li {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 48px;
 }
 
 .button.primary {
@@ -253,7 +254,7 @@ th { color: var(--text); }
   flex-wrap: wrap;
 }
 
-.footer-inner a { color: var(--muted); }
+.footer-inner a { color: var(--muted); display: inline-flex; align-items: center; min-height: 48px; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
