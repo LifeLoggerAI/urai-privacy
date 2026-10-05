@@ -7,10 +7,11 @@ const runner = hasPnpm ? 'pnpm' : 'npm';
 const commands = [];
 
 if (hasPackage) {
-  commands.push([runner, ['run', 'typecheck', '--if-present']]);
-  commands.push([runner, ['test', '--if-present']]);
-  commands.push([runner, ['run', 'build', '--if-present']]);
-  commands.push([runner, ['run', 'urai:qa', '--if-present']]);
+  // pnpm forwards options after a script name to the script itself.
+  // Handle optional scripts on the package-manager side for both runners.
+  for (const script of ['typecheck', 'test', 'build', 'urai:qa']) {
+    commands.push([runner, ['run', '--if-present', script]]);
+  }
 }
 
 let failed = false;
