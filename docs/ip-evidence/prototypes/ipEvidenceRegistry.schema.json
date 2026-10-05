@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://urai.app/schemas/ipEvidenceRegistry.schema.json",
+  "title": "URAI IP Evidence Registry Item",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidenceId",
+    "title",
+    "sourceType",
+    "familyIds",
+    "ipClasses",
+    "claimStatus",
+    "rightsStatus",
+    "disclosureStatus",
+    "ownerEntity",
+    "verifiedAt"
+  ],
+  "properties": {
+    "evidenceId": { "type": "string", "pattern": "^URAI-EVID-[0-9]{4,}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "sourceType": {
+      "type": "string",
+      "enum": ["drive_doc", "drive_sheet", "drive_file", "github_file", "github_pr", "workflow_artifact", "screenshot", "generated_asset", "disclosure_record", "legal_receipt"]
+    },
+    "driveId": { "type": ["string", "null"] },
+    "repo": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "path": { "type": ["string", "null"] },
+    "sha": { "type": ["string", "null"] },
+    "url": { "type": ["string", "null"], "format": "uri" },
+    "createdAt": { "type": ["string", "null"], "format": "date-time" },
+    "verifiedAt": { "type": "string", "format": "date-time" },
+    "familyIds": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^URAI-[0-9]{3}$" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "ipClasses": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["patent", "copyright", "design", "trademark", "trade_secret", "contract", "release_evidence"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "claimStatus": { "type": "string", "enum": ["private_disclosure", "public_safe", "evidence_gated", "official_receipt_required", "not_supported"] },
+    "rightsStatus": { "type": "string", "enum": ["founder_created", "assignment_needed", "contractor_review_needed", "rights_clearance_needed", "official_receipt_attached"] },
+    "disclosureStatus": { "type": "string", "enum": ["private_internal", "nda_controlled", "public", "unknown"] },
+    "ownerEntity": { "type": "string" },
+    "notes": { "type": ["string", "null"] }
+  }
+}
