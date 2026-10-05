@@ -79,6 +79,7 @@ a:focus-visible,
 .brand {
   display: flex;
   min-height: 48px;
+  min-width: 48px;
   align-items: center;
   gap: 10px;
   text-decoration: none;
@@ -103,7 +104,7 @@ a:focus-visible,
   font-size: 14px;
 }
 
-.nav-links a { text-decoration: none; display: inline-flex; align-items: center; min-height: 48px; padding: 8px 4px; }
+.nav-links a { text-decoration: none; display: inline-flex; align-items: center; min-height: 48px; min-width: 48px; justify-content: center; padding: 8px 8px; }
 .nav-links a:hover { color: var(--text); }
 
 main {
@@ -254,7 +255,7 @@ th { color: var(--text); }
   flex-wrap: wrap;
 }
 
-.footer-inner a { color: var(--muted); display: inline-flex; align-items: center; min-height: 48px; }
+.footer-inner a { color: var(--muted); display: inline-flex; align-items: center; min-height: 48px; min-width: 48px; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
