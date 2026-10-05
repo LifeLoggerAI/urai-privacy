@@ -15,6 +15,7 @@ REQUIRED_PAGES = [
     "governance.html",
     "legal.html",
     "contact.html",
+    "accessibility.html",
     "status.html",
     "404.html",
 ]
