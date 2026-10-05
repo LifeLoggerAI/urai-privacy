@@ -100,7 +100,7 @@ class WebsiteStaticE2ETests(unittest.TestCase):
         self.assertIn("security@urailabs.com", contact_html)
         self.assertIn("support@urailabs.com", contact_html)
         self.assertIn("Do not post sensitive data publicly", contact_html)
-        self.assertIn("not independent inbound-delivery certification", contact_html)
+        self.assertIn("not SendGrid transport or external-recipient delivery certification", contact_html)
 
     def test_status_path_exposes_launch_blockers(self) -> None:
         index_html = (WEBSITE / "index.html").read_text(encoding="utf-8")
