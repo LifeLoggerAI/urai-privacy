@@ -22,7 +22,7 @@
     "test:smoke": "node scripts/smoke-routes.mjs",
     "test:smoke:live": "node scripts/smoke-live.mjs",
     "test:live-auth-proof": "node scripts/verify-authenticated-live-proof.mjs",
-    "test:emulators": "firebase emulators:exec --config firebase.emulators.json --project urai-privacy-integration-test --only auth,firestore,storage,functions \"npm run test:rules:emulated && npm run test:integration:emulated\"",
+    "test:emulators": "firebase emulators:exec --config firebase.emulators.json --project urai-privacy-integration-test --only auth,firestore,storage,functions \"node scripts/check-functions-emulator-loaded.mjs && npm run test:rules:emulated && npm run test:integration:emulated\"",
     "check:java": "node scripts/check-java.mjs",
     "audit:privacy": "node scripts/urai_privacy_adoption_check.mjs",
     "audit:tier-one": "node scripts/audit-tier-one.mjs",
@@ -37,7 +37,8 @@
     "verify:release": "bash scripts/verify-release.sh",
     "final:production-lock": "bash scripts/final-production-lock.sh",
     "test:export:contract": "node scripts/check-complete-export-contract.mjs",
-    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs"
+    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs",
+    "pretest:emulators": "npm --prefix functions run build"
   },
   "dependencies": {
     "firebase": "^12.13.0",
@@ -67,6 +68,7 @@
     "@tootallnate/once": "^3.0.1",
     "@firebase/firestore": {
       "@grpc/grpc-js": "^1.14.4"
-    }
+    },
+    "source-map-js": "1.2.2"
   }
 }

@@ -19,6 +19,7 @@ const exportCollections = [
   "users",
   "privacyRequests",
   "exportJobs",
+  "exportArtifactAttempts",
   "deletionRequests",
   "consentRecords",
   "consentEvents",
@@ -28,7 +29,7 @@ const exportCollections = [
   "adminActions",
   "legalHoldRecords"
 ] as const;
-const deletableUserCollections = ["privacyRequests", "exportJobs", "consentRecords", "dataAccessEvents"] as const;
+const deletableUserCollections = ["privacyRequests", "exportJobs", "exportArtifactAttempts", "consentRecords", "dataAccessEvents"] as const;
 const retainedDeletionCollections = [
   "auditLogs",
   "policyVersions",
