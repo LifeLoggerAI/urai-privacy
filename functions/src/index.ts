@@ -60,6 +60,7 @@ const deletionPlanSchema = z.object({
   counts: z.record(z.string(), z.number().int().nonnegative()),
   targets: z.record(z.string(), z.array(z.string())),
   storageObjects: z.array(z.string()),
+  storageObjectGenerations: z.record(z.string(), z.string().regex(/^[0-9]+$/)).default({}),
   retainedData: z.array(z.string()),
   generatedAt: z.string().datetime(),
   mode: z.literal("safe-plan"),
@@ -227,6 +228,15 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
 
   const [files] = await bucket.getFiles({ prefix: `exports/${uid}/` });
   const storageObjects = files.map((file) => file.name).sort();
+  const storageObjectGenerations: Record<string, string> = {};
+  for (const file of files) {
+    const metadata = file.metadata.generation === undefined ? (await file.getMetadata())[0] : file.metadata;
+    const generation = String(metadata.generation ?? "");
+    if (!/^[0-9]+$/.test(generation)) {
+      throw new HttpsError("failed-precondition", "An export object's exact generation is unavailable; deletion planning is blocked.");
+    }
+    storageObjectGenerations[file.name] = generation;
+  }
   const counts = Object.fromEntries(Object.entries(targets).map(([name, ids]) => [name, ids.length]));
   counts.storageObjects = storageObjects.length;
 
@@ -235,6 +245,7 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
     counts,
     targets,
     storageObjects,
+    storageObjectGenerations,
     retainedData: [...retainedDeletionCollections],
     generatedAt: new Date().toISOString(),
     mode: "safe-plan",
@@ -254,6 +265,9 @@ function normalizedDeletionPlan(plan: DeletionPlan) {
         .map(([name, ids]) => [name, [...ids].sort()])
     ),
     storageObjects: [...plan.storageObjects].sort(),
+    storageObjectGenerations: Object.fromEntries(
+      Object.entries(plan.storageObjectGenerations).sort(([left], [right]) => left.localeCompare(right))
+    ),
     retainedData: [...plan.retainedData].sort(),
     mode: plan.mode,
     legalHold: plan.legalHold,
@@ -300,17 +314,37 @@ function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: Deletio
   }
   const approvedStorageObjects = new Set(approved.storageObjects);
   if (current.storageObjects.some((name) => !approvedStorageObjects.has(name))) return false;
+  if (current.storageObjects.some((name) => !approved.storageObjectGenerations[name]
+    || current.storageObjectGenerations[name] !== approved.storageObjectGenerations[name])) return false;
   return true;
 }
 
-async function deleteDocumentIds(collectionName: string, ids: string[]) {
+async function deleteDocumentIds(collectionName: string, ids: string[], uid: string) {
   let deleted = 0;
   for (let start = 0; start < ids.length; start += DELETE_BATCH_LIMIT) {
-    const batch = db.batch();
     const chunk = ids.slice(start, start + DELETE_BATCH_LIMIT);
-    for (const id of chunk) batch.delete(db.collection(collectionName).doc(id));
-    await batch.commit();
-    deleted += chunk.length;
+    // An approved ID is not continuing ownership authority. Read ownership and
+    // delete atomically so a concurrent correction/restoration causes a retry
+    // instead of deleting a foreign subject's replacement document.
+    deleted += await db.runTransaction(async (transaction) => {
+      const references = chunk.map((id) => db.collection(collectionName).doc(id));
+      const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
+      for (const snapshot of snapshots) {
+        if (!snapshot.exists) continue;
+        const owner = snapshot.data()?.uid;
+        const owned = collectionName === "users"
+          ? snapshot.id === uid && (owner === undefined || owner === uid)
+          : owner === uid;
+        if (!owned) {
+          throw new HttpsError("failed-precondition", "Deletion target ownership changed after approval. Re-run the dry run before continuing.");
+        }
+      }
+      let removed = 0;
+      snapshots.forEach((snapshot, index) => {
+        if (snapshot.exists) { transaction.delete(references[index]); removed += 1; }
+      });
+      return removed;
+    });
   }
   return deleted;
 }
@@ -346,14 +380,25 @@ async function executeDeletion(args: {
   });
 
   for (const collectionName of deletableUserCollections) {
-    deleted[collectionName] = await deleteDocumentIds(collectionName, currentPlan.targets[collectionName] ?? []);
+    deleted[collectionName] = await deleteDocumentIds(collectionName, currentPlan.targets[collectionName] ?? [], args.uid);
   }
 
-  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? []);
+  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? [], args.uid);
 
   let deletedStorageObjects = 0;
   for (const objectName of currentPlan.storageObjects) {
-    await bucket.file(objectName).delete({ ignoreNotFound: true });
+    const generation = plan.storageObjectGenerations[objectName];
+    if (!generation || generation !== currentPlan.storageObjectGenerations[objectName]) {
+      throw new HttpsError("failed-precondition", "Deletion requires the exact approved export generation. Re-run the dry run before continuing.");
+    }
+    try {
+      await bucket.file(objectName).delete({ ignoreNotFound: true, ifGenerationMatch: generation });
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "code" in error && Number(error.code) === 412) {
+        throw new HttpsError("failed-precondition", "An export generation changed during deletion. Re-run the dry run before continuing.");
+      }
+      throw error;
+    }
     deletedStorageObjects += 1;
   }
   deleted.storageObjects = deletedStorageObjects;

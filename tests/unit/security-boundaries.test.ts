@@ -64,7 +64,9 @@ describe("privacy security boundaries", () => {
     expect(functionsSource).toContain("DELETION_EXECUTION_LEASE_MS");
     expect(functionsSource).toContain("deletionExecutionLeaseUntil");
     expect(functionsSource).toContain("deleteDocumentIds(collectionName, currentPlan.targets[collectionName]");
-    expect(functionsSource).toContain('bucket.file(objectName).delete({ ignoreNotFound: true })');
+    expect(functionsSource).toContain('bucket.file(objectName).delete({ ignoreNotFound: true, ifGenerationMatch: generation })');
+    expect(functionsSource).toContain('current.storageObjectGenerations[name] !== approved.storageObjectGenerations[name]');
+    expect(functionsSource).toContain('Deletion target ownership changed after approval.');
     expect(functionsSource).toContain("await auth.deleteUser(args.uid)");
   });
 
