@@ -10,6 +10,11 @@ import { deleteObject, getBytes, ref, uploadString } from "firebase/storage";
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 
 const PROJECT_ID = process.env.FIREBASE_TEST_PROJECT_ID ?? process.env.GCLOUD_PROJECT ?? "urai-privacy-integration-test";
+// rules-unit-testing defaults to gs://<projectId>, whereas the Functions Admin
+// SDK's synthetic default bucket is <projectId>.appspot.com. Seed and exercise
+// the same bucket so the actual callable lifecycle cannot fail on a fixture-only
+// missing object or pass against a different Storage authority.
+const TEST_STORAGE_BUCKET = process.env.FIREBASE_TEST_STORAGE_BUCKET ?? `${PROJECT_ID}.appspot.com`;
 const STORAGE_EMULATOR_HOST = process.env.FIREBASE_STORAGE_EMULATOR_HOST ?? "127.0.0.1:9199";
 const [storageHost, storagePortRaw] = STORAGE_EMULATOR_HOST.replace(/^https?:\/\//, "").split(":");
 const storagePort = Number(storagePortRaw ?? 9199);
@@ -57,16 +62,16 @@ function requireStorageEnv(): RulesTestEnvironment {
 }
 
 function storageFor(uid: string, token: Record<string, unknown> = {}) {
-  return requireStorageEnv().authenticatedContext(uid, token).storage();
+  return requireStorageEnv().authenticatedContext(uid, token).storage(`gs://${TEST_STORAGE_BUCKET}`);
 }
 
 function anonStorage() {
-  return requireStorageEnv().unauthenticatedContext().storage();
+  return requireStorageEnv().unauthenticatedContext().storage(`gs://${TEST_STORAGE_BUCKET}`);
 }
 
 async function seedStorage(path: string, contents = "{}") {
   await requireStorageEnv().withSecurityRulesDisabled(async (context) => {
-    await uploadString(ref(context.storage(), path), contents);
+    await uploadString(ref(context.storage(`gs://${TEST_STORAGE_BUCKET}`), path), contents);
   });
 }
 
