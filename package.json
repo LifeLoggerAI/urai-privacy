@@ -67,6 +67,7 @@
     "@tootallnate/once": "^3.0.1",
     "@firebase/firestore": {
       "@grpc/grpc-js": "^1.14.4"
-    }
+    },
+    "source-map-js": "1.2.2"
   }
 }
