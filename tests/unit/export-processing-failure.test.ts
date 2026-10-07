@@ -150,6 +150,7 @@ vi.mock("../../functions/node_modules/firebase-admin/lib/esm/auth/index.js", () 
 import { processExportRequest } from "../../functions/src/export-request";
 import { cleanupExportArtifactAttempts } from "../../functions/src/export-attempt-maintenance";
 import { collectDeletionCompletionResiduals } from "../../functions/src/deletion-completion-verifier";
+import { CONSENT_DECISION_POLICY_VERSION } from "../../functions/src/consent-decision";
 const run = processExportRequest as unknown as (request: Row) => Promise<Row>;
 const adminRequest = { auth: { uid: "admin-a", token: { admin: true } }, data: { jobId: "job-a" } };
 function job() { return fixture.documents.get("exportJobs/job-a")!; }
@@ -161,6 +162,11 @@ beforeEach(() => {
   Object.assign(fixture, { transactions: 0, saves: 0, nextId: 0, failSave: 0, failDeletes: false, failAudit: false, failAllAudits: false, losePublicationReply: false, failAttemptRead: false, authExists: false, failAuditTransaction: 0, beforePublication: undefined, beforeTransaction: undefined });
   fixture.documents.set("exportJobs/job-a", { uid: "user-a", requestId: "request-a", status: "pending" });
   fixture.documents.set("privacyRequests/request-a", { uid: "user-a", type: "export", status: "pending" });
+  fixture.documents.set("consentRecords/user-a_data_export", {
+    uid: "user-a", purpose: "data.export", consentTier: "C7", status: "granted",
+    policyVersion: CONSENT_DECISION_POLICY_VERSION, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    receiptHash: "a".repeat(64)
+  });
 });
 
 function seedExpiredAttempt(status = "processing") {
@@ -260,6 +266,25 @@ describe("export callable failure and concurrency behavior", () => {
     await expect(run({ ...adminRequest, data: { jobId: "job-a/other" } })).rejects.toMatchObject({ code: "invalid-argument" });
     expect(fixture.transactions).toBe(0);
   });
+  it.each(["missing", "revoked", "expired"])("blocks %s export consent before collection", async (state) => {
+    const path = "consentRecords/user-a_data_export";
+    if (state === "missing") fixture.documents.delete(path);
+    else fixture.documents.set(path, { ...fixture.documents.get(path),
+      ...(state === "revoked" ? { status: "revoked" } : { expiresAt: new Date(Date.now() - 1).toISOString() }) });
+    await expect(run(adminRequest)).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(job().status).toBe("pending"); expect(fixture.objects.size).toBe(0);
+  });
+  it.each(["revoked", "expired", "replaced"])("blocks consent %s while export is processing", async (state) => {
+    fixture.beforePublication = () => {
+      const path = "consentRecords/user-a_data_export";
+      fixture.documents.set(path, { ...fixture.documents.get(path),
+        ...(state === "revoked" ? { status: "revoked" } : state === "expired"
+          ? { expiresAt: new Date(Date.now() - 1).toISOString() } : { receiptHash: "b".repeat(64) }) });
+    };
+    await expect(run(adminRequest)).rejects.toMatchObject({ code: "internal" });
+    expect(job().status).toBe("failed"); expect(fixture.objects.size).toBe(0);
+    expect([...fixture.documents.values()].some((row) => row.action === "export_processed")).toBe(false);
+  });
   it("rejects duplicate active work without changing the first lease", async () => {
     fixture.documents.set("exportJobs/job-a", { ...job(), status: "processing", processingLeaseExpiresAt: { toMillis: () => Date.now() + 60_000 }, processingLeaseToken: "first" });
     await expect(run(adminRequest)).rejects.toMatchObject({ code: "failed-precondition" });
@@ -333,6 +358,7 @@ describe("export callable failure and concurrency behavior", () => {
 describe("export attempt deletion residual verification", () => {
   it("cannot report deletion complete while an export attempt ledger remains", async () => {
     fixture.documents.delete("exportJobs/job-a"); fixture.documents.delete("privacyRequests/request-a");
+    fixture.documents.delete("consentRecords/user-a_data_export");
     fixture.documents.set("exportArtifactAttempts/stale", { uid: "user-a", status: "cleanup_pending" });
     const residuals = await collectDeletionCompletionResiduals("user-a");
     expect(residuals.firestoreTargets.exportArtifactAttempts).toEqual(["stale"]);
@@ -342,6 +368,7 @@ describe("export attempt deletion residual verification", () => {
   });
   it("separately counts account, export bytes, Auth and legal hold without including another user", async () => {
     fixture.documents.delete("exportJobs/job-a"); fixture.documents.delete("privacyRequests/request-a");
+    fixture.documents.delete("consentRecords/user-a_data_export");
     fixture.documents.set("exportArtifactAttempts/other", { uid: "user-b" });
     fixture.documents.set("users/user-a", { uid: "user-a", legalHold: true });
     fixture.objects.set("exports/user-a/job-a/attempt/export.json", "private"); fixture.authExists = true;

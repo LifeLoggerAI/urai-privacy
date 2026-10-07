@@ -7,6 +7,7 @@ import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 import { EXPORT_PACKAGE_TTL_MS } from "./export-lifecycle-contract";
 import { exportAttemptPaths, exportPublicationBlockReason, ownsExportAttempt } from "./export-processing-authority";
+import { evaluateConsentDecision } from "./consent-decision";
 
 const exportCollections = [
   "users",
@@ -219,12 +220,20 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
 
     const requestRef = db.collection("privacyRequests").doc(requestId);
     const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
-    const [requestSnap, deletionFence] = await Promise.all([
+    const consentRef = db.collection("consentRecords").doc(`${uid}_data_export`);
+    const [requestSnap, deletionFence, consentSnap] = await Promise.all([
       tx.get(requestRef),
-      tx.get(deletionFenceRef)
+      tx.get(deletionFenceRef),
+      tx.get(consentRef)
     ]);
     if (!requestSnap.exists || requestSnap.data()?.uid !== uid || requestSnap.data()?.type !== "export") {
       throw new HttpsError("failed-precondition", "Export request linkage is invalid.");
+    }
+    const consent = consentSnap.data() ?? {};
+    const consentReceiptHash = consent.receiptHash;
+    if (consent.uid !== uid || !/^[0-9a-f]{64}$/.test(String(consentReceiptHash ?? ""))
+      || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed) {
+      throw new HttpsError("failed-precondition", "Current export consent is required before processing.");
     }
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is fenced; export processing is blocked.");
@@ -259,6 +268,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     });
     tx.create(attemptRef, {
       uid, jobId, requestId, token,
+      consentReceiptHash,
       status: "processing",
       paths: [exportPath, manifestPath],
       cleanupDueAt: processingLeaseExpiresAt,
@@ -266,7 +276,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       updatedAt: FieldValue.serverTimestamp()
     });
     tx.update(requestRef, { status: "processing", updatedAt: FieldValue.serverTimestamp() });
-    return { uid, requestId, requestRef, exportPath, manifestPath };
+    return { uid, requestId, requestRef, exportPath, manifestPath, consentRef, consentReceiptHash };
   });
 
   const { exportPath, manifestPath } = claim;
@@ -288,8 +298,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     const auditRef = db.collection("auditLogs").doc();
     await db.runTransaction(async (tx) => {
       const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(claim.uid);
-      const [jobSnap, deletionFence, attemptSnap, requestSnap] = await Promise.all([
-        tx.get(jobRef), tx.get(deletionFenceRef), tx.get(attemptRef), tx.get(claim.requestRef)
+      const [jobSnap, deletionFence, attemptSnap, requestSnap, consentSnap] = await Promise.all([
+        tx.get(jobRef), tx.get(deletionFenceRef), tx.get(attemptRef), tx.get(claim.requestRef), tx.get(claim.consentRef)
       ]);
       const blocked = exportPublicationBlockReason({
         job: jobSnap.data() ?? {}, fence: deletionFence.data() ?? {},
@@ -298,6 +308,11 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       });
       if (blocked) {
         throw new HttpsError("aborted", "Export processing lost its deletion-fence lease before publication.");
+      }
+      const consent = consentSnap.data() ?? {};
+      if (consent.uid !== claim.uid || consent.receiptHash !== claim.consentReceiptHash
+        || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed) {
+        throw new HttpsError("aborted", "Export consent changed before publication.");
       }
       const completedAt = Date.now();
       tx.update(jobRef, {
