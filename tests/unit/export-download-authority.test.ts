@@ -10,7 +10,10 @@ const fixture = vi.hoisted(() => ({
   transactions: 0,
   serial: 0,
   verifyFails: false,
-  delivered: [] as string[]
+  delivered: [] as string[],
+  chunks: [] as Buffer[],
+  afterChunk: null as null | (() => void),
+  closed: false
 }));
 const firestoreMock = vi.hoisted(() => {
   const ref = (path: string) => ({
@@ -48,7 +51,9 @@ const appMock = vi.hoisted(() => ({ getApps: () => [{}], getApp: () => ({ option
 const storageMock = vi.hoisted(() => ({
   getStorage: () => ({ bucket: () => ({ file: (path: string) => ({
     exists: async () => { fixture.beforeSign?.(); return [true]; },
-    createReadStream: () => { fixture.delivered.push(path); return { syntheticStream: true, destroy: () => undefined }; },
+    createReadStream: () => { fixture.delivered.push(path); return {
+      async *[Symbol.asyncIterator]() { yield Buffer.alloc(128 * 1024, "s"); }, destroy: () => { fixture.closed = true; }
+    }; },
     getSignedUrl: async ({ expires }: { expires: number }) => {
       fixture.signs.push({ path, expires }); fixture.beforeSign?.(); return ["https://synthetic.invalid/export"];
     }
@@ -77,7 +82,11 @@ const authMock = vi.hoisted(() => ({ getAuth: () => ({ verifyIdToken: async (tok
 } }) }));
 vi.mock("firebase-admin/auth", () => authMock);
 vi.mock("../../functions/node_modules/firebase-admin/lib/esm/auth/index.js", () => authMock);
-vi.mock("node:stream/promises", () => ({ pipeline: async () => undefined }));
+vi.mock("node:stream/promises", () => ({ pipeline: async (source: AsyncIterable<Buffer> & { destroy: () => void },
+  guard: (source: AsyncIterable<Buffer>) => AsyncIterable<Buffer>, response: { destroyed: boolean }) => {
+  try { for await (const chunk of guard(source)) { fixture.chunks.push(chunk); fixture.afterChunk?.(); } }
+  catch (error) { source.destroy(); response.destroyed = true; throw error; }
+} }));
 
 import { getExportDownloadUrl, downloadExportPackage } from "../../functions/src/export-lifecycle-functions";
 const run = getExportDownloadUrl as unknown as (request: { auth?: { uid: string; token?: Record<string, unknown> }; data: unknown }) => Promise<Record<string, unknown>>;
@@ -87,8 +96,9 @@ const consentPath = "consentRecords/user-a_data_export";
 const fencePath = "privacyDeletionTombstones/user-a";
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   fixture.records.clear(); fixture.signs = []; fixture.audits = []; fixture.beforeSign = null;
-  fixture.failAudit = false; fixture.transactions = 0; fixture.serial = 0; fixture.verifyFails = false; fixture.delivered = [];
+  fixture.failAudit = false; fixture.transactions = 0; fixture.serial = 0; fixture.verifyFails = false; fixture.delivered = []; fixture.chunks = []; fixture.afterChunk = null; fixture.closed = false;
   const now = Date.now();
   const consentExpiresAt = now + 60_000;
   fixture.records.set(consentPath, {
@@ -212,5 +222,23 @@ describe("actual authenticated export delivery endpoint", () => {
     const issued = await run(ownerRequest); fixture.failAudit = true;
     const reply = await requestDownload(String(issued.url));
     expect(reply.status).toBe(500); expect(fixture.delivered).toEqual([]);
+  });
+});
+
+
+describe("live export streaming authority", () => {
+  it.each(["revocation", "deletion", "receipt", "session", "expiry"])("stops before the next 64KiB after %s", async (reason) => {
+    const issued = await run(ownerRequest);
+    fixture.afterChunk = () => {
+      if (reason === "revocation") fixture.records.get(consentPath)!.status = "revoked";
+      else if (reason === "deletion") fixture.records.get(fencePath)!.active = true;
+      else if (reason === "receipt") fixture.records.get(consentPath)!.receiptHash = "b".repeat(64);
+      else if (reason === "session") fixture.verifyFails = true;
+      else vi.spyOn(Date, "now").mockReturnValue(Number(issued.downloadExpiresAt) + 1);
+    };
+    await requestDownload(String(issued.url));
+    expect(fixture.chunks).toHaveLength(1);
+    expect(fixture.chunks[0].length).toBe(64 * 1024);
+    expect(fixture.closed).toBe(true);
   });
 });

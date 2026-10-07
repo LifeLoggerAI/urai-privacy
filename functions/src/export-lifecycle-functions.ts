@@ -212,7 +212,23 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
     response.set({ "Content-Type": "application/json", "Content-Disposition": `attachment; filename="urai-${file}.json"` });
     const stream = object.createReadStream();
     response.once("close", () => { if (!response.writableFinished) stream.destroy(); });
-    await pipeline(stream, response);
+    const guardedChunks = async function* (source: AsyncIterable<Buffer>) {
+      for await (const incoming of source) {
+        const chunk = Buffer.isBuffer(incoming) ? incoming : Buffer.from(incoming);
+        for (let offset = 0; offset < chunk.length; offset += 64 * 1024) {
+          let currentToken;
+          try { currentToken = await getAuth(app).verifyIdToken(bearer, true); }
+          catch { throw new HttpsError("unauthenticated", "Current authentication is required."); }
+          const current = await db.runTransaction((transaction) => readExportDownloadAuthority(transaction,
+            { uid: currentToken.uid, token: currentToken }, jobId, file));
+          if (current.identityHash !== authorityHash || expiresAt <= Date.now()) {
+            throw new HttpsError("failed-precondition", "Export authority changed during delivery.");
+          }
+          yield chunk.subarray(offset, offset + 64 * 1024);
+        }
+      }
+    };
+    await pipeline(stream, guardedChunks, response);
   } catch (error) {
     if (response.headersSent || response.destroyed) return;
     const status = error instanceof HttpsError
