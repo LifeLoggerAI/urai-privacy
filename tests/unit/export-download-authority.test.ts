@@ -10,6 +10,10 @@ const fixture = vi.hoisted(() => ({
   transactions: 0,
   serial: 0,
   verifyFails: false,
+  verificationUid: null as string | null,
+  currentAdminAllowed: true,
+  verificationChecks: [] as boolean[],
+  afterTransaction: null as null | ((id: number) => void),
   delivered: [] as string[],
   chunks: [] as Buffer[],
   afterChunk: null as null | (() => void),
@@ -32,7 +36,7 @@ const firestoreMock = vi.hoisted(() => {
     getFirestore: () => ({
       collection: (name: string) => ({ doc: (id?: string) => ref(`${name}/${id ?? `audit-${++fixture.serial}`}`) }),
       runTransaction: async (fn: (tx: unknown) => unknown) => {
-        fixture.transactions += 1;
+        const id = ++fixture.transactions;
         const writes: Array<{ path: string; value: Record<string, unknown> }> = [];
         const result = await fn({
           get: async (target: { path: string }) => ({ exists: fixture.records.has(target.path), data: () => fixture.records.get(target.path) }),
@@ -42,6 +46,7 @@ const firestoreMock = vi.hoisted(() => {
           }
         });
         for (const write of writes) { fixture.records.set(write.path, write.value); fixture.audits.push(write.value); }
+        fixture.afterTransaction?.(id);
         return result;
       }
     })
@@ -77,8 +82,10 @@ vi.mock("firebase-functions/v2/scheduler", () => schedulerMock);
 vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/scheduler.js", () => schedulerMock);
 
 const authMock = vi.hoisted(() => ({ getAuth: () => ({ verifyIdToken: async (token: string, checkRevoked: boolean) => {
+  fixture.verificationChecks.push(checkRevoked);
   if (fixture.verifyFails || !checkRevoked) throw new Error("synthetic revoked token");
-  return { uid: token === "other-user" ? "user-b" : "user-a" };
+  return { uid: fixture.verificationUid ?? (token === "other-user" ? "user-b" : token === "current-admin" ? "synthetic-admin" : "user-a"),
+    admin: token === "current-admin" && fixture.currentAdminAllowed };
 } }) }));
 vi.mock("firebase-admin/auth", () => authMock);
 vi.mock("../../functions/node_modules/firebase-admin/lib/esm/auth/index.js", () => authMock);
@@ -98,7 +105,7 @@ const fencePath = "privacyDeletionTombstones/user-a";
 beforeEach(() => {
   vi.restoreAllMocks();
   fixture.records.clear(); fixture.signs = []; fixture.audits = []; fixture.beforeSign = null;
-  fixture.failAudit = false; fixture.transactions = 0; fixture.serial = 0; fixture.verifyFails = false; fixture.delivered = []; fixture.chunks = []; fixture.afterChunk = null; fixture.closed = false;
+  fixture.failAudit = false; fixture.transactions = 0; fixture.serial = 0; fixture.verifyFails = false; fixture.verificationUid = null; fixture.currentAdminAllowed = true; fixture.verificationChecks = []; fixture.afterTransaction = null; fixture.delivered = []; fixture.chunks = []; fixture.afterChunk = null; fixture.closed = false;
   const now = Date.now();
   const consentExpiresAt = now + 60_000;
   fixture.records.set(consentPath, {
@@ -241,4 +248,40 @@ describe("live export streaming authority", () => {
     expect(fixture.chunks[0].length).toBe(64 * 1024);
     expect(fixture.closed).toBe(true);
   });
+});
+
+
+const authenticationDrifts = ["revocation", "owner change", "administrative permission withdrawal"];
+
+describe("post-await canonical export authentication", () => {
+  it.each(["initial authority", "object lookup", "audit"].flatMap(phase => authenticationDrifts.map(drift => [phase, drift])))("blocks %s delivery await after %s invalidation", async (phase, drift) => {
+      const issued = await run(ownerRequest);
+      const start = fixture.transactions;
+      const invalidate = () => {
+        if (drift === "revocation") fixture.verifyFails = true;
+        else if (drift === "owner change") fixture.verificationUid = "synthetic-other-owner";
+        else fixture.currentAdminAllowed = false;
+      };
+      fixture.afterTransaction = id => { if (id === start + (phase === "audit" ? 2 : 1) && phase !== "object lookup") invalidate(); };
+      fixture.beforeSign = phase === "object lookup" ? invalidate : null;
+      const reply = await requestDownload(String(issued.url), drift === "administrative permission withdrawal" ? "current-admin" : "current-user");
+      expect(reply.status).toBe(drift === "revocation" ? 401 : 403);
+      expect(fixture.delivered).toEqual([]); expect(fixture.chunks).toEqual([]);
+      expect(fixture.verificationChecks.every(check => check === true)).toBe(true);
+    });
+  it.each([1, 2].flatMap(chunk => authenticationDrifts.map(drift => [chunk, drift] as const)))("does not yield chunk%s after %s during its authority await", async (chunk, drift) => {
+      const issued = await run(ownerRequest);
+      const start = fixture.transactions;
+      fixture.afterTransaction = id => {
+        if (id !== start + 2 + chunk) return;
+        if (drift === "revocation") fixture.verifyFails = true;
+        else if (drift === "owner change") fixture.verificationUid = "synthetic-other-owner";
+        else fixture.currentAdminAllowed = false;
+      };
+      await requestDownload(String(issued.url), drift === "administrative permission withdrawal" ? "current-admin" : "current-user");
+      expect(fixture.chunks).toHaveLength(chunk - 1);
+      expect(fixture.chunks.reduce((sum, bytes) => sum + bytes.length, 0)).toBe((chunk - 1) * 64 * 1024);
+      expect(fixture.closed).toBe(true);
+      expect(fixture.verificationChecks.every(check => check === true)).toBe(true);
+    });
 });

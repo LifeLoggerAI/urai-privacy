@@ -1,0 +1,15 @@
+# Canonical export post-await authentication repair
+
+Date: 2026-10-07
+Owner base: `bc7390ed603c678d18da688737ce1d10c156db5a`
+Status: source proof; exact hosted CI, independent review and governed release acceptance remain required.
+
+The actual protected download verified a token, then awaited Firestore authority before yielding a bounded chunk. Revocation during that await could release one extra 64 KiB. Initial authority/object/audit awaits could also outlive authentication while opening the private object stream. New handler regressions inject session revocation, original-actor UID drift and withdrawn administrative permission at each of those boundaries. The existing canonical C7/data.export grant, matching receipt and tombstone projection, completed request/job, package deadline, selected file and audit remain server authority.
+
+The HTTP handler now repeats revocation-checked verifyIdToken(bearer,true) after its initial authority read, Storage existence lookup and committed authorization audit, and after each chunk authority transaction immediately before yielding bytes. It pins the originally verified actor UID, rejects a changed connection, and rechecks current owner/administrative permission against the current subject. Existing token verification before each chunk authority read is retained. No signed Storage URL or direct client Storage read is introduced; already emitted bytes cannot be recalled.
+
+The getExportDownloadUrl API and requiresAuthorization=true descriptor remain unchanged. This canonical Privacy endpoint keeps its root exportJobs/privacyRequests schema; Spatial's distinct operational job/issued-descriptor schema is not imported. Homepage route repairs, provenance and Labs owner receipts are retained from the current base. Runtime CORS options and consent policy/receipt semantics are unchanged by this bounded repair.
+
+Actual Node 22.23.3 validation: the prior actual handler has 25 retained PASS /15 new FAIL in the focused suite. All 265 unit cases in 25 suites PASS after the repair, including all 40 focused handler cases. Strict Functions build, ordinary app typecheck, lint and the existing complete-export contract PASS. Lint initially identified two test call-formatting errors; those are corrected without changing assertions. Dependency graph/locks are unchanged. This uses actual source handlers through synthetic SDK/transport boundaries, not real account data or deployed/emulator acceptance.
+
+Original before/after, strict compiler, typecheck, lint and contract logs are retained. The loaded local Functions emulator remains blocked by AF_UNIX EPERM; no emulator PASS is claimed. Native current-head CI, independent security/release review, protected deployed identity/revocation/export/delete evidence and owner signoff remain separate required gates. Previously issued GCS URLs require expiry/object removal; Storage rules cannot retroactively revoke them. No private real data, cloud credentials, paid provider/spend calls, production deployment or Golden Master claim were used or made.

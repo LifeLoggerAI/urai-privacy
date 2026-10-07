@@ -188,13 +188,25 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
     if (!parsed.success) throw new HttpsError("invalid-argument", "A valid export download request is required.");
     const { jobId, file, expiresAt, authorityHash } = parsed.data;
     const actorAuth = { uid: verified.uid, token: verified };
+    const requireCurrentDownloadAuthentication = async (ownerUid: string) => {
+      let currentToken;
+      try { currentToken = await getAuth(app).verifyIdToken(bearer, true); }
+      catch { throw new HttpsError("unauthenticated", "Current authentication is required."); }
+      if (currentToken.uid !== verified.uid) throw new HttpsError("permission-denied", "Authenticated export actor changed.");
+      if (request.aborted || response.destroyed) throw new HttpsError("unauthenticated", "The export connection changed.");
+      const currentAuth = { uid: currentToken.uid, token: currentToken };
+      requireOwnerOrAdmin(currentAuth, ownerUid);
+      return currentAuth;
+    };
     const authority = await db.runTransaction((transaction) => readExportDownloadAuthority(transaction, actorAuth, jobId, file));
+    await requireCurrentDownloadAuthentication(authority.uid);
     if (authority.identityHash !== authorityHash || expiresAt <= Date.now()
       || expiresAt > Math.min(Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS, authority.packageExpiresAt, authority.consentExpiresAt)) {
       throw new HttpsError("failed-precondition", "Export download authority has expired or changed.");
     }
     const object = bucket.file(authority.path);
     const [exists] = await object.exists();
+    await requireCurrentDownloadAuthentication(authority.uid);
     if (!exists) throw new HttpsError("not-found", "Export package file is missing.");
     const auditRef = db.collection("auditLogs").doc();
     await db.runTransaction(async (transaction) => {
@@ -209,6 +221,7 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
       };
       transaction.create(auditRef, { ...audit, timestamp: FieldValue.serverTimestamp(), integrityHash: digest({ auditId: auditRef.id, ...audit }) });
     });
+    await requireCurrentDownloadAuthentication(authority.uid);
     response.set({ "Content-Type": "application/json", "Content-Disposition": `attachment; filename="urai-${file}.json"` });
     const stream = object.createReadStream();
     response.once("close", () => { if (!response.writableFinished) stream.destroy(); });
@@ -216,11 +229,11 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
       for await (const incoming of source) {
         const chunk = Buffer.isBuffer(incoming) ? incoming : Buffer.from(incoming);
         for (let offset = 0; offset < chunk.length; offset += 64 * 1024) {
-          let currentToken;
-          try { currentToken = await getAuth(app).verifyIdToken(bearer, true); }
-          catch { throw new HttpsError("unauthenticated", "Current authentication is required."); }
-          const current = await db.runTransaction((transaction) => readExportDownloadAuthority(transaction,
-            { uid: currentToken.uid, token: currentToken }, jobId, file));
+          const currentAuth = await requireCurrentDownloadAuthentication(authority.uid);
+          const current = await db.runTransaction((transaction) => readExportDownloadAuthority(transaction, currentAuth, jobId, file));
+          // A token or administrative claim can be invalidated while Firestore awaits.
+          // Pin the original actor and revalidate its current owner/admin grant before bytes.
+          await requireCurrentDownloadAuthentication(current.uid);
           if (current.identityHash !== authorityHash || expiresAt <= Date.now()) {
             throw new HttpsError("failed-precondition", "Export authority changed during delivery.");
           }
