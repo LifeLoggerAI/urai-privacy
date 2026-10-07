@@ -97,7 +97,7 @@ jobs:
       - name: Install Functions dependencies
         run: npm ci --prefix functions
       - name: Verify emulator-load assertion
-        run: node --test tests/functions-emulator-loaded.test.mjs
+        run: node --test scripts/functions-emulator-loaded.cases.mjs
       - name: Run Firebase emulator tests
         env:
           URAI_RELEASE_VERIFY: '1'

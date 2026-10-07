@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertCallableLoaded } from '../scripts/check-functions-emulator-loaded.mjs'
+import { assertCallableLoaded } from './check-functions-emulator-loaded.mjs'
 
 test('only loaded protected callable rejection establishes emulator authority', () => {
   assert.doesNotThrow(() => assertCallableLoaded({ status: 401 }, { error: { status: 'UNAUTHENTICATED' } }))
