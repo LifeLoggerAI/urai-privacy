@@ -76,6 +76,8 @@ async function seedCompletedExport(uid: string, jobId: string, expiresAt = Date.
       uid,
       status: "completed",
       complete: true,
+      exportPackagePath: `exports/${uid}/${jobId}/export.json`,
+      exportManifestPath: `exports/${uid}/${jobId}/manifest.json`,
       packageExpiresAt: Timestamp.fromMillis(expiresAt)
     });
   });
@@ -107,14 +109,38 @@ describe("Storage export and evidence rules", () => {
     await assertFails(getBytes(ref(anonStorage(), "exports/user-a/export-1/manifest.json")));
   });
 
-  it("allows only either supported admin claim shape to write export and evidence objects", async ({ skip }) => {
+  it("permits only trusted server exports and either admin claim shape for evidence writes", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await assertFails(uploadString(ref(storageFor("user-a"), "exports/user-a/export-2/manifest.json"), "{}"));
-    await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-2/manifest.json"), "{}"));
-    await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-role-admin/manifest.json"), "{}"));
+    await assertFails(uploadString(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-2/manifest.json"), "{}"));
+    await assertFails(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-role-admin/manifest.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "evidence/release-lock.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "evidence/role-release-lock.json"), "{}"));
     await assertFails(uploadString(ref(storageFor("user-a"), "evidence/release-lock.json"), "{}"));
+  });
+
+  it("allows only the published attempt and denies stale attempt and legacy objects", async ({ skip }) => {
+    if (!storageRulesAvailable) return skip();
+    const active = "exports/user-a/attempt-job/current/manifest.json";
+    const stale = "exports/user-a/attempt-job/stale/manifest.json";
+    const legacy = "exports/user-a/attempt-job/manifest.json";
+    for (const path of [active, stale, legacy]) await seedStorage(path);
+    await requireStorageEnv().withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "exportJobs", "attempt-job"), {
+        uid: "user-a", status: "completed", complete: true,
+        packageExpiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+        exportPackagePath: "exports/user-a/attempt-job/current/export.json",
+        exportManifestPath: active
+      });
+    });
+    await assertSucceeds(getBytes(ref(storageFor("user-a"), active)));
+    await assertSucceeds(getBytes(ref(storageFor("admin-a", { admin: true }), active)));
+    await assertFails(getBytes(ref(storageFor("user-a"), stale)));
+    await assertFails(getBytes(ref(storageFor("admin-a", { admin: true }), stale)));
+    await assertFails(getBytes(ref(storageFor("user-a"), legacy)));
+    await assertFails(getBytes(ref(storageFor("user-b"), active)));
+    await assertFails(getBytes(ref(anonStorage(), active)));
+    await assertFails(uploadString(ref(storageFor("admin-a", { admin: true }), active), "overwrite"));
   });
 
   it("denies deletes and deny-default paths", async ({ skip }) => {

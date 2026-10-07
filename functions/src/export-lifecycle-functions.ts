@@ -22,6 +22,7 @@ import {
   validExportObjectPath
 } from "./export-lifecycle-contract";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
+import { cleanupExportArtifactAttempts } from "./export-attempt-maintenance";
 
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
@@ -369,6 +370,7 @@ export const cleanupExpiredExportPackages = onSchedule(
     const now = Date.now();
 
     await backfillLegacyExportPackageExpiry(now);
+    await cleanupExportArtifactAttempts(now);
 
     for (let pageNumber = 0; pageNumber < EXPORT_CLEANUP_MAX_PAGES; pageNumber += 1) {
       let query = db

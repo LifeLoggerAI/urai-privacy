@@ -66,6 +66,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /exportArtifactAttempts/{id} {
+      allow read: if isOwner(resource.data.uid) || isAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /consentRecords/{id} {
       allow read: if isOwner(resource.data.uid) || isAdmin();
       allow create, update, delete: if false;
