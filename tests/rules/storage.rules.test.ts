@@ -125,7 +125,7 @@ describe("Storage export and evidence rules", () => {
       });
       await setDoc(doc(context.firestore(), "privacyRequests", `request-${uid}`), { uid, type: "export", status: "completed" });
     });
-    await assertSucceeds(getBytes(ref(storageFor(uid), path)));
+    await assertFails(getBytes(ref(storageFor(uid), path)));
     const descriptorResponse = await fetch(`http://${functionsHost}/${PROJECT_ID}/us-central1/getExportDownloadUrl`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${identity.idToken}` },
       body: JSON.stringify({ data: { jobId, file: "manifest" } })
@@ -143,14 +143,14 @@ describe("Storage export and evidence rules", () => {
     if (withdrawn.status !== 409) throw new Error("An earlier descriptor survived canonical consent withdrawal.");
   });
 
-  it("allows owners and both supported admin claim shapes to read user export paths", async ({ skip }) => {
+  it("denies direct Storage reads even for owners and both admin claim shapes", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await seedStorage("exports/user-a/export-1/manifest.json");
     await seedCompletedExport("user-a", "export-1");
 
-    await assertSucceeds(getBytes(ref(storageFor("user-a"), "exports/user-a/export-1/manifest.json")));
-    await assertSucceeds(getBytes(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-1/manifest.json")));
-    await assertSucceeds(getBytes(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("user-a"), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-1/manifest.json")));
   });
 
   it("denies direct owner reads after package expiry", async ({ skip }) => {
@@ -178,7 +178,7 @@ describe("Storage export and evidence rules", () => {
     await assertFails(uploadString(ref(storageFor("user-a"), "evidence/release-lock.json"), "{}"));
   });
 
-  it("allows only the published attempt and denies stale attempt and legacy objects", async ({ skip }) => {
+  it("requires guarded Function delivery for published, stale and legacy export objects", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     const active = "exports/user-a/attempt-job/current/manifest.json";
     const stale = "exports/user-a/attempt-job/stale/manifest.json";
@@ -193,8 +193,8 @@ describe("Storage export and evidence rules", () => {
         exportManifestPath: active
       }, { merge: true });
     });
-    await assertSucceeds(getBytes(ref(storageFor("user-a"), active)));
-    await assertSucceeds(getBytes(ref(storageFor("admin-a", { admin: true }), active)));
+    await assertFails(getBytes(ref(storageFor("user-a"), active)));
+    await assertFails(getBytes(ref(storageFor("admin-a", { admin: true }), active)));
     await assertFails(getBytes(ref(storageFor("user-a"), stale)));
     await assertFails(getBytes(ref(storageFor("admin-a", { admin: true }), stale)));
     await assertFails(getBytes(ref(storageFor("user-a"), legacy)));

@@ -11,55 +11,11 @@ service firebase.storage {
     }
     function isCreateOrUpdate() { return request.resource != null; }
 
-    function exportJob(jobId) {
-      return firestore.get(/databases/(default)/documents/exportJobs/$(jobId));
-    }
-    function subjectFence(uid) {
-      return firestore.get(/databases/(default)/documents/privacyDeletionTombstones/$(uid));
-    }
-    function currentExportConsent(uid, jobId) {
-      let fence = subjectFence(uid).data;
-      return fence.uid == uid
-        && (!('active' in fence) || fence.active == false)
-        && fence.exportConsentStatus == "granted"
-        && fence.exportConsentPolicyVersion == "1.0.0"
-        && fence.exportConsentReceiptHash is string
-        && fence.exportConsentReceiptHash.size() == 64
-        && fence.exportConsentReceiptHash == exportJob(jobId).data.consentReceiptHash
-        && fence.exportConsentExpiresAt is timestamp
-        && fence.exportConsentExpiresAt > request.time
-        && fence.exportConsentExpiresAt == exportJob(jobId).data.exportConsentExpiresAt;
-    }
-    function activeExportPackage(uid, jobId) {
-      return firestore.exists(/databases/(default)/documents/exportJobs/$(jobId))
-        && exportJob(jobId).data.uid == uid
-        && exportJob(jobId).data.status == "completed"
-        && exportJob(jobId).data.complete == true
-        && exportJob(jobId).data.packageExpiresAt is timestamp
-        && exportJob(jobId).data.packageExpiresAt > request.time
-        && currentExportConsent(uid, jobId);
-    }
-
-    match /exports/{uid}/{jobId}/{fileName} {
-      allow read: if (isOwner(uid) || isAdmin())
-        && fileName in ["export.json", "manifest.json"]
-        && activeExportPackage(uid, jobId)
-        && (
-          (fileName == "export.json" && exportJob(jobId).data.exportPackagePath == "exports/" + uid + "/" + jobId + "/export.json")
-          || (fileName == "manifest.json" && exportJob(jobId).data.exportManifestPath == "exports/" + uid + "/" + jobId + "/manifest.json")
-        );
-      allow write: if false;
-    }
-
-    match /exports/{uid}/{jobId}/{attemptToken}/{fileName} {
-      allow read: if (isOwner(uid) || isAdmin())
-        && fileName in ["export.json", "manifest.json"]
-        && activeExportPackage(uid, jobId)
-        && (
-          (fileName == "export.json" && exportJob(jobId).data.exportPackagePath == "exports/" + uid + "/" + jobId + "/" + attemptToken + "/export.json")
-          || (fileName == "manifest.json" && exportJob(jobId).data.exportManifestPath == "exports/" + uid + "/" + jobId + "/" + attemptToken + "/manifest.json")
-        );
-      allow write: if false;
+    // Private export bytes can only be delivered by the authenticated Function,
+    // which checks current authority again before each bounded stream chunk.
+    // A direct Storage SDK read cannot enforce mid-transfer withdrawal.
+    match /exports/{uid}/{allPaths=**} {
+      allow read, write: if false;
     }
 
     match /evidence/{allPaths=**} {

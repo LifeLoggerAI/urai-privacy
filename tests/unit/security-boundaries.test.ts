@@ -192,8 +192,10 @@ describe("privacy security boundaries", () => {
     expect(lifecycle).toContain("artifactCleanupLeaseToken: cleanupToken");
     expect(exportRequest).toContain('status === "artifact_cleanup"');
     expect(lifecycle).toContain("cleanupFailedJob(document)");
-    expect(storageRules).toContain("activeExportPackage(uid, jobId)");
-    expect(storageRules).toContain("packageExpiresAt > request.time");
+    expect(storageRules).toMatch(/match \/exports\/\{uid\}\/\{allPaths=\*\*\}\s*\{\s*allow read, write: if false;/);
+    expect(lifecycle).toContain("packageExpiresAt <= now");
+    expect(lifecycle).toContain("verifyIdToken(bearer, true)");
+    expect(lifecycle).toContain("pipeline(stream, guardedChunks, response)");
   });
 
   it("does not claim privacy certification from queue counts alone", () => {

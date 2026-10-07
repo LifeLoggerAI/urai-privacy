@@ -15,6 +15,7 @@ const consentApi = read("functions/src/consent-api.ts");
 const contract = read("functions/src/export-contract.ts");
 const lifecycle = read("functions/src/export-lifecycle-functions.ts");
 const lifecycleContract = read("functions/src/export-lifecycle-contract.ts");
+const storageRules = read("storage.rules");
 
 const failures = [];
 const requireMatch = (label, value, pattern) => {
@@ -120,6 +121,7 @@ requireMatch("download descriptors must not outlive package or consent", lifecyc
 requireMatch("actual delivery must require revocation-checked authentication", lifecycle, /verifyIdToken\(bearer,\s*true\)/);
 requireMatch("actual delivery must reread current export authority", lifecycle, /downloadExportPackage[\s\S]*readExportDownloadAuthority/);
 rejectMatch("actual export lifecycle must not mint Storage bearer URLs", lifecycle, /getSignedUrl/);
+requireMatch("private exports must require guarded delivery instead of direct Storage reads", storageRules, /match \/exports\/\{uid\}\/\{allPaths=\*\*\}\s*\{\s*allow read, write: if false;/);
 requireMatch("download must verify job-scoped object paths", lifecycle, /validExportObjectPath\(\{\s*uid,\s*jobId,\s*path\s*\}\)/);
 requireMatch("expired package cleanup must be scheduled", lifecycle, /cleanupExpiredExportPackages\s*=\s*onSchedule/);
 requireMatch("cleanup must tolerate missing objects", lifecycle, /delete\(\{\s*ignoreNotFound:\s*true\s*\}\)/);
