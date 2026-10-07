@@ -5,7 +5,7 @@ const state = vi.hoisted(() => ({
   records: new Map<string, Record<string, unknown>>(),
   creates: [] as Array<{ path: string; value: Record<string, unknown> }>
 }));
-vi.mock("firebase-admin/firestore", () => ({
+const firestoreMock = vi.hoisted(() => ({
   FieldValue: { serverTimestamp: () => "synthetic-server-timestamp" },
   getFirestore: () => ({
     collection: (collection: string) => ({ doc: (id: string) => ({ path: collection + "/" + id }) }),
@@ -17,13 +17,19 @@ vi.mock("firebase-admin/firestore", () => ({
     })
   })
 }));
-vi.mock("firebase-functions/v2/firestore", () => ({
+vi.mock("firebase-admin/firestore", () => firestoreMock);
+vi.mock("../../functions/node_modules/firebase-admin/lib/esm/firestore/index.js", () => firestoreMock);
+const triggerMock = vi.hoisted(() => ({
   onDocumentWritten: (_path: string, handler: unknown) => handler
 }));
-vi.mock("firebase-functions/v2/https", () => ({
+vi.mock("firebase-functions/v2/firestore", () => triggerMock);
+vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/firestore.js", () => triggerMock);
+const httpsMock = vi.hoisted(() => ({
   onCall: (handler: unknown) => handler,
   HttpsError: class extends Error {}
 }));
+vi.mock("firebase-functions/v2/https", () => httpsMock);
+vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/https.js", () => httpsMock);
 import { publishConsentRevocation } from "../../functions/src/consent-revocation";
 async function invoke(before: Record<string, unknown> | null, after: Record<string, unknown> | null) {
   const snapshot = (data: Record<string, unknown> | null) => ({ exists: data !== null, data: () => data });
