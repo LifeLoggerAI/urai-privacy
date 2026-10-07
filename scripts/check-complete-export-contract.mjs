@@ -105,7 +105,7 @@ requireMatch("canonical consent must commit record, event, and audit in one tran
 requireMatch("contract must include consent events", contract, /collection:\s*["']consentEvents["']/);
 requireMatch("contract must include consent decisions", contract, /collection:\s*["']consentDecisions["']/);
 requireMatch("contract must recursively scrub array entries", contract, /value\.map\(\(entry\)\s*=>\s*serializeForExport\(entry\)\)/);
-requireMatch("lifecycle must enforce owner or administrative access", lifecycle, /requireOwnerOrAdmin\(request\.auth,\s*uid\)/);
+requireMatch("lifecycle must enforce owner or administrative access", lifecycle, /requireOwnerOrAdmin\(auth,\s*uid\)/);
 requireMatch(
   "download must reject incomplete jobs even when status says completed",
   lifecycle,
@@ -116,7 +116,10 @@ requireMatch(
   lifecycleContract,
   /resolveExportPackageExpiry[\s\S]*packageExpiresAt[\s\S]*completedAt/m
 );
-requireMatch("download links must not outlive the package", lifecycle, /Math\.min\([\s\S]*EXPORT_DOWNLOAD_URL_TTL_MS[\s\S]*packageExpiresAt/);
+requireMatch("download descriptors must not outlive package or consent", lifecycle, /Math\.min\([\s\S]*EXPORT_DOWNLOAD_URL_TTL_MS[\s\S]*packageExpiresAt[\s\S]*consentExpiresAt/);
+requireMatch("actual delivery must require revocation-checked authentication", lifecycle, /verifyIdToken\(bearer,\s*true\)/);
+requireMatch("actual delivery must reread current export authority", lifecycle, /downloadExportPackage[\s\S]*readExportDownloadAuthority/);
+rejectMatch("actual export lifecycle must not mint Storage bearer URLs", lifecycle, /getSignedUrl/);
 requireMatch("download must verify job-scoped object paths", lifecycle, /validExportObjectPath\(\{\s*uid,\s*jobId,\s*path\s*\}\)/);
 requireMatch("expired package cleanup must be scheduled", lifecycle, /cleanupExpiredExportPackages\s*=\s*onSchedule/);
 requireMatch("cleanup must tolerate missing objects", lifecycle, /delete\(\{\s*ignoreNotFound:\s*true\s*\}\)/);

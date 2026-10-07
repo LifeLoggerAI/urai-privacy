@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import {
@@ -46,7 +46,7 @@ function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknow
 }
 
 function canonicalPurpose(value: string): ConsentPurpose {
-  if (!(value in consentPurposeRegistry)) {
+  if (!Object.hasOwn(consentPurposeRegistry, value)) {
     throw new HttpsError("failed-precondition", "Unknown consent purpose. Processing must fail closed until the purpose registry is updated.");
   }
   return value as ConsentPurpose;
@@ -126,7 +126,8 @@ export const setCanonicalConsent = onCall(async (request) => {
   const auditRef = db.collection("auditLogs").doc();
 
   await db.runTransaction(async (transaction) => {
-    const deletionFence = await transaction.get(db.collection("privacyDeletionTombstones").doc(uid));
+    const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
+    const deletionFence = await transaction.get(deletionFenceRef);
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent changes are blocked.");
     }
@@ -135,6 +136,18 @@ export const setCanonicalConsent = onCall(async (request) => {
       receiptHash,
       serverUpdatedAt: FieldValue.serverTimestamp()
     }, { merge: false });
+    // Storage can read only two Firestore documents per evaluation. Keep this
+    // canonical receipt projection in the existing subject fence, atomically
+    // with the actual consent record. It cannot independently grant consent.
+    if (purpose === "data.export") transaction.set(deletionFenceRef, {
+      uid,
+      exportConsentStatus: parsed.data.status,
+      exportConsentReceiptHash: receiptHash,
+      exportConsentPolicyVersion: CONSENT_DECISION_POLICY_VERSION,
+      exportConsentExpiresAt: effectiveExpiresAt
+        ? Timestamp.fromMillis(Date.parse(effectiveExpiresAt)) : FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
     transaction.set(eventRef, {
       ...receipt,
       consentRecordId: recordId,

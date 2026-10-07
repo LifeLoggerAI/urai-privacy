@@ -2,7 +2,8 @@
 
 import { httpsCallable } from "firebase/functions";
 import { collection, limit, onSnapshot, orderBy, query, where, type DocumentData } from "firebase/firestore";
-import { db, functions } from "../../firebase/firebase";
+import { auth, db, firebaseApp, functions } from "../../firebase/firebase";
+import { fetchAuthorizedExport } from "./export-download-client";
 
 export type CallableResult = Record<string, unknown>;
 
@@ -69,6 +70,30 @@ export function evaluateConsentPreference(payload: { purpose: string; correlatio
 
 export function getExportDownloadUrl(payload: { jobId: string; file?: "export" | "manifest" }) {
   return callPrivacyFunction("getExportDownloadUrl", payload);
+}
+
+export async function downloadExportPackage(payload: { jobId: string; file?: "export" | "manifest" }) {
+  const user = auth?.currentUser;
+  const projectId = firebaseApp?.options.projectId;
+  if (!user || !projectId) throw new Error("Current authentication is required for export downloads.");
+  const result = await getExportDownloadUrl(payload);
+  if (typeof result.url !== "string" || result.requiresAuthorization !== true) {
+    throw new Error("An authenticated export download was not returned.");
+  }
+  const contents = await fetchAuthorizedExport({
+    url: result.url, projectId, getIdToken: () => user.getIdToken(true)
+  });
+  const localUrl = URL.createObjectURL(contents);
+  try {
+    const link = document.createElement("a");
+    link.href = localUrl;
+    link.download = `urai-${payload.file ?? "export"}.json`;
+    link.rel = "noopener noreferrer";
+    document.body.append(link);
+    link.click();
+    link.remove();
+  } finally { setTimeout(() => URL.revokeObjectURL(localUrl), 1000); }
+  return result;
 }
 
 export function executeDeletionRequest(payload: { requestId: string; mode?: "dryRun" | "execute"; expectedPlanHash?: string }) {

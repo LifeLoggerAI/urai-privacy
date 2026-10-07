@@ -14,13 +14,30 @@ service firebase.storage {
     function exportJob(jobId) {
       return firestore.get(/databases/(default)/documents/exportJobs/$(jobId));
     }
+    function subjectFence(uid) {
+      return firestore.get(/databases/(default)/documents/privacyDeletionTombstones/$(uid));
+    }
+    function currentExportConsent(uid, jobId) {
+      let fence = subjectFence(uid).data;
+      return fence.uid == uid
+        && (!('active' in fence) || fence.active == false)
+        && fence.exportConsentStatus == "granted"
+        && fence.exportConsentPolicyVersion == "1.0.0"
+        && fence.exportConsentReceiptHash is string
+        && fence.exportConsentReceiptHash.size() == 64
+        && fence.exportConsentReceiptHash == exportJob(jobId).data.consentReceiptHash
+        && fence.exportConsentExpiresAt is timestamp
+        && fence.exportConsentExpiresAt > request.time
+        && fence.exportConsentExpiresAt == exportJob(jobId).data.exportConsentExpiresAt;
+    }
     function activeExportPackage(uid, jobId) {
       return firestore.exists(/databases/(default)/documents/exportJobs/$(jobId))
         && exportJob(jobId).data.uid == uid
         && exportJob(jobId).data.status == "completed"
         && exportJob(jobId).data.complete == true
         && exportJob(jobId).data.packageExpiresAt is timestamp
-        && exportJob(jobId).data.packageExpiresAt > request.time;
+        && exportJob(jobId).data.packageExpiresAt > request.time
+        && currentExportConsent(uid, jobId);
     }
 
     match /exports/{uid}/{jobId}/{fileName} {

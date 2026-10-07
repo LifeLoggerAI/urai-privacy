@@ -5,7 +5,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
-import { EXPORT_PACKAGE_TTL_MS } from "./export-lifecycle-contract";
+import { EXPORT_PACKAGE_TTL_MS, timestampMillis } from "./export-lifecycle-contract";
 import { exportAttemptPaths, exportPublicationBlockReason, ownsExportAttempt } from "./export-processing-authority";
 import { evaluateConsentDecision } from "./consent-decision";
 
@@ -235,6 +235,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed) {
       throw new HttpsError("failed-precondition", "Current export consent is required before processing.");
     }
+    const consentExpiresAt = Timestamp.fromMillis(timestampMillis(consent.expiresAt)!);
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is fenced; export processing is blocked.");
     }
@@ -253,6 +254,10 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       exportProcessingLeaseToken: token,
       exportProcessingLeaseExpiresAt: processingLeaseExpiresAt,
       exportProcessingBy: adminUid,
+      exportConsentStatus: "granted",
+      exportConsentReceiptHash: consentReceiptHash,
+      exportConsentPolicyVersion: consent.policyVersion,
+      exportConsentExpiresAt: consentExpiresAt,
       updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
     tx.update(jobRef, {
@@ -276,7 +281,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       updatedAt: FieldValue.serverTimestamp()
     });
     tx.update(requestRef, { status: "processing", updatedAt: FieldValue.serverTimestamp() });
-    return { uid, requestId, requestRef, exportPath, manifestPath, consentRef, consentReceiptHash };
+    return { uid, requestId, requestRef, exportPath, manifestPath, consentRef, consentReceiptHash, consentExpiresAt };
   });
 
   const { exportPath, manifestPath } = claim;
@@ -326,6 +331,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         processingLeaseExpiresAt: FieldValue.delete(),
         exportManifestPath: manifestPath,
         exportPackagePath: exportPath,
+        consentReceiptHash: claim.consentReceiptHash,
+        exportConsentExpiresAt: claim.consentExpiresAt,
         recordCount: exportData.recordCount,
         manifestSha256: manifestFile.sha256,
         exportSha256: exportFile.sha256,

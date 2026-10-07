@@ -12,8 +12,8 @@ Status: operational guidance for export, deletion, correction, retention, redact
 2. System creates `privacyRequests` record and `exportJobs` record.
 3. Admin or backend processor runs `processExportRequest`.
 4. Export package is written to private Storage under `exports/{uid}/{jobId}/`.
-5. User retrieves export through `getExportDownloadUrl`, which requires owner/admin access and returns a short-lived signed URL.
-6. Audit event records request, processing, and signed URL creation.
+5. User retrieves export through `getExportDownloadUrl` and authenticated `downloadExportPackage` delivery. Both reread current consent, receipt/deadline binding, package lifetime, and deletion fence; delivery checks Firebase token revocation.
+6. Audit events record request, processing, descriptor creation, and authorization before delivery. See `docs/EXPORT_DOWNLOAD_CONSENT_FENCE_20261007.md` for consumer and legacy-package transition requirements.
 
 Required evidence:
 
@@ -23,7 +23,7 @@ Required evidence:
 - target uid
 - manifest hash
 - package hash
-- signed URL creation audit
+- authenticated descriptor creation and delivery audits
 - completion timestamp
 
 ### Deletion
@@ -71,7 +71,7 @@ Deleted by default when in scope and not legally held:
 | Telemetry/analytics | R1/R2 aggregate, R3 raw | Prefer aggregate. Raw user-scoped telemetry must have retention and export/delete handling. |
 | Companion/chat/memory | R3/R4 | Consent-gated. Delete user-scoped records on deletion unless legal hold applies. |
 | Generated assets/manifests | R3/R4 | Retain ownership/rights evidence. Delete unpublished user-scoped assets on deletion unless legally retained. |
-| Export packages | R2 | Short-lived private storage, owner/admin signed retrieval only. |
+| Export packages | R2 | Short-lived private storage; current owner/admin authentication, consent receipt and deletion fence required at delivery. |
 | Deletion requests | R5 | Retained as legal/privacy evidence. |
 | Audit logs/admin actions | R5/R6 | Append-only, retained for security/legal evidence. |
 | Legal hold records | R6 | Admin-managed retained evidence. |
@@ -83,7 +83,7 @@ Deleted by default when in scope and not legally held:
 - [ ] Avoid storing provider tokens, secrets, raw credentials, or private keys.
 - [ ] Avoid public exposure of private/passive/memory/relationship data.
 - [ ] Separate public profile data from private account data.
-- [ ] Prefer short-lived signed URLs over public files.
+- [ ] Require current authentication and consent at private export delivery; do not issue irrevocable signed download capabilities.
 - [ ] Define retention class before storing a new data class.
 
 ## Sensitive-field redaction checklist
