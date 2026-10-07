@@ -14,6 +14,10 @@ const fixture = vi.hoisted(() => ({
   failAllAudits: false,
   losePublicationReply: false,
   failAttemptRead: false,
+  delayPublicationCommit: false,
+  commitBeforeFirstDelete: false,
+  pendingPublication: undefined as (() => boolean) | undefined,
+  delayedPublicationCommitted: undefined as boolean | undefined,
   authExists: false,
   failAuditTransaction: 0,
   beforeTransaction: undefined as ((phase: number) => void) | undefined,
@@ -86,10 +90,15 @@ const firestoreMock = vi.hoisted(() => {
       fixture.transactions += 1;
       const phase = fixture.transactions;
       fixture.beforeTransaction?.(phase);
+      if (phase === 3 && fixture.failAttemptRead) throw new Error("Uncertain cleanup claim /internal/path");
       if (phase === 2) fixture.beforePublication?.();
       const writes: Array<{ kind: string; path: string; data: Row; merge: boolean }> = [];
+      const reads = new Map<string, Row | undefined>();
       const tx = {
-        get: async (ref: { path: string }) => snapshot(ref.path),
+        get: async (ref: { path: string }) => {
+          reads.set(ref.path, fixture.documents.get(ref.path));
+          return snapshot(ref.path);
+        },
         create: (ref: { path: string }, data: Row) => {
           if (ref.path.startsWith("auditLogs/") && (fixture.failAllAudits || fixture.failAuditTransaction === phase || fixture.failAudit && data.action === "export_processed")) {
             throw new Error("Audit write outage at /sensitive/provider/key");
@@ -100,11 +109,23 @@ const firestoreMock = vi.hoisted(() => {
         set: (ref: { path: string }, data: Row, options?: { merge?: boolean }) => writes.push({ kind: "set", path: ref.path, data, merge: options?.merge ?? false })
       };
       const result = await handler(tx);
-      for (const write of writes) {
-        if (write.kind === "update" && !fixture.documents.has(write.path)) throw new Error("Missing document update");
-        if (write.kind === "create" && fixture.documents.has(write.path)) throw new Error("Duplicate immutable document");
+      const commit = () => {
+        if ([...reads].some(([path, original]) => fixture.documents.get(path) !== original)) return false;
+        for (const write of writes) {
+          if (write.kind === "update" && !fixture.documents.has(write.path)) throw new Error("Missing document update");
+          if (write.kind === "create" && fixture.documents.has(write.path)) throw new Error("Duplicate immutable document");
+        }
+        for (const write of writes) fixture.documents.set(write.path, apply(write.merge ? fixture.documents.get(write.path) ?? {} : {}, write.data));
+        return true;
+      };
+      if (phase === 2 && fixture.delayPublicationCommit) {
+        fixture.pendingPublication = () => {
+          fixture.delayedPublicationCommitted = commit();
+          return fixture.delayedPublicationCommitted;
+        };
+        throw new Error("Publication commit reply unavailable before server outcome is known");
       }
-      for (const write of writes) fixture.documents.set(write.path, apply(write.merge ? fixture.documents.get(write.path) ?? {} : {}, write.data));
+      if (!commit()) throw new Error("Transaction snapshot changed");
       if (phase === 2 && fixture.losePublicationReply) throw new Error("Publication response lost at /private/path");
       return result;
     }
@@ -129,6 +150,9 @@ const storageMock = vi.hoisted(() => ({
       fixture.objects.set(path, contents);
     },
     delete: async () => {
+      if (fixture.commitBeforeFirstDelete && fixture.pendingPublication) {
+        fixture.pendingPublication(); fixture.pendingPublication = undefined;
+      }
       fixture.deletes.push(path);
       if (fixture.failDeletes) throw new Error("Storage deletion outage /private/path");
       fixture.objects.delete(path);
@@ -159,7 +183,7 @@ function attempt() { return [...fixture.documents.entries()].find(([path]) => pa
 
 beforeEach(() => {
   fixture.documents.clear(); fixture.objects.clear(); fixture.deletes = [];
-  Object.assign(fixture, { transactions: 0, saves: 0, nextId: 0, failSave: 0, failDeletes: false, failAudit: false, failAllAudits: false, losePublicationReply: false, failAttemptRead: false, authExists: false, failAuditTransaction: 0, beforePublication: undefined, beforeTransaction: undefined });
+  Object.assign(fixture, { transactions: 0, saves: 0, nextId: 0, failSave: 0, failDeletes: false, failAudit: false, failAllAudits: false, losePublicationReply: false, failAttemptRead: false, delayPublicationCommit: false, commitBeforeFirstDelete: false, pendingPublication: undefined, delayedPublicationCommitted: undefined, authExists: false, failAuditTransaction: 0, beforePublication: undefined, beforeTransaction: undefined });
   fixture.documents.set("exportJobs/job-a", { uid: "user-a", requestId: "request-a", status: "pending" });
   fixture.documents.set("privacyRequests/request-a", { uid: "user-a", type: "export", status: "pending" });
   fixture.documents.set("consentRecords/user-a_data_export", {
@@ -323,6 +347,20 @@ describe("export callable failure and concurrency behavior", () => {
     expect(job().status).toBe("completed"); expect(fixture.objects.size).toBe(2); expect(fixture.deletes).toEqual([]);
     expect([...fixture.documents.values()].filter((row) => row.action === "export_processed")).toHaveLength(1);
   });
+  it("preserves bytes when delayed publication commits before cleanup claims ownership", async () => {
+    fixture.delayPublicationCommit = true;
+    fixture.beforeTransaction = (phase) => { if (phase === 3) fixture.pendingPublication?.(); };
+    await expect(run(adminRequest)).rejects.toMatchObject({ code: "unavailable" });
+    expect(fixture.delayedPublicationCommitted).toBe(true);
+    expect(job().status).toBe("completed"); expect(fixture.objects.size).toBe(2); expect(fixture.deletes).toEqual([]);
+  });
+  it("fences a delayed publication before cleanup deletes any object", async () => {
+    fixture.delayPublicationCommit = true; fixture.commitBeforeFirstDelete = true;
+    await expect(run(adminRequest)).rejects.toMatchObject({ code: "internal" });
+    expect(fixture.delayedPublicationCommitted).toBe(false);
+    expect(job().status).toBe("failed"); expect(job().complete).toBe(false); expect(fixture.objects.size).toBe(0);
+    expect([...fixture.documents.values()].some((row) => row.action === "export_processed")).toBe(false);
+  });
   it("retains cleanup ownership when Storage removal fails, without exposing raw paths", async () => {
     fixture.failSave = 2; fixture.failDeletes = true;
     const error = await run(adminRequest).catch((value) => value);
@@ -336,9 +374,9 @@ describe("export callable failure and concurrency behavior", () => {
     fixture.failAllAudits = true;
     const error = await run(adminRequest).catch((value) => value);
     expect(error.code).toBe("unavailable"); expect(error.message).not.toContain("/sensitive/provider/key");
-    expect(attempt()[1].status).toBe("processing"); expect(job().status).toBe("processing");
+    expect(attempt()[1].status).toBe("artifact_cleanup"); expect(job().status).toBe("artifact_cleanup");
   });
-  it("preserves artifacts while publication status readback is unavailable", async () => {
+  it("preserves artifacts while the cleanup ownership transaction is unavailable", async () => {
     fixture.losePublicationReply = true; fixture.failAttemptRead = true;
     await expect(run(adminRequest)).rejects.toMatchObject({ code: "unavailable" });
     expect(job().status).toBe("completed"); expect(fixture.objects.size).toBe(2); expect(fixture.deletes).toEqual([]);

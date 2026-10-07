@@ -358,15 +358,40 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     });
     return { jobId, status: "completed", auditId: auditRef.id, manifestPath, exportPath, recordCount: exportData.recordCount };
   } catch (error) {
-    // A transaction commit may succeed while its reply is lost. Published bytes must
-    // never be removed on that uncertain outcome; retained attempt maintenance retries.
-    let attemptState: Record<string, unknown>;
-    try {
-      attemptState = (await attemptRef.get()).data() ?? {};
-    } catch {
+    // Serialize cleanup against publication even when the publication RPC outcome
+    // is uncertain. The ledger write invalidates any older publication transaction.
+    const cleanupToken = randomUUID();
+    const cleanupClaim = await db.runTransaction(async (tx) => {
+      const [attemptSnap, jobSnap] = await Promise.all([tx.get(attemptRef), tx.get(jobRef)]);
+      if (attemptSnap.data()?.status === "completed") return false;
+      if (!attemptSnap.exists) return true; // Removed subject data cannot be republished.
+      if (attemptSnap.data()?.token !== token || attemptSnap.data()?.uid !== claim.uid
+        || attemptSnap.data()?.jobId !== jobId || attemptSnap.data()?.requestId !== claim.requestId) {
+        throw new HttpsError("aborted", "Export cleanup authority changed.");
+      }
+      if (processingLeaseIsActive(attemptSnap.data()?.cleanupLeaseExpiresAt)) {
+        throw new HttpsError("aborted", "Another worker owns export cleanup.");
+      }
+      const cleanupLeaseExpiresAt = Timestamp.fromMillis(Date.now() + EXPORT_PROCESSING_LEASE_MS);
+      tx.update(attemptRef, {
+        status: "artifact_cleanup", cleanupLeaseToken: cleanupToken,
+        cleanupLeaseExpiresAt, cleanupDueAt: Timestamp.fromMillis(Date.now()),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      if (ownsExportAttempt(jobSnap.data() ?? {}, authority)) {
+        tx.update(jobRef, {
+          status: "artifact_cleanup", complete: false,
+          artifactCleanupStatus: "processing", artifactCleanupPendingPaths: [exportPath, manifestPath],
+          artifactCleanupLeaseToken: cleanupToken, artifactCleanupLeaseExpiresAt: cleanupLeaseExpiresAt,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+      return true;
+    }).catch(() => {
+      // No cleanup runs without committed ownership; maintenance can recover later.
       throw new HttpsError("unavailable", "Export outcome is unavailable; retry the job status later.");
-    }
-    if (attemptState.status === "completed") {
+    });
+    if (!cleanupClaim) {
       throw new HttpsError("unavailable", "Export publication completed; retry the job status later.");
     }
     const cleanup = await removeExportArtifacts([exportPath, manifestPath], deleteExportArtifact);
@@ -378,15 +403,20 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       const [jobSnap, deletionFence, attemptSnap] = await Promise.all([
         tx.get(jobRef), tx.get(deletionFenceRef), tx.get(attemptRef)
       ]);
-      if (!attemptSnap.exists || attemptSnap.data()?.status === "completed") return;
+      if (!attemptSnap.exists || attemptSnap.data()?.status !== "artifact_cleanup"
+        || attemptSnap.data()?.cleanupLeaseToken !== cleanupToken) return;
       tx.update(attemptRef, {
         status: cleanup.pendingPaths.length ? "cleanup_pending" : "cleaned",
         paths: cleanup.pendingPaths,
         cleanupDueAt: Timestamp.fromMillis(Date.now()),
         cleanupFailureCount: cleanup.pendingPaths.length,
+        cleanupLeaseToken: FieldValue.delete(), cleanupLeaseExpiresAt: FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp()
       });
-      const ownsJob = ownsExportAttempt(jobSnap.data() ?? {}, authority);
+      const job = jobSnap.data() ?? {};
+      const ownsJob = job.uid === claim.uid && job.requestId === claim.requestId
+        && job.status === "artifact_cleanup" && job.processingLeaseToken === token
+        && job.artifactCleanupLeaseToken === cleanupToken;
       if (ownsJob) tx.update(jobRef, {
         status: "failed",
         complete: false,
