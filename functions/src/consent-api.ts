@@ -9,6 +9,7 @@ import {
   type ConsentPurpose
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
 
 const db = getFirestore();
 
@@ -39,12 +40,6 @@ const CANONICAL_CONSENT_NOTICE = Object.freeze({
   })
 });
 
-function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknown> } }) {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Authentication is required.");
-  return uid;
-}
-
 function canonicalPurpose(value: string): ConsentPurpose {
   if (!Object.hasOwn(consentPurposeRegistry, value)) {
     throw new HttpsError("failed-precondition", "Unknown consent purpose. Processing must fail closed until the purpose registry is updated.");
@@ -71,7 +66,8 @@ function crossUserAuthority(token?: Record<string, unknown>) {
 }
 
 export const setCanonicalConsent = onCall(async (request) => {
-  const uid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const uid = actor.uid;
   const parsed = setConsentSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
@@ -131,6 +127,8 @@ export const setCanonicalConsent = onCall(async (request) => {
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent changes are blocked.");
     }
+    // Auth can be revoked, disabled, or recreated while the transaction read waits.
+    await actor.requireCurrent();
     transaction.set(recordRef, {
       ...receipt,
       receiptHash,
@@ -176,6 +174,7 @@ export const setCanonicalConsent = onCall(async (request) => {
     });
   });
 
+  await actor.requireCurrent();
   return {
     consentId: recordId,
     consentEventId: eventRef.id,
@@ -191,16 +190,30 @@ export const setCanonicalConsent = onCall(async (request) => {
 });
 
 export const evaluateCanonicalConsent = onCall(async (request) => {
-  const actorUid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const actorUid = actor.uid;
   const parsed = decisionSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
   const purpose = canonicalPurpose(parsed.data.purpose);
   const targetUid = parsed.data.targetUid ?? actorUid;
-  const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthority(request.auth?.token);
-  if (!authority) {
-    throw new HttpsError("permission-denied", "Owner, administrator, or a consumer-bound trusted system authority is required.");
-  }
+  const requireCurrentAuthority = async () => {
+    const current = await actor.requireCurrent();
+    const authority = targetUid === actorUid
+      ? { role: "user" as const, consumerId: null } : crossUserAuthority(current.token);
+    if (!authority) {
+      throw new HttpsError("permission-denied", "Current owner, administrator, or consumer-bound trusted system authority is required.");
+    }
+    return authority;
+  };
+  const initialAuthority = await requireCurrentAuthority();
+  const requireUnchangedAuthority = async () => {
+    const current = await requireCurrentAuthority();
+    if (current.role !== initialAuthority.role || current.consumerId !== initialAuthority.consumerId) {
+      throw new HttpsError("permission-denied", "Consent decision actor authority changed.");
+    }
+    return current;
+  };
 
   const recordId = consentRecordId(targetUid, purpose);
   const recordRef = db.collection("consentRecords").doc(recordId);
@@ -215,6 +228,7 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent decisions are blocked.");
     }
 
+    const authority = await requireUnchangedAuthority();
     const evaluated = evaluateConsentDecision({
       purpose,
       record: snapshot.exists ? snapshot.data() : null
@@ -247,5 +261,7 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     return evaluated;
   });
 
+  await requireUnchangedAuthority();
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
 });
+

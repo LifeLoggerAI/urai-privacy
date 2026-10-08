@@ -36,10 +36,16 @@ export async function createPrivacyActorGuard(request: ActorRequest, adminOnly =
       const claims = account.customClaims ?? {};
       const signedAdmin = afterAccount.admin === true || afterAccount.role === "admin";
       const admin = signedAdmin && (claims.admin === true || claims.role === "admin");
+      const consumerId = typeof claims.consumerId === "string" ? claims.consumerId.trim() : "";
+      const signedConsumerId = typeof afterAccount.consumerId === "string" ? afterAccount.consumerId.trim() : "";
+      const system = (afterAccount.system === true || afterAccount.role === "system")
+        && (claims.system === true || claims.role === "system")
+        && /^[a-zA-Z0-9._-]{2,120}$/.test(consumerId) && consumerId === signedConsumerId;
       if ((adminOnly || (ownerUid !== undefined && ownerUid !== uid)) && !admin) {
         throw new HttpsError("permission-denied", "Current administrative access is required.");
       }
-      return { uid, token: { ...claims, admin, role: admin ? claims.role : undefined } };
+      return { uid, token: { ...claims, admin, system,
+        role: admin || system ? claims.role : undefined, consumerId: system ? consumerId : undefined } };
     } catch (error) {
       if (error instanceof HttpsError) throw error;
       throw new HttpsError("unauthenticated", "Current authentication is required.");
@@ -48,3 +54,4 @@ export async function createPrivacyActorGuard(request: ActorRequest, adminOnly =
   await requireCurrent();
   return { uid, requireCurrent };
 }
+

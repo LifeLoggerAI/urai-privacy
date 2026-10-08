@@ -39,15 +39,26 @@ const httpsMock = vi.hoisted(() => ({
   onCall: (handler: unknown) => handler,
   HttpsError: class extends Error { constructor(public code: string, message: string) { super(message); } }
 }));
+const authMock = vi.hoisted(() => ({ getAuth: () => ({
+  verifyIdToken: async (_token: string, checkRevoked: boolean) => {
+    if (!checkRevoked) throw new Error("Current token revocation check is required.");
+    return { uid: "user-a" };
+  },
+  getUser: async (uid: string) => ({ uid, disabled: false, customClaims: {},
+    metadata: { creationTime: "2026-10-01T00:00:00.000Z" } })
+}) }));
 vi.mock("firebase-admin/firestore", () => firestoreMock);
 vi.mock("../../functions/node_modules/firebase-admin/lib/esm/firestore/index.js", () => firestoreMock);
 vi.mock("firebase-functions/v2/https", () => httpsMock);
 vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/https.js", () => httpsMock);
+vi.mock("firebase-admin/auth", () => authMock);
+vi.mock("../../functions/node_modules/firebase-admin/lib/esm/auth/index.js", () => authMock);
 
 import { setCanonicalConsent } from "../../functions/src/consent-api";
 const run = setCanonicalConsent as unknown as (request: { auth?: { uid: string }; data: Record<string, unknown> }) => Promise<Record<string, unknown>>;
 const fencePath = "privacyDeletionTombstones/user-a";
-const request = (purpose: string, status: string) => ({ auth: { uid: "user-a" }, data: { purpose, status } });
+const request = (purpose: string, status: string) => ({ auth: { uid: "user-a" }, data: { purpose, status },
+  rawRequest: { get: () => "Bearer synthetic-owner-token" } });
 
 beforeEach(() => {
   fixture.records.clear(); fixture.reads = []; fixture.serial = 0; fixture.failAudit = false;
@@ -96,3 +107,4 @@ describe("actual canonical export consent projection", () => {
     expect(fixture.reads).toEqual([]); expect(fixture.records.size).toBe(1);
   });
 });
+
