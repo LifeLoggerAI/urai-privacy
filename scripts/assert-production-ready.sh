@@ -89,7 +89,7 @@ grep -q '"final:production-lock"' package.json
 grep -q '"release:evidence:staging"' package.json
 grep -q '"test:export:contract"' package.json
 grep -q '"test:deletion:contract"' package.json
-grep -q '"firebase-tools": "15.24.0"' package.json
+grep -q '"firebase-tools": "15.32.1"' package.json
 grep -q -- '--config firebase.emulators.json' package.json
 
 echo "[assert-production-ready] Checking final production lock strictness"
