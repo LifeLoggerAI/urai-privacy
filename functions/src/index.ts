@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp } from "firebase-admin/app";
-import { FieldPath, FieldValue, getFirestore, type DocumentData } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, getFirestore, type DocumentData, type Transaction, type Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
@@ -56,6 +56,11 @@ const executeDeletionSchema = z.object({
   expectedPlanHash: z.string().regex(/^[0-9a-f]{64}$/).optional()
 });
 const deletionPlanSchema = z.object({
+  version: z.literal("privacy-deletion-plan-v2"),
+  targetVersions: z.record(z.string(), z.object({
+    seconds: z.number().int().safe(), nanoseconds: z.number().int().min(0).max(999_999_999)
+  })),
+  authAccountCreatedAt: z.string().datetime().nullable(),
   uid: z.string().min(1),
   counts: z.record(z.string(), z.number().int().nonnegative()),
   targets: z.record(z.string(), z.array(z.string())),
@@ -157,7 +162,7 @@ async function writeAudit(args: {
 }
 
 async function listScopedDocuments(collectionName: string, field: "uid" | "targetUid", uid: string) {
-  const documents: Array<{ id: string; data: DocumentData }> = [];
+  const documents: Array<{ id: string; data: DocumentData; updateTime?: Timestamp }> = [];
   let cursor: string | null = null;
   while (true) {
     let query = db.collection(collectionName)
@@ -166,7 +171,7 @@ async function listScopedDocuments(collectionName: string, field: "uid" | "targe
       .limit(QUERY_PAGE_LIMIT);
     if (cursor) query = query.startAfter(cursor);
     const snapshot = await query.get();
-    documents.push(...snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() })));
+    documents.push(...snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data(), updateTime: doc.updateTime })));
     if (snapshot.size < QUERY_PAGE_LIMIT) return documents;
     cursor = snapshot.docs.at(-1)?.id ?? null;
     if (!cursor) return documents;
@@ -206,24 +211,52 @@ async function writeJson(path: string, value: unknown) {
   return { path, sha256: sha256(body), bytes: Buffer.byteLength(body, "utf8") };
 }
 
-async function hasLegalHold(uid: string) {
-  const userDoc = await db.collection("users").doc(uid).get();
-  const userHold = userDoc.exists && userDoc.data()?.legalHold === true;
-  const holdSnap = await db.collection("legalHoldRecords").where("uid", "==", uid).where("status", "==", "active").limit(1).get();
-  return userHold || !holdSnap.empty;
+async function hasLegalHold(uid: string, transaction?: Transaction) {
+  const userRef = db.collection("users").doc(uid);
+  const holdQuery = db.collection("legalHoldRecords").where("uid", "==", uid).where("status", "==", "active").limit(1);
+  const [userDoc, holdSnap] = await Promise.all([
+    transaction ? transaction.get(userRef) : userRef.get(),
+    transaction ? transaction.get(holdQuery) : holdQuery.get()
+  ]);
+  return (userDoc.exists && userDoc.data()?.legalHold === true) || !holdSnap.empty;
 }
 
-async function listUserScopedIds(collectionName: string, uid: string) {
-  const rows = await listScopedDocuments(collectionName, "uid", uid);
-  return rows.map((row) => row.id).sort();
+function targetVersion(value: Timestamp | undefined) {
+  if (!value || !Number.isSafeInteger(value.seconds) || !Number.isSafeInteger(value.nanoseconds)
+    || value.nanoseconds < 0 || value.nanoseconds >= 1_000_000_000) {
+    throw new HttpsError("failed-precondition", "The exact deletion target version is unavailable. Create a current dry run.");
+  }
+  return { seconds: value.seconds, nanoseconds: value.nanoseconds };
+}
+
+function sameTargetVersion(left: DeletionPlan["targetVersions"][string] | undefined, right: DeletionPlan["targetVersions"][string]) {
+  return !!left && left.seconds === right.seconds && left.nanoseconds === right.nanoseconds;
+}
+
+async function authAccountCreatedAt(uid: string): Promise<string | null> {
+  try {
+    const current = await auth.getUser(uid);
+    const createdAt = Date.parse(current.metadata.creationTime);
+    if (current.uid !== uid || !Number.isFinite(createdAt)) {
+      throw new HttpsError("failed-precondition", "The deletion authentication identity is unavailable.");
+    }
+    return new Date(createdAt).toISOString();
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "auth/user-not-found") return null;
+    throw error;
+  }
 }
 
 async function deletionPlan(uid: string): Promise<DeletionPlan> {
   const userDoc = await db.collection("users").doc(uid).get();
   const targets: Record<string, string[]> = { users: userDoc.exists ? [uid] : [] };
+  const targetVersions: DeletionPlan["targetVersions"] = {};
+  if (userDoc.exists) targetVersions[`users/${uid}`] = targetVersion(userDoc.updateTime);
 
   for (const collectionName of deletableUserCollections) {
-    targets[collectionName] = await listUserScopedIds(collectionName, uid);
+    const rows = await listScopedDocuments(collectionName, "uid", uid);
+    targets[collectionName] = rows.map(row => row.id).sort();
+    for (const row of rows) targetVersions[`${collectionName}/${row.id}`] = targetVersion(row.updateTime);
   }
 
   const [files] = await bucket.getFiles({ prefix: `exports/${uid}/` });
@@ -241,6 +274,9 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
   counts.storageObjects = storageObjects.length;
 
   return {
+    version: "privacy-deletion-plan-v2",
+    targetVersions,
+    authAccountCreatedAt: await authAccountCreatedAt(uid),
     uid,
     counts,
     targets,
@@ -257,6 +293,9 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
 
 function normalizedDeletionPlan(plan: DeletionPlan) {
   return {
+    version: plan.version,
+    targetVersions: Object.fromEntries(Object.entries(plan.targetVersions).sort(([left], [right]) => left.localeCompare(right))),
+    authAccountCreatedAt: plan.authAccountCreatedAt,
     uid: plan.uid,
     counts: Object.fromEntries(Object.entries(plan.counts).sort(([left], [right]) => left.localeCompare(right))),
     targets: Object.fromEntries(
@@ -310,8 +349,10 @@ function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: Deletio
   if (current.uid !== approved.uid || current.legalHold) return false;
   for (const [collectionName, currentIds] of Object.entries(current.targets)) {
     const approvedIds = new Set(approved.targets[collectionName] ?? []);
-    if (currentIds.some((id) => !approvedIds.has(id))) return false;
+    if (currentIds.some((id) => !approvedIds.has(id)
+      || !sameTargetVersion(approved.targetVersions[`${collectionName}/${id}`], current.targetVersions[`${collectionName}/${id}`]))) return false;
   }
+  if (current.authAccountCreatedAt !== null && current.authAccountCreatedAt !== approved.authAccountCreatedAt) return false;
   const approvedStorageObjects = new Set(approved.storageObjects);
   if (current.storageObjects.some((name) => !approvedStorageObjects.has(name))) return false;
   if (current.storageObjects.some((name) => !approved.storageObjectGenerations[name]
@@ -319,7 +360,64 @@ function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: Deletio
   return true;
 }
 
-async function deleteDocumentIds(collectionName: string, ids: string[], uid: string) {
+type DeletionExecutionAuthority = {
+  uid: string; requestId: string; adminUid: string; planHash: string; planPath: string;
+  token: string; expiresAt: number; mutationToken: string | null; bearer: string;
+};
+
+async function requireCurrentDeletionActor(authority: DeletionExecutionAuthority) {
+  let current;
+  try { current = await auth.verifyIdToken(authority.bearer, true); }
+  catch { throw new HttpsError("unauthenticated", "Current administrative authentication is required for deletion."); }
+  if (current.uid !== authority.adminUid || !isAdmin(current)) {
+    throw new HttpsError("permission-denied", "Current administrative deletion authority changed.");
+  }
+  // Changing custom claims does not itself invalidate an already issued JWT.
+  // Read the provider's current actor record as well as verifying that token.
+  let actor;
+  try { actor = await auth.getUser(authority.adminUid); }
+  catch { throw new HttpsError("unauthenticated", "Current administrative authentication is required for deletion."); }
+  if (actor.uid !== authority.adminUid || actor.disabled || !isAdmin(actor.customClaims)) {
+    throw new HttpsError("permission-denied", "Current administrative deletion role is unavailable.");
+  }
+}
+
+async function readDeletionExecutionAuthority(transaction: Transaction, authority: DeletionExecutionAuthority) {
+  const [operation, tombstone] = await Promise.all([
+    transaction.get(db.collection("deletionRequests").doc(authority.requestId)),
+    transaction.get(db.collection("privacyDeletionTombstones").doc(authority.uid))
+  ]);
+  const state = operation.data() ?? {};
+  const fence = tombstone.data() ?? {};
+  if (!operation.exists || state.uid !== authority.uid || state.scope !== "account" || state.status !== "processing"
+    || state.deletionExecutionState !== "executing" || state.deletionExecutionAttemptToken !== authority.token
+    || state.deletionExecutionStartedBy !== authority.adminUid || state.deletionExecutionPlanHash !== authority.planHash
+    || state.approvedPlanHash !== authority.planHash || state.approvedDeletionPlanPath !== authority.planPath
+    || timestampMillis(state.deletionExecutionLeaseUntil) !== authority.expiresAt || authority.expiresAt <= Date.now()
+    || fence.uid !== authority.uid || fence.requestId !== authority.requestId || fence.active !== true
+    || fence.deletionExecutionAttemptToken !== authority.token
+    || (authority.mutationToken !== null && (state.deletionMutationLeaseToken !== authority.mutationToken
+      || state.deletionMutationLeaseOperation !== "execute" || state.deletionMutationLeaseBy !== authority.adminUid
+      || timestampMillis(state.deletionMutationLeaseUntil) <= Date.now()))
+    || (authority.mutationToken === null && state.deletionMutationLeaseToken !== undefined)) {
+    throw new HttpsError("failed-precondition", "Deletion execution authority changed or expired. Reconcile the current request before continuing.");
+  }
+  if (await hasLegalHold(authority.uid, transaction)) {
+    throw new HttpsError("failed-precondition", "Deletion is blocked by active legal hold.");
+  }
+  return operation;
+}
+
+async function requireCurrentDeletionExecution(authority: DeletionExecutionAuthority) {
+  await requireCurrentDeletionActor(authority);
+  await db.runTransaction(async transaction => {
+    await readDeletionExecutionAuthority(transaction, authority);
+    await requireCurrentDeletionActor(authority);
+  });
+}
+
+async function deleteDocumentIds(collectionName: string, ids: string[], uid: string,
+  versions: DeletionPlan["targetVersions"], authority: DeletionExecutionAuthority) {
   let deleted = 0;
   for (let start = 0; start < ids.length; start += DELETE_BATCH_LIMIT) {
     const chunk = ids.slice(start, start + DELETE_BATCH_LIMIT);
@@ -327,6 +425,7 @@ async function deleteDocumentIds(collectionName: string, ids: string[], uid: str
     // delete atomically so a concurrent correction/restoration causes a retry
     // instead of deleting a foreign subject's replacement document.
     deleted += await db.runTransaction(async (transaction) => {
+      await readDeletionExecutionAuthority(transaction, authority);
       const references = chunk.map((id) => db.collection(collectionName).doc(id));
       const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
       for (const snapshot of snapshots) {
@@ -335,13 +434,16 @@ async function deleteDocumentIds(collectionName: string, ids: string[], uid: str
         const owned = collectionName === "users"
           ? snapshot.id === uid && (owner === undefined || owner === uid)
           : owner === uid;
-        if (!owned) {
-          throw new HttpsError("failed-precondition", "Deletion target ownership changed after approval. Re-run the dry run before continuing.");
+        if (!owned || !sameTargetVersion(versions[`${collectionName}/${snapshot.id}`], targetVersion(snapshot.updateTime))) {
+          throw new HttpsError("failed-precondition", "Deletion target ownership or version changed after approval. Re-run the dry run before continuing.");
         }
       }
+      // Firestore can await after the callable's initial ID-token validation.
+      // Revalidate the original actor after those reads and before atomic writes.
+      await requireCurrentDeletionActor(authority);
       let removed = 0;
       snapshots.forEach((snapshot, index) => {
-        if (snapshot.exists) { transaction.delete(references[index]); removed += 1; }
+        if (snapshot.exists) { transaction.delete(references[index], { lastUpdateTime: snapshot.updateTime }); removed += 1; }
       });
       return removed;
     });
@@ -356,8 +458,9 @@ async function executeDeletion(args: {
   plan: DeletionPlan;
   currentPlan: DeletionPlan;
   planHash: string;
+  authority: DeletionExecutionAuthority;
 }) {
-  const { plan, currentPlan, planHash } = args;
+  const { plan, currentPlan, planHash, authority } = args;
   if (plan.uid !== args.uid) {
     throw new HttpsError("failed-precondition", "Deletion plan subject does not match the requested account.");
   }
@@ -369,6 +472,7 @@ async function executeDeletion(args: {
   }
 
   const deleted: Record<string, number> = {};
+  await requireCurrentDeletionExecution(authority);
   await writeAudit({
     actorUid: args.adminUid,
     actorRole: "admin",
@@ -380,10 +484,10 @@ async function executeDeletion(args: {
   });
 
   for (const collectionName of deletableUserCollections) {
-    deleted[collectionName] = await deleteDocumentIds(collectionName, currentPlan.targets[collectionName] ?? [], args.uid);
+    deleted[collectionName] = await deleteDocumentIds(collectionName, currentPlan.targets[collectionName] ?? [], args.uid, plan.targetVersions, authority);
   }
 
-  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? [], args.uid);
+  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? [], args.uid, plan.targetVersions, authority);
 
   let deletedStorageObjects = 0;
   for (const objectName of currentPlan.storageObjects) {
@@ -392,6 +496,7 @@ async function executeDeletion(args: {
       throw new HttpsError("failed-precondition", "Deletion requires the exact approved export generation. Re-run the dry run before continuing.");
     }
     try {
+      await requireCurrentDeletionExecution(authority);
       await bucket.file(objectName).delete({ ignoreNotFound: true, ifGenerationMatch: generation });
     } catch (error) {
       if (typeof error === "object" && error !== null && "code" in error && Number(error.code) === 412) {
@@ -399,12 +504,20 @@ async function executeDeletion(args: {
       }
       throw error;
     }
+    await requireCurrentDeletionExecution(authority);
     deletedStorageObjects += 1;
   }
   deleted.storageObjects = deletedStorageObjects;
 
   try {
+    await requireCurrentDeletionExecution(authority);
+    const currentAuthCreatedAt = await authAccountCreatedAt(args.uid);
+    if (currentAuthCreatedAt !== null && currentAuthCreatedAt !== plan.authAccountCreatedAt) {
+      throw new HttpsError("failed-precondition", "The approved authentication account identity changed during deletion.");
+    }
+    await requireCurrentDeletionExecution(authority);
     await auth.deleteUser(args.uid);
+    await requireCurrentDeletionExecution(authority);
     deleted.authUsers = 1;
   } catch (error) {
     const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
@@ -764,6 +877,14 @@ export const executeDeletionRequest = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Deletion plan changed. Re-run dry run and retry with the latest plan hash.", { auditId });
   }
 
+  const bearer = request.rawRequest?.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
+  if (!bearer) throw new HttpsError("unauthenticated", "Current administrative authentication is required for deletion.");
+  const authority: DeletionExecutionAuthority = {
+    bearer,
+    uid, requestId, adminUid, planHash: approvedPlanHash, planPath: String(deletion.approvedDeletionPlanPath),
+    token: randomUUID(), expiresAt: Date.now() + DELETION_EXECUTION_LEASE_MS,
+    mutationToken: typeof deletion.deletionMutationLeaseToken === "string" ? deletion.deletionMutationLeaseToken : null
+  };
   await db.runTransaction(async (tx) => {
     const tombstoneRef = db.collection("privacyDeletionTombstones").doc(uid);
     const [current, tombstone] = await Promise.all([
@@ -773,6 +894,13 @@ export const executeDeletionRequest = onCall(async (request) => {
     if (!current.exists) throw new HttpsError("not-found", "Deletion request not found.");
     const state = current.data() ?? {};
     const tombstoneState = tombstone.data() ?? {};
+    if (state.uid !== uid || state.scope !== "account" || state.approvedDeletionPlanPath !== authority.planPath
+      || (tombstone.exists && tombstoneState.uid !== uid)
+      || (authority.mutationToken !== null && (state.deletionMutationLeaseToken !== authority.mutationToken
+        || state.deletionMutationLeaseOperation !== "execute" || state.deletionMutationLeaseBy !== adminUid
+        || timestampMillis(state.deletionMutationLeaseUntil) <= Date.now()))) {
+      throw new HttpsError("failed-precondition", "Deletion subject or approval authority changed before execution.");
+    }
     if (tombstoneState.active === true && tombstoneState.requestId !== requestId) {
       throw new HttpsError("failed-precondition", "Account deletion is already fenced by another deletion request.");
     }
@@ -802,11 +930,13 @@ export const executeDeletionRequest = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "Deletion approval changed before execution.");
     }
     tx.update(ref, {
+      status: "processing",
       deletionExecutionState: "executing",
+      deletionExecutionAttemptToken: authority.token,
       deletionExecutionStartedAt: FieldValue.serverTimestamp(),
       deletionExecutionStartedBy: adminUid,
       deletionExecutionPlanHash: approvedPlanHash,
-      deletionExecutionLeaseUntil: new Date(Date.now() + DELETION_EXECUTION_LEASE_MS),
+      deletionExecutionLeaseUntil: new Date(authority.expiresAt),
       updatedAt: FieldValue.serverTimestamp()
     });
     tx.set(tombstoneRef, {
@@ -814,6 +944,7 @@ export const executeDeletionRequest = onCall(async (request) => {
       requestId,
       active: true,
       status: "deletion_in_progress",
+      deletionExecutionAttemptToken: authority.token,
       fencedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
@@ -830,23 +961,27 @@ export const executeDeletionRequest = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "Deletion targets changed after dry run. Re-run dry run before execution.");
     }
 
-    const result = await executeDeletion({ adminUid, uid, requestId, plan: approvedPlan, currentPlan, planHash: approvedPlanHash });
-    await ref.update({
-      status: "processing",
-      updatedAt: FieldValue.serverTimestamp(),
-      deletionPlanCounts: result.plan.counts,
-      planHash: result.planHash,
-      deletedCounts: result.deleted,
-      retainedData: [...retainedDeletionCollections],
-      destructiveDeletionBlocked: false,
-      destructiveDeletionReady: false,
-      destructiveDeletionMutationCompletedAt: FieldValue.serverTimestamp(),
-      destructiveDeletionCompletedAt: FieldValue.delete(),
-      deletionExecutionState: "verification_required",
-      deletionCompletionVerificationRequired: true,
-      deletionCompletionVerified: false,
-      deletionCompletionVerificationStatus: "pending",
-      deletionExecutionLeaseUntil: FieldValue.delete()
+    const result = await executeDeletion({ adminUid, uid, requestId, plan: approvedPlan, currentPlan, planHash: approvedPlanHash, authority });
+    await db.runTransaction(async (tx) => {
+      await readDeletionExecutionAuthority(tx, authority);
+      await requireCurrentDeletionActor(authority);
+      tx.update(ref, {
+        status: "processing",
+        updatedAt: FieldValue.serverTimestamp(),
+        deletionPlanCounts: result.plan.counts,
+        planHash: result.planHash,
+        deletedCounts: result.deleted,
+        retainedData: [...retainedDeletionCollections],
+        destructiveDeletionBlocked: false,
+        destructiveDeletionReady: false,
+        destructiveDeletionMutationCompletedAt: FieldValue.serverTimestamp(),
+        destructiveDeletionCompletedAt: FieldValue.delete(),
+        deletionExecutionState: "verification_required",
+        deletionCompletionVerificationRequired: true,
+        deletionCompletionVerified: false,
+        deletionCompletionVerificationStatus: "pending",
+        deletionExecutionLeaseUntil: FieldValue.delete()
+      });
     });
     const auditId = await writeAudit({
       actorUid: adminUid,
@@ -860,14 +995,20 @@ export const executeDeletionRequest = onCall(async (request) => {
     return { requestId, status: "processing", mode, auditId, planCounts: result.plan.counts, planHash: result.planHash, deletedCounts: result.deleted, verificationRequired: true };
   } catch (error) {
     const isPrecondition = error instanceof HttpsError && error.code === "failed-precondition";
-    await ref.update({
-      status: "processing",
-      updatedAt: FieldValue.serverTimestamp(),
-      destructiveDeletionBlocked: true,
-      destructiveDeletionReady: false,
-      destructiveDeletionReason: error instanceof Error ? error.message : "Deletion execution failed.",
-      deletionExecutionState: isPrecondition ? "blocked" : "retry_required",
-      deletionExecutionLeaseUntil: FieldValue.delete()
+    await db.runTransaction(async (tx) => {
+      const current = await tx.get(ref);
+      if (!current.exists || current.data()?.uid !== uid || current.data()?.status !== "processing"
+        || current.data()?.deletionExecutionAttemptToken !== authority.token
+        || current.data()?.deletionExecutionState !== "executing") return;
+      tx.update(ref, {
+        status: "processing",
+        updatedAt: FieldValue.serverTimestamp(),
+        destructiveDeletionBlocked: true,
+        destructiveDeletionReady: false,
+        destructiveDeletionReason: error instanceof Error ? error.message : "Deletion execution failed.",
+        deletionExecutionState: isPrecondition ? "blocked" : "retry_required",
+        deletionExecutionLeaseUntil: FieldValue.delete()
+      });
     });
     const auditId = await writeAudit({
       actorUid: adminUid,
@@ -921,3 +1062,4 @@ export const getPrivacyHealthReport = onCall(async (request) => {
     certification: "not_certified"
   };
 });
+
