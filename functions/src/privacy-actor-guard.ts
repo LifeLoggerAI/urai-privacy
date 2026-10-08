@@ -45,7 +45,7 @@ export async function createPrivacyActorGuard(request: ActorRequest, adminOnly =
         throw new HttpsError("permission-denied", "Current administrative access is required.");
       }
       return { uid, token: { ...claims, admin, system,
-        role: admin || system ? claims.role : undefined, consumerId: system ? consumerId : undefined } };
+        role: admin ? "admin" : system ? "system" : undefined, consumerId: system ? consumerId : undefined } };
     } catch (error) {
       if (error instanceof HttpsError) throw error;
       throw new HttpsError("unauthenticated", "Current authentication is required.");

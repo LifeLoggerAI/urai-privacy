@@ -22,6 +22,7 @@ let administrator: Actor;
 let consumer: Actor;
 let unsignedAdmin: Actor;
 let unsignedConsumer: Actor;
+let mixedConsumer: Actor;
 
 async function actor(label: string, claims: Record<string, unknown> = {}): Promise<Actor> {
   const uid = `consent-proof-${label}-${randomUUID()}`;
@@ -43,7 +44,7 @@ async function actor(label: string, claims: Record<string, unknown> = {}): Promi
   return result;
 }
 
-async function call(name: "setCanonicalConsent" | "evaluateCanonicalConsent", actor: Actor, data: Record<string, unknown>) {
+async function call(name: "setCanonicalConsent" | "evaluateCanonicalConsent" | "processExportRequest", actor: Actor, data: Record<string, unknown>) {
   const response = await fetch(`http://127.0.0.1:5001/${PROJECT}/us-central1/${name}`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${actor.token}` },
     body: JSON.stringify({ data })
@@ -79,6 +80,7 @@ async function deniedDecision(actor: Actor) {
     consumer = await actor("consumer", { role: "system", consumerId: "urai-jobs" });
     unsignedAdmin = await actor("unsigned-admin");
     unsignedConsumer = await actor("unsigned-consumer");
+    mixedConsumer = await actor("mixed-consumer", { system: true, consumerId: "urai-jobs" });
   }, 30_000);
 
   afterAll(async () => {
@@ -130,6 +132,17 @@ async function deniedDecision(actor: Actor) {
   it("denies current-only system access absent from the old signed token", async () => {
     await auth.setCustomUserClaims(unsignedConsumer.uid, { role: "system", consumerId: "urai-jobs" });
     await deniedDecision(unsignedConsumer);
+  });
+  it("keeps mixed current admin claims consumer-bound and denies actual admin-only export processing", async () => {
+    await auth.setCustomUserClaims(mixedConsumer.uid, { system: true, role: "admin", consumerId: "urai-jobs" });
+    const reply = await decide(mixedConsumer);
+    expect(reply.status).toBe(200); expect(reply.result?.allowed).toBe(true);
+    const events = await db.collection("dataAccessEvents").where("actorUid", "==", mixedConsumer.uid).get();
+    expect(events.size).toBe(1);
+    expect(events.docs[0].data().actorRole).toBe("system");
+    expect(events.docs[0].data().consumerId).toBe("urai-jobs");
+    const adminOnly = await call("processExportRequest", mixedConsumer, { jobId: `uncreated-${randomUUID()}` });
+    expect(adminOnly.status).toBe(403); expect(adminOnly.result).toBeUndefined();
   });
   it("denies a disabled owner without changing its existing consent receipt", async () => {
     const ref = db.collection("consentRecords").doc(`${owner.uid}_data_export`);

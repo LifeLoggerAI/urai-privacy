@@ -173,6 +173,20 @@ describe("actual canonical consent handlers keep current actor authority", () =>
     const event = fixture.records.get(fixture.writes[0]);
     expect(event?.actorRole).toBe("system"); expect(event?.consumerId).toBe("urai-jobs");
   });
+  it("keeps mixed current admin claims at their signed system consumer authority", async () => {
+    system(); fixture.signedClaims = { system: true, consumerId: "urai-jobs" };
+    fixture.currentClaims = { system: true, role: "admin", consumerId: "urai-jobs" };
+    expect((await decision()).allowed).toBe(true);
+    const event = fixture.records.get(fixture.writes[0]);
+    expect(event?.actorRole).toBe("system"); expect(event?.consumerId).toBe("urai-jobs");
+  });
+  it("keeps admin-only effects denied for signed system/current mixed admin claims", async () => {
+    system(); fixture.signedClaims = { system: true, consumerId: "urai-jobs" };
+    fixture.currentClaims = { system: true, role: "admin", consumerId: "urai-jobs" };
+    const { createPrivacyActorGuard } = await import("../../functions/src/privacy-actor-guard");
+    await expect(createPrivacyActorGuard(request({}), true)).rejects.toMatchObject({ code: "permission-denied" });
+    expect(fixture.reads).toEqual([]); expect(fixture.writes).toEqual([]);
+  });
   it.each(["removed", "rebound", "unsigned"])("rejects a system consumer that is %s before reading private consent", async (state) => {
     system();
     if (state === "removed") fixture.currentClaims = {};
