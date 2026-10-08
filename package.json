@@ -39,7 +39,7 @@
     "test:export:contract": "node scripts/check-complete-export-contract.mjs",
     "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs",
     "pretest:emulators": "npm --prefix functions run build",
-    "test:dependency-security": "node --test scripts/dependency-security.behavior.test.cjs"
+    "test:dependency-security": "node --test scripts/dependency-security.behavior.node-test.cjs"
   },
   "dependencies": {
     "firebase": "^12.13.0",
