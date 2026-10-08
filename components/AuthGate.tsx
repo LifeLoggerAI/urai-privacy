@@ -32,29 +32,32 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
   const [status, setStatus] = useState<GateStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const [verifiedAdminOnly, setVerifiedAdminOnly] = useState<boolean | null>(null);
   const lifetime = useRef({ active: false, generation: 0 });
 
   useEffect(() => {
     lifetime.current.active = true;
+    let effectActive = true;
     const firebaseAuth = requireFirebaseAuth();
 
     if (!firebaseAuth) {
       setUser(null);
       setError("Firebase Auth is not configured.");
       setStatus("error");
-      return () => { lifetime.current.active = false; lifetime.current.generation++; };
+      return () => { effectActive = false; lifetime.current.active = false; lifetime.current.generation++; };
     }
 
     const currentTransition = (sequence: number, nextUser: User) =>
-      lifetime.current.active && lifetime.current.generation === sequence && firebaseAuth.currentUser === nextUser;
+      effectActive && lifetime.current.active && lifetime.current.generation === sequence && firebaseAuth.currentUser === nextUser;
 
     const unsubscribe = onAuthStateChanged(
       firebaseAuth,
       async (nextUser) => {
-        if (!lifetime.current.active) return;
+        if (!effectActive || !lifetime.current.active) return;
         const sequence = ++lifetime.current.generation;
         setError(null);
         setUser(null);
+        setVerifiedAdminOnly(null);
         setStatus(nextUser ? "loading" : "signed-out");
 
         if (!nextUser) return;
@@ -70,6 +73,7 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
 
           setUser(nextUser);
           setSessionKey(`${nextUser.uid}:${sequence}`);
+          setVerifiedAdminOnly(adminOnly);
           setStatus("ready");
         } catch (err) {
           if (!currentTransition(sequence, nextUser)) return;
@@ -79,7 +83,7 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
         }
       },
       (err) => {
-        if (!lifetime.current.active) return;
+        if (!effectActive || !lifetime.current.active) return;
         lifetime.current.generation++;
         setUser(null);
         setError(err.message);
@@ -87,7 +91,7 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
       }
     );
 
-    return () => { lifetime.current.active = false; lifetime.current.generation++; unsubscribe(); };
+    return () => { effectActive = false; lifetime.current.active = false; lifetime.current.generation++; unsubscribe(); };
   }, [adminOnly]);
 
   const signIn = useCallback(async () => {
@@ -135,7 +139,7 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
     }
   }, []);
 
-  if (status === "loading" || (status === "ready" && user !== auth?.currentUser)) {
+  if (status === "loading" || (status === "ready" && (user !== auth?.currentUser || verifiedAdminOnly !== adminOnly))) {
     return (
       <section
         className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-slate-300"

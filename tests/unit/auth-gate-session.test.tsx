@@ -6,14 +6,15 @@ const state = vi.hoisted(() => ({
   auth: { currentUser: null as User | null },
   hooks: [] as unknown[], cursor: 0, writes: 0, mounted: false,
   observe: null as ((user: User | null) => Promise<void>) | null,
+  observeError: null as ((error: Error) => void) | null,
   cleanup: null as (() => void) | null,
   unsubscribe: vi.fn(), signIn: vi.fn(), signOut: vi.fn()
 }));
 vi.mock("../../firebase/firebase", () => ({ auth: state.auth }));
 vi.mock("firebase/auth", () => ({
   GoogleAuthProvider: class {}, signInWithPopup: state.signIn, signOut: state.signOut,
-  onAuthStateChanged: (_auth: unknown, next: typeof state.observe) => {
-    state.observe = next; return state.unsubscribe;
+  onAuthStateChanged: (_auth: unknown, next: typeof state.observe, error: typeof state.observeError) => {
+    state.observe = next; state.observeError = error; return state.unsubscribe;
   }
 }));
 vi.mock("react", async () => {
@@ -56,6 +57,10 @@ function observe(current: User | null) {
   state.auth.currentUser = current;
   return state.observe!(current);
 }
+function replaceEffect(adminOnly: boolean) {
+  state.cleanup!(); state.mounted = false;
+  return render(adminOnly);
+}
 function action(tree: React.ReactNode, label: string): () => Promise<void> {
   if (!React.isValidElement<{ children?: React.ReactNode; onClick?: () => Promise<void> }>(tree)) throw new Error("Action was not found: " + label);
   const children = React.Children.toArray(tree.props.children);
@@ -68,7 +73,7 @@ function action(tree: React.ReactNode, label: string): () => Promise<void> {
 }
 beforeEach(() => {
   vi.clearAllMocks(); state.hooks.length = 0; state.cursor = 0; state.writes = 0;
-  state.mounted = false; state.observe = null; state.cleanup = null; state.auth.currentUser = null;
+  state.mounted = false; state.observe = null; state.observeError = null; state.cleanup = null; state.auth.currentUser = null;
   state.signIn.mockResolvedValue(undefined); state.signOut.mockResolvedValue(undefined);
   vi.stubGlobal("React", React);
   render();
@@ -172,5 +177,38 @@ describe("actual AuthGate session transitions with deferred Firebase claims", ()
     state.cleanup!(); const writesAtUnmount = state.writes;
     signOut.resolve(); await pending;
     expect(state.writes).toBe(writesAtUnmount);
+  });
+
+  it("ignores an unsubscribed permissive listener delivered after a stricter effect activates", async () => {
+    replaceEffect(false);
+    const oldListener = state.observe!;
+    replaceEffect(true);
+    const current = user("owner-b", Promise.resolve({ claims: {} }));
+    state.auth.currentUser = current;
+    const delivery = deferred<void>();
+    const pending = delivery.promise.then(() => oldListener(current));
+    const writesBeforeDelivery = state.writes;
+    delivery.resolve(); await pending; render();
+    expect(state.writes).toBe(writesBeforeDelivery);
+    expect(children).not.toHaveBeenCalled();
+  });
+
+  it("ignores an old observer error after a replacement effect authorizes the current admin", async () => {
+    replaceEffect(false);
+    const oldError = state.observeError!;
+    replaceEffect(true);
+    const current = user("owner-b"); await observe(current);
+    const writesBeforeError = state.writes;
+    oldError(new Error("synthetic-unsubscribed-observer-error")); render();
+    expect(state.writes).toBe(writesBeforeError);
+    expect(children).toHaveBeenCalledWith(current);
+  });
+
+  it("withholds private content when admin authorization becomes required before the new observer delivers", async () => {
+    replaceEffect(false);
+    await observe(user("owner-a", Promise.resolve({ claims: {} }))); render(false);
+    children.mockClear();
+    replaceEffect(true);
+    expect(children).not.toHaveBeenCalled();
   });
 });
