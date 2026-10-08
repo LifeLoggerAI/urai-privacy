@@ -87,11 +87,18 @@ const firestoreMock = vi.hoisted(() => {
   const db = {
     collection: query,
     runTransaction: async (handler: (tx: unknown) => Promise<unknown>) => {
-      fixture.transactions += 1;
-      const phase = fixture.transactions;
-      fixture.beforeTransaction?.(phase);
+      // Interleavings target mutating transactions. The production handler now
+      // performs additional read-only authority transactions between each page.
+      const phase = fixture.transactions + 1;
+      let mutationStarted = false;
+      const startMutation = () => {
+        if (mutationStarted) return;
+        mutationStarted = true;
+        fixture.transactions = phase;
+        fixture.beforeTransaction?.(phase);
+        if (phase === 2) fixture.beforePublication?.();
+      };
       if (phase === 3 && fixture.failAttemptRead) throw new Error("Uncertain cleanup claim /internal/path");
-      if (phase === 2) fixture.beforePublication?.();
       const writes: Array<{ kind: string; path: string; data: Row; merge: boolean }> = [];
       const reads = new Map<string, Row | undefined>();
       const tx = {
@@ -100,13 +107,14 @@ const firestoreMock = vi.hoisted(() => {
           return snapshot(ref.path);
         },
         create: (ref: { path: string }, data: Row) => {
+          startMutation();
           if (ref.path.startsWith("auditLogs/") && (fixture.failAllAudits || fixture.failAuditTransaction === phase || fixture.failAudit && data.action === "export_processed")) {
             throw new Error("Audit write outage at /sensitive/provider/key");
           }
           writes.push({ kind: "create", path: ref.path, data, merge: false });
         },
-        update: (ref: { path: string }, data: Row) => writes.push({ kind: "update", path: ref.path, data, merge: true }),
-        set: (ref: { path: string }, data: Row, options?: { merge?: boolean }) => writes.push({ kind: "set", path: ref.path, data, merge: options?.merge ?? false })
+        update: (ref: { path: string }, data: Row) => { startMutation(); writes.push({ kind: "update", path: ref.path, data, merge: true }); },
+        set: (ref: { path: string }, data: Row, options?: { merge?: boolean }) => { startMutation(); writes.push({ kind: "set", path: ref.path, data, merge: options?.merge ?? false }); }
       };
       const result = await handler(tx);
       const commit = () => {
@@ -118,7 +126,7 @@ const firestoreMock = vi.hoisted(() => {
         for (const write of writes) fixture.documents.set(write.path, apply(write.merge ? fixture.documents.get(write.path) ?? {} : {}, write.data));
         return true;
       };
-      if (phase === 2 && fixture.delayPublicationCommit) {
+      if (mutationStarted && phase === 2 && fixture.delayPublicationCommit) {
         fixture.pendingPublication = () => {
           fixture.delayedPublicationCommitted = commit();
           return fixture.delayedPublicationCommitted;
@@ -126,7 +134,7 @@ const firestoreMock = vi.hoisted(() => {
         throw new Error("Publication commit reply unavailable before server outcome is known");
       }
       if (!commit()) throw new Error("Transaction snapshot changed");
-      if (phase === 2 && fixture.losePublicationReply) throw new Error("Publication response lost at /private/path");
+      if (mutationStarted && phase === 2 && fixture.losePublicationReply) throw new Error("Publication response lost at /private/path");
       return result;
     }
   };
@@ -163,9 +171,13 @@ vi.mock("firebase-admin/storage", () => storageMock);
 vi.mock("../../functions/node_modules/firebase-admin/lib/esm/storage/index.js", () => storageMock);
 
 const authMock = vi.hoisted(() => ({
-  getAuth: () => ({ getUser: async () => {
+  getAuth: () => ({ verifyIdToken: async (token: string, revoked: boolean) => {
+    if (!revoked) throw new Error("Revocation checking is required");
+    return { uid: token, admin: token === "admin-a" };
+  }, getUser: async (uid: string) => {
+    if (uid === "admin-a") return { uid, disabled: false, metadata: { creationTime: "2026-10-01T00:00:00.000Z" }, customClaims: { admin: true } };
     if (!fixture.authExists) throw { code: "auth/user-not-found" };
-    return { uid: "user-a" };
+    return { uid: "user-a", disabled: false, metadata: { creationTime: "2026-10-01T00:00:00.000Z" }, customClaims: {} };
   } })
 }));
 vi.mock("firebase-admin/auth", () => authMock);
@@ -175,7 +187,11 @@ import { processExportRequest } from "../../functions/src/export-request";
 import { cleanupExportArtifactAttempts } from "../../functions/src/export-attempt-maintenance";
 import { collectDeletionCompletionResiduals } from "../../functions/src/deletion-completion-verifier";
 import { CONSENT_DECISION_POLICY_VERSION } from "../../functions/src/consent-decision";
-const run = processExportRequest as unknown as (request: Row) => Promise<Row>;
+const callable = processExportRequest as unknown as (request: Row) => Promise<Row>;
+const run = (request: Row) => callable({ ...request, rawRequest: { get: () => {
+  const auth = request.auth as { uid?: string } | undefined;
+  return auth?.uid ? `Bearer ${auth.uid}` : undefined;
+} } });
 const adminRequest = { auth: { uid: "admin-a", token: { admin: true } }, data: { jobId: "job-a" } };
 function job() { return fixture.documents.get("exportJobs/job-a")!; }
 function fence() { return fixture.documents.get("privacyDeletionTombstones/user-a")!; }
@@ -282,6 +298,7 @@ describe("export callable failure and concurrency behavior", () => {
     expect(fence()).not.toHaveProperty("exportProcessingLeaseToken");
   });
   it("rejects anonymous and ordinary-user processing before claiming or writing", async () => {
+    fixture.authExists = true;
     await expect(run({ data: { jobId: "job-a" } })).rejects.toMatchObject({ code: "unauthenticated" });
     await expect(run({ auth: { uid: "user-a", token: {} }, data: { jobId: "job-a" } })).rejects.toMatchObject({ code: "permission-denied" });
     expect(fixture.transactions).toBe(0); expect(fixture.objects.size).toBe(0);

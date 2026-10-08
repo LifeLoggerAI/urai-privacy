@@ -84,9 +84,11 @@ vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/schedu
 const authMock = vi.hoisted(() => ({ getAuth: () => ({ verifyIdToken: async (token: string, checkRevoked: boolean) => {
   fixture.verificationChecks.push(checkRevoked);
   if (fixture.verifyFails || !checkRevoked) throw new Error("synthetic revoked token");
-  return { uid: fixture.verificationUid ?? (token === "other-user" ? "user-b" : token === "current-admin" ? "synthetic-admin" : "user-a"),
-    admin: token === "current-admin" && fixture.currentAdminAllowed };
-} }) }));
+  return { uid: fixture.verificationUid ?? (token === "other-user" ? "user-b" : token === "current-admin" ? "synthetic-admin" : token === "admin-a" ? "admin-a" : "user-a"),
+    admin: token === "current-admin" || token === "admin-a" };
+}, getUser: async (uid: string) => ({ uid, disabled: false,
+  metadata: { creationTime: "2026-10-01T00:00:00.000Z" },
+  customClaims: (uid === "synthetic-admin" || uid === "admin-a") && fixture.currentAdminAllowed ? { admin: true } : {} }) }) }));
 vi.mock("firebase-admin/auth", () => authMock);
 vi.mock("../../functions/node_modules/firebase-admin/lib/esm/auth/index.js", () => authMock);
 vi.mock("node:stream/promises", () => ({ pipeline: async (source: AsyncIterable<Buffer> & { destroy: () => void },
@@ -96,7 +98,9 @@ vi.mock("node:stream/promises", () => ({ pipeline: async (source: AsyncIterable<
 } }));
 
 import { getExportDownloadUrl, downloadExportPackage } from "../../functions/src/export-lifecycle-functions";
-const run = getExportDownloadUrl as unknown as (request: { auth?: { uid: string; token?: Record<string, unknown> }; data: unknown }) => Promise<Record<string, unknown>>;
+const callable = getExportDownloadUrl as unknown as (request: unknown) => Promise<Record<string, unknown>>;
+const run = (request: { auth?: { uid: string; token?: Record<string, unknown> }; data: unknown }) => callable({ ...request,
+  rawRequest: { get: () => request.auth?.uid ? `Bearer ${request.auth.uid === "user-a" ? "current-user" : request.auth.uid === "user-b" ? "other-user" : request.auth.uid === "admin-a" ? "admin-a" : "current-admin"}` : undefined } });
 const ownerRequest = { auth: { uid: "user-a", token: {} }, data: { jobId: "job-a" } };
 const receiptHash = "a".repeat(64);
 const consentPath = "consentRecords/user-a_data_export";

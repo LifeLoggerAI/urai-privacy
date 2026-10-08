@@ -8,6 +8,7 @@ import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 import { EXPORT_PACKAGE_TTL_MS, timestampMillis } from "./export-lifecycle-contract";
 import { exportAttemptPaths, exportPublicationBlockReason, ownsExportAttempt } from "./export-processing-authority";
 import { evaluateConsentDecision } from "./consent-decision";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
 
 const exportCollections = [
   "users",
@@ -43,24 +44,6 @@ const EXPORT_PROCESSING_LEASE_MS = 15 * 60 * 1000;
 const processExportSchema = z.object({ jobId: z.string().trim().min(1).max(160).regex(/^[^/]+$/) });
 
 type ExportRow = { id: string; data: DocumentData };
-
-function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknown> } }) {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Authentication is required.");
-  return uid;
-}
-
-function isAdmin(token?: Record<string, unknown>) {
-  return token?.admin === true || token?.role === "admin";
-}
-
-async function requireAdmin(request: { auth?: { uid?: string; token?: Record<string, unknown> } }) {
-  const uid = uidFrom(request);
-  if (!isAdmin(request.auth?.token)) {
-    throw new HttpsError("permission-denied", "Admin access is required.");
-  }
-  return uid;
-}
 
 function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown): T {
   const parsed = schema.safeParse(data ?? {});
@@ -101,7 +84,7 @@ export function processingLeaseIsActive(value: unknown, nowMs = Date.now()) {
   }
 }
 
-async function listScopedDocuments(collectionName: string, field: "uid" | "targetUid", uid: string) {
+async function listScopedDocuments(collectionName: string, field: "uid" | "targetUid", uid: string, requireCurrent: () => Promise<unknown>) {
   const db = getFirestore();
   return collectPaginatedRows<DocumentData>(async (cursor, limit) => {
     let query = db.collection(collectionName)
@@ -109,12 +92,14 @@ async function listScopedDocuments(collectionName: string, field: "uid" | "targe
       .orderBy(FieldPath.documentId())
       .limit(limit);
     if (cursor) query = query.startAfter(cursor);
+    await requireCurrent();
     const snapshot = await query.get();
+    await requireCurrent();
     return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
   }, QUERY_PAGE_LIMIT);
 }
 
-async function listSubcollectionDocuments(parentCollection: string, parentId: string, subcollectionName: string) {
+async function listSubcollectionDocuments(parentCollection: string, parentId: string, subcollectionName: string, requireCurrent: () => Promise<unknown>) {
   const db = getFirestore();
   return collectPaginatedRows<DocumentData>(async (cursor, limit) => {
     let query = db.collection(parentCollection)
@@ -123,16 +108,18 @@ async function listSubcollectionDocuments(parentCollection: string, parentId: st
       .orderBy(FieldPath.documentId())
       .limit(limit);
     if (cursor) query = query.startAfter(cursor);
+    await requireCurrent();
     const snapshot = await query.get();
+    await requireCurrent();
     return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
   }, QUERY_PAGE_LIMIT);
 }
 
-async function collectRevocationAcknowledgements(outboxRows: ExportRow[]) {
+async function collectRevocationAcknowledgements(outboxRows: ExportRow[], requireCurrent: () => Promise<unknown>) {
   return collectNestedRows({
     parents: outboxRows,
     concurrency: NESTED_QUERY_CONCURRENCY,
-    loadChildren: (outbox) => listSubcollectionDocuments("consentRevocationOutbox", outbox.id, "acknowledgements"),
+    loadChildren: (outbox) => listSubcollectionDocuments("consentRevocationOutbox", outbox.id, "acknowledgements", requireCurrent),
     mapChild: (outbox, row) => ({
       ...(scrubExportValue(row.data) as Record<string, unknown>),
       id: row.id,
@@ -142,14 +129,16 @@ async function collectRevocationAcknowledgements(outboxRows: ExportRow[]) {
   });
 }
 
-async function collectUserExport(uid: string) {
+async function collectUserExport(uid: string, requireCurrent: () => Promise<unknown>) {
   const db = getFirestore();
   const collections: Record<string, Array<Record<string, unknown>>> = {};
   let recordCount = 0;
 
   for (const name of exportCollections) {
     if (name === "users") {
+      await requireCurrent();
       const userDoc = await db.collection("users").doc(uid).get();
+      await requireCurrent();
       const docs = userDoc.exists ? [{ id: userDoc.id, ...(scrubExportValue(userDoc.data() ?? {}) as Record<string, unknown>) }] : [];
       collections[name] = docs;
       recordCount += docs.length;
@@ -157,13 +146,13 @@ async function collectUserExport(uid: string) {
     }
 
     const field = name === "auditLogs" || name === "adminActions" ? "targetUid" : "uid";
-    const rows = await listScopedDocuments(name, field, uid);
+    const rows = await listScopedDocuments(name, field, uid, requireCurrent);
     const docs = rows.map((row) => ({ id: row.id, ...(scrubExportValue(row.data) as Record<string, unknown>) }));
     collections[name] = docs;
     recordCount += docs.length;
 
     if (name === "consentRevocationOutbox") {
-      const acknowledgements = await collectRevocationAcknowledgements(rows);
+      const acknowledgements = await collectRevocationAcknowledgements(rows, requireCurrent);
       collections[revocationAcknowledgementExportKey] = acknowledgements;
       recordCount += acknowledgements.length;
     }
@@ -193,7 +182,8 @@ async function deleteExportArtifact(path: string) {
 
 export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
   const db = getFirestore();
-  const adminUid = await requireAdmin(request);
+  const actor = await createPrivacyActorGuard(request, true);
+  const adminUid = actor.uid;
   const { jobId } = parseOrThrow(processExportSchema, request.data);
   const jobRef = db.collection("exportJobs").doc(jobId);
   const token = randomUUID();
@@ -248,6 +238,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
 
     const { exportPath, manifestPath } = exportAttemptPaths(uid, jobId, token);
     const processingLeaseExpiresAt = Timestamp.fromMillis(Date.now() + EXPORT_PROCESSING_LEASE_MS);
+    await actor.requireCurrent();
     tx.set(deletionFenceRef, {
       uid,
       exportProcessingJobId: jobId,
@@ -286,10 +277,29 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
 
   const { exportPath, manifestPath } = claim;
   const authority = { uid: claim.uid, jobId, requestId: claim.requestId, actorUid: adminUid, token };
+  const requireCurrent = async () => {
+    await actor.requireCurrent();
+    await db.runTransaction(async (tx) => {
+      const [job, fence, attempt, privacyRequest, consentSnapshot] = await Promise.all([
+        tx.get(jobRef), tx.get(db.collection("privacyDeletionTombstones").doc(claim.uid)), tx.get(attemptRef),
+        tx.get(claim.requestRef), tx.get(claim.consentRef)
+      ]);
+      const consent = consentSnapshot.data() ?? {};
+      if (exportPublicationBlockReason({ job: job.data() ?? {}, fence: fence.data() ?? {},
+        attempt: attempt.data() ?? {}, request: privacyRequest.data() ?? {}, authority, nowMillis: Date.now() })
+        || consent.uid !== claim.uid || consent.receiptHash !== claim.consentReceiptHash
+        || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed) {
+        throw new HttpsError("aborted", "Current export processing authority changed.");
+      }
+    });
+    await actor.requireCurrent();
+  };
 
   try {
-    const exportData = await collectUserExport(claim.uid);
+    const exportData = await collectUserExport(claim.uid, requireCurrent);
+    await requireCurrent();
     const exportFile = await writeJson(exportPath, { uid: claim.uid, requestId: claim.requestId, jobId, generatedAt: new Date().toISOString(), data: exportData.collections });
+    await requireCurrent();
     const manifestFile = await writeJson(manifestPath, {
       uid: claim.uid,
       requestId: claim.requestId,
@@ -299,6 +309,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       files: [exportFile],
       excludedFieldMarkers: [...sensitiveFieldMarkers]
     });
+    await requireCurrent();
 
     const auditRef = db.collection("auditLogs").doc();
     await db.runTransaction(async (tx) => {
@@ -319,6 +330,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed) {
         throw new HttpsError("aborted", "Export consent changed before publication.");
       }
+      await actor.requireCurrent();
       const completedAt = Date.now();
       tx.update(jobRef, {
         status: "completed",

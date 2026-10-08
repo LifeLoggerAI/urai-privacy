@@ -26,6 +26,7 @@ import {
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { cleanupExportArtifactAttempts } from "./export-attempt-maintenance";
 import { evaluateConsentDecision, CONSENT_DECISION_POLICY_VERSION } from "./consent-decision";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
 
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
@@ -134,10 +135,14 @@ export const getExportDownloadUrl = onCall(async (request) => {
   const parsed = downloadSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", "A valid export job and file are required.");
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Authentication is required.");
+  const actor = await createPrivacyActorGuard(request);
   const { jobId, file } = parsed.data;
-  const authority = await db.runTransaction((transaction) => readExportDownloadAuthority(transaction, request.auth, jobId, file));
+  const initialAuth = await actor.requireCurrent();
+  const authority = await db.runTransaction((transaction) => readExportDownloadAuthority(transaction, initialAuth, jobId, file));
   const { uid, requestId, path, packageExpiresAt, consentExpiresAt } = authority;
+  await actor.requireCurrent(uid);
   const [exists] = await bucket.file(path).exists();
+  await actor.requireCurrent(uid);
   if (!exists) throw new HttpsError("not-found", "Export package file is missing.");
   const downloadExpiresAt = Math.min(Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS, packageExpiresAt, consentExpiresAt);
   const url = new URL(exportDownloadEndpoint(request.rawRequest?.get("host")));
@@ -148,10 +153,12 @@ export const getExportDownloadUrl = onCall(async (request) => {
 
   const auditRef = db.collection("auditLogs").doc();
   await db.runTransaction(async (transaction) => {
-    const current = await readExportDownloadAuthority(transaction, request.auth, jobId, file);
+    const currentAuth = await actor.requireCurrent(uid);
+    const current = await readExportDownloadAuthority(transaction, currentAuth, jobId, file);
     if (current.identityHash !== authority.identityHash || downloadExpiresAt <= Date.now()) {
       throw new HttpsError("failed-precondition", "Export authority changed while preparing the download.");
     }
+    await actor.requireCurrent(uid);
     const audit = {
       actorUid: current.actor.actorUid, actorRole: current.actor.actorRole,
       action: "export_download_url_created", targetUid: uid, requestId,
@@ -162,6 +169,7 @@ export const getExportDownloadUrl = onCall(async (request) => {
       ...audit, timestamp: FieldValue.serverTimestamp(), integrityHash: digest({ auditId: auditRef.id, ...audit })
     });
   });
+  await actor.requireCurrent(uid);
   return { jobId, requestId, file, url: url.toString(), downloadExpiresAt, packageExpiresAt,
     requiresAuthorization: true,
     expiresInSeconds: Math.max(0, Math.floor((downloadExpiresAt - Date.now()) / 1000)), auditId: auditRef.id };
@@ -184,17 +192,14 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
     let verified;
     try { verified = await getAuth(app).verifyIdToken(bearer, true); }
     catch { throw new HttpsError("unauthenticated", "Current authentication is required."); }
+    const actor = await createPrivacyActorGuard({ auth: { uid: verified.uid }, rawRequest: request });
     const parsed = deliverySchema.safeParse(request.query);
     if (!parsed.success) throw new HttpsError("invalid-argument", "A valid export download request is required.");
     const { jobId, file, expiresAt, authorityHash } = parsed.data;
-    const actorAuth = { uid: verified.uid, token: verified };
+    const actorAuth = await actor.requireCurrent();
     const requireCurrentDownloadAuthentication = async (ownerUid: string) => {
-      let currentToken;
-      try { currentToken = await getAuth(app).verifyIdToken(bearer, true); }
-      catch { throw new HttpsError("unauthenticated", "Current authentication is required."); }
-      if (currentToken.uid !== verified.uid) throw new HttpsError("permission-denied", "Authenticated export actor changed.");
+      const currentAuth = await actor.requireCurrent(ownerUid);
       if (request.aborted || response.destroyed) throw new HttpsError("unauthenticated", "The export connection changed.");
-      const currentAuth = { uid: currentToken.uid, token: currentToken };
       requireOwnerOrAdmin(currentAuth, ownerUid);
       return currentAuth;
     };
