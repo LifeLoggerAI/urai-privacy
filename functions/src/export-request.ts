@@ -9,6 +9,7 @@ import { EXPORT_PACKAGE_TTL_MS, timestampMillis } from "./export-lifecycle-contr
 import { exportAttemptPaths, exportPublicationBlockReason, ownsExportAttempt } from "./export-processing-authority";
 import { evaluateConsentDecision } from "./consent-decision";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
+import { timestampIso } from "./export-contract";
 
 const exportCollections = [
   "users",
@@ -61,6 +62,10 @@ export function shouldRedactExportField(key: string) {
 }
 
 export function scrubExportValue(value: unknown): unknown {
+  // Preserve temporal values using the existing ISO export convention before
+  // traversing object fields; Date has none and Timestamp fields are SDK internals.
+  const timestamp = timestampIso(value);
+  if (timestamp) return timestamp;
   if (Array.isArray(value)) return value.map(scrubExportValue);
   if (value && typeof value === "object") {
     return Object.fromEntries(
