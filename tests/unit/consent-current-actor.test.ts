@@ -18,11 +18,15 @@ const fixture = vi.hoisted(() => ({
 }));
 const firestoreMock = vi.hoisted(() => {
   const DELETE = { kind: "delete" };
+  type SyntheticReference = { path: string; id: string; collection: (name: string) => { doc: (id?: string) => SyntheticReference } };
+  const reference: (path: string) => SyntheticReference = (path) => ({
+    path, id: path.split("/").at(-1)!, collection: (name: string) => ({ doc: (id?: string) => reference(`${path}/${name}/${id ?? `synthetic-${++fixture.serial}`}`) })
+  });
   return {
     FieldValue: { serverTimestamp: () => "synthetic-server-timestamp", delete: () => DELETE },
     Timestamp: { fromMillis: (millis: number) => ({ toMillis: () => millis }) },
     getFirestore: () => ({
-      collection: (name: string) => ({ doc: (id?: string) => ({ path: `${name}/${id ?? `synthetic-${++fixture.serial}`}` }) }),
+      collection: (name: string) => ({ doc: (id?: string) => reference(`${name}/${id ?? `synthetic-${++fixture.serial}`}`) }),
       runTransaction: async (fn: (transaction: unknown) => unknown) => {
         const writes: Array<{ path: string; value: Record<string, unknown>; merge: boolean }> = [];
         const stage = (target: { path: string }, value: Record<string, unknown>, options?: { merge?: boolean }) => {
@@ -36,7 +40,8 @@ const firestoreMock = vi.hoisted(() => {
             return { exists: value !== undefined, data: () => value };
           },
           set: stage,
-          create: stage
+          create: stage,
+          update: (target: { path: string }, value: Record<string, unknown>) => stage(target, value, { merge: true })
         });
         for (const { path, value, merge } of writes) {
           const next: Record<string, unknown> = { ...(merge ? fixture.records.get(path) : {}), ...value };
@@ -69,11 +74,19 @@ vi.mock("firebase-admin/auth", () => authMock);
 vi.mock("../../functions/node_modules/firebase-admin/lib/esm/auth/index.js", () => authMock);
 vi.mock("firebase-functions/v2/https", () => httpsMock);
 vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/https.js", () => httpsMock);
+vi.mock("firebase-functions/v2/firestore", () => ({ onDocumentWritten: (_path: string, handler: unknown) => handler }));
+vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/firestore.js", () => ({ onDocumentWritten: (_path: string, handler: unknown) => handler }));
 
 import { setCanonicalConsent, evaluateCanonicalConsent } from "../../functions/src/consent-api";
+import { acknowledgeConsentRevocation } from "../../functions/src/consent-revocation";
 type SyntheticRequest = { auth?: { uid: string; token: Record<string, unknown> }; data: Record<string, unknown>; rawRequest?: { get: () => string } };
 const set = setCanonicalConsent as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
 const evaluate = evaluateCanonicalConsent as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
+const acknowledge = acknowledgeConsentRevocation as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
+const eventId = "a".repeat(64);
+const acknowledgementPath = `consentRevocationOutbox/${eventId}/acknowledgements/urai-jobs`;
+const ackData = () => ({ eventId, consumerId: "urai-jobs", status: "applied", correlationId: "synthetic-ack-correlation", detailHash: "b".repeat(64) });
+const ack = () => acknowledge(request(ackData()));
 const request = (data: Record<string, unknown>): SyntheticRequest => ({
   auth: { uid: fixture.uid, token: { ...fixture.signedClaims } }, data,
   rawRequest: { get: () => "Bearer synthetic-current-actor" }
@@ -104,6 +117,7 @@ beforeEach(() => {
     uid: "owner-a", purpose: "data.export", consentTier: "C7", status: "granted",
     policyVersion: CONSENT_DECISION_POLICY_VERSION, expiresAt: new Date(Date.now() + 60_000).toISOString()
   });
+  fixture.records.set(`consentRevocationOutbox/${eventId}`, { eventId, uid: "owner-a", schemaVersion: "consent.revoked.v1" });
 });
 
 describe("actual canonical consent handlers keep current actor authority", () => {
@@ -211,6 +225,69 @@ describe("actual canonical consent handlers keep current actor authority", () =>
     const input = request({ purpose: "data.export", status: "granted" });
     delete input.rawRequest;
     await expect(set(input)).rejects.toMatchObject({ code: "unauthenticated" });
+    expect(fixture.reads).toEqual([]); expect(fixture.writes).toEqual([]);
+  });
+});
+
+describe("actual revocation acknowledgements retain current consumer authority", () => {
+  it("creates one bound acknowledgement, outbox update and audit receipt for the current signed consumer", async () => {
+    system();
+    expect(await ack()).toMatchObject({ eventId, consumerId: "urai-jobs", status: "applied", idempotent: false });
+    expect(fixture.records.get(acknowledgementPath)).toMatchObject({ consumerId: "urai-jobs", actorUid: "system-a", actorRole: "system" });
+    expect(fixture.writes).toHaveLength(3);
+    expect(fixture.verificationChecks.length).toBeGreaterThan(0);
+    expect(fixture.verificationChecks.every(Boolean)).toBe(true);
+  });
+  it("returns an identical current-consumer replay without another receipt write", async () => {
+    system(); await ack(); fixture.writes = [];
+    expect(await ack()).toMatchObject({ idempotent: true, auditId: null });
+    expect(fixture.writes).toEqual([]);
+  });
+  it("rejects a different immutable acknowledgement payload", async () => {
+    system(); await ack(); fixture.writes = [];
+    await expect(acknowledge(request({ ...ackData(), detailHash: "c".repeat(64) }))).rejects.toMatchObject({ code: "already-exists" });
+    expect(fixture.writes).toEqual([]);
+  });
+  it.each(["removed", "rebound", "unsigned"])("rejects a %s consumer before reading the outbox", async (state) => {
+    system();
+    if (state === "removed") fixture.currentClaims = {};
+    else if (state === "rebound") fixture.currentClaims = { role: "system", consumerId: "urai-studio" };
+    else fixture.signedClaims = {};
+    await expect(ack()).rejects.toMatchObject({ code: "permission-denied" });
+    expect(fixture.reads).toEqual([]); expect(fixture.writes).toEqual([]);
+  });
+  it.each(["disabled", "revoked"])("rejects an initially %s consumer before reading the outbox", async (state) => {
+    system(); fixture[state as "disabled" | "revoked"] = true;
+    await expect(ack()).rejects.toMatchObject({ code: "unauthenticated" });
+    expect(fixture.reads).toEqual([]); expect(fixture.writes).toEqual([]);
+  });
+  it.each(["removed", "rebound", "disabled", "revoked", "recreated", "switched"])("stages no acknowledgement when the consumer becomes %s during a read", async (state) => {
+    system(); fixture.afterRead = () => {
+      if (state === "removed") fixture.currentClaims = {};
+      else if (state === "rebound") fixture.currentClaims = { role: "system", consumerId: "urai-studio" };
+      else if (state === "disabled") fixture.disabled = true;
+      else if (state === "revoked") fixture.revoked = true;
+      else if (state === "recreated") fixture.creationTime = "2026-10-08T00:00:00.000Z";
+      else fixture.uid = "system-b";
+    };
+    await expect(ack()).rejects.toMatchObject({ code: ["removed", "rebound", "switched"].includes(state) ? "permission-denied" : "unauthenticated" });
+    expect(fixture.writes).toEqual([]);
+  });
+  it("withholds a successful response when authority is removed after the authorized commit", async () => {
+    system(); fixture.afterCommit = () => { fixture.currentClaims = {}; };
+    await expect(ack()).rejects.toMatchObject({ code: "permission-denied" });
+    // The separate Auth and Firestore services cannot recall a committed receipt.
+    expect(fixture.writes).toHaveLength(3);
+  });
+  it("checks current authority even for an immutable idempotent replay", async () => {
+    system(); await ack(); fixture.writes = []; fixture.afterRead = () => { fixture.revoked = true; };
+    await expect(ack()).rejects.toMatchObject({ code: "unauthenticated" });
+    expect(fixture.writes).toEqual([]);
+  });
+  it("requires signed Bearer transport and rejects a requested foreign consumer", async () => {
+    system(); const input = request(ackData()); delete input.rawRequest;
+    await expect(acknowledge(input)).rejects.toMatchObject({ code: "unauthenticated" });
+    await expect(acknowledge(request({ ...ackData(), consumerId: "urai-studio" }))).rejects.toMatchObject({ code: "permission-denied" });
     expect(fixture.reads).toEqual([]); expect(fixture.writes).toEqual([]);
   });
 });
