@@ -11,23 +11,11 @@ service firebase.storage {
     }
     function isCreateOrUpdate() { return request.resource != null; }
 
-    function exportJob(jobId) {
-      return firestore.get(/databases/(default)/documents/exportJobs/$(jobId));
-    }
-    function activeExportPackage(uid, jobId) {
-      return firestore.exists(/databases/(default)/documents/exportJobs/$(jobId))
-        && exportJob(jobId).data.uid == uid
-        && exportJob(jobId).data.status == "completed"
-        && exportJob(jobId).data.complete == true
-        && exportJob(jobId).data.packageExpiresAt is timestamp
-        && exportJob(jobId).data.packageExpiresAt > request.time;
-    }
-
-    match /exports/{uid}/{jobId}/{fileName} {
-      allow read: if (isOwner(uid) || isAdmin())
-        && fileName in ["export.json", "manifest.json"]
-        && activeExportPackage(uid, jobId);
-      allow write: if isAdmin() && isCreateOrUpdate();
+    // Private export bytes can only be delivered by the authenticated Function,
+    // which checks current authority again before each bounded stream chunk.
+    // A direct Storage SDK read cannot enforce mid-transfer withdrawal.
+    match /exports/{uid}/{allPaths=**} {
+      allow read, write: if false;
     }
 
     match /evidence/{allPaths=**} {

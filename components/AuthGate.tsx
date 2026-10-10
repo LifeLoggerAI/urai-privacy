@@ -8,7 +8,7 @@ import {
   type Auth,
   type User
 } from "firebase/auth";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { auth } from "../firebase/firebase";
 
 type AuthGateProps = {
@@ -31,51 +31,67 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<GateStatus>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const [verifiedAdminOnly, setVerifiedAdminOnly] = useState<boolean | null>(null);
+  const lifetime = useRef({ active: false, generation: 0 });
 
   useEffect(() => {
+    lifetime.current.active = true;
+    let effectActive = true;
     const firebaseAuth = requireFirebaseAuth();
 
     if (!firebaseAuth) {
       setUser(null);
       setError("Firebase Auth is not configured.");
       setStatus("error");
-      return;
+      return () => { effectActive = false; lifetime.current.active = false; lifetime.current.generation++; };
     }
+
+    const currentTransition = (sequence: number, nextUser: User) =>
+      effectActive && lifetime.current.active && lifetime.current.generation === sequence && firebaseAuth.currentUser === nextUser;
 
     const unsubscribe = onAuthStateChanged(
       firebaseAuth,
       async (nextUser) => {
+        if (!effectActive || !lifetime.current.active) return;
+        const sequence = ++lifetime.current.generation;
         setError(null);
+        setUser(null);
+        setVerifiedAdminOnly(null);
+        setStatus(nextUser ? "loading" : "signed-out");
 
-        if (!nextUser) {
-          setUser(null);
-          setStatus("signed-out");
-          return;
-        }
+        if (!nextUser) return;
 
         try {
-          if (adminOnly && !(await hasAdminClaim(nextUser))) {
+          const allowed = !adminOnly || await hasAdminClaim(nextUser);
+          if (!currentTransition(sequence, nextUser)) return;
+          if (!allowed) {
             setUser(null);
             setStatus("forbidden");
             return;
           }
 
           setUser(nextUser);
+          setSessionKey(`${nextUser.uid}:${sequence}`);
+          setVerifiedAdminOnly(adminOnly);
           setStatus("ready");
         } catch (err) {
+          if (!currentTransition(sequence, nextUser)) return;
           setUser(null);
           setError(err instanceof Error ? err.message : "Unable to verify the signed-in session.");
           setStatus("error");
         }
       },
       (err) => {
+        if (!effectActive || !lifetime.current.active) return;
+        lifetime.current.generation++;
         setUser(null);
         setError(err.message);
         setStatus("error");
       }
     );
 
-    return () => unsubscribe();
+    return () => { effectActive = false; lifetime.current.active = false; lifetime.current.generation++; unsubscribe(); };
   }, [adminOnly]);
 
   const signIn = useCallback(async () => {
@@ -89,11 +105,15 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
     }
 
     setError(null);
+    setUser(null);
     setStatus("loading");
+    const sequence = ++lifetime.current.generation;
+    const previousUser = firebaseAuth.currentUser;
 
     try {
       await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
     } catch (err) {
+      if (!lifetime.current.active || lifetime.current.generation !== sequence || firebaseAuth.currentUser !== previousUser) return;
       setUser(null);
       setError(err instanceof Error ? err.message : "Unable to sign in.");
       setStatus("signed-out");
@@ -103,13 +123,23 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
   const signOutCurrentUser = useCallback(async () => {
     const firebaseAuth = requireFirebaseAuth();
     if (!firebaseAuth) return;
-
-    await signOut(firebaseAuth);
     setUser(null);
-    setStatus("signed-out");
+    setStatus("loading");
+    setError(null);
+    const sequence = ++lifetime.current.generation;
+    const previousUser = firebaseAuth.currentUser;
+    try {
+      await signOut(firebaseAuth);
+      if (!lifetime.current.active || lifetime.current.generation !== sequence || firebaseAuth.currentUser !== null) return;
+      setStatus("signed-out");
+    } catch (err) {
+      if (!lifetime.current.active || lifetime.current.generation !== sequence || firebaseAuth.currentUser !== previousUser) return;
+      setError(err instanceof Error ? err.message : "Unable to sign out.");
+      setStatus("error");
+    }
   }, []);
 
-  if (status === "loading") {
+  if (status === "loading" || (status === "ready" && (user !== auth?.currentUser || verifiedAdminOnly !== adminOnly))) {
     return (
       <section
         className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-slate-300"
@@ -172,5 +202,5 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
     );
   }
 
-  return <>{children(user)}</>;
+  return <Fragment key={sessionKey}>{children(user)}</Fragment>;
 }

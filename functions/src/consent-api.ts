@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import {
@@ -9,6 +9,7 @@ import {
   type ConsentPurpose
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
 
 const db = getFirestore();
 
@@ -39,14 +40,8 @@ const CANONICAL_CONSENT_NOTICE = Object.freeze({
   })
 });
 
-function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknown> } }) {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Authentication is required.");
-  return uid;
-}
-
 function canonicalPurpose(value: string): ConsentPurpose {
-  if (!(value in consentPurposeRegistry)) {
+  if (!Object.hasOwn(consentPurposeRegistry, value)) {
     throw new HttpsError("failed-precondition", "Unknown consent purpose. Processing must fail closed until the purpose registry is updated.");
   }
   return value as ConsentPurpose;
@@ -71,7 +66,8 @@ function crossUserAuthority(token?: Record<string, unknown>) {
 }
 
 export const setCanonicalConsent = onCall(async (request) => {
-  const uid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const uid = actor.uid;
   const parsed = setConsentSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
@@ -126,15 +122,30 @@ export const setCanonicalConsent = onCall(async (request) => {
   const auditRef = db.collection("auditLogs").doc();
 
   await db.runTransaction(async (transaction) => {
-    const deletionFence = await transaction.get(db.collection("privacyDeletionTombstones").doc(uid));
+    const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
+    const deletionFence = await transaction.get(deletionFenceRef);
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent changes are blocked.");
     }
+    // Auth can be revoked, disabled, or recreated while the transaction read waits.
+    await actor.requireCurrent();
     transaction.set(recordRef, {
       ...receipt,
       receiptHash,
       serverUpdatedAt: FieldValue.serverTimestamp()
     }, { merge: false });
+    // Storage can read only two Firestore documents per evaluation. Keep this
+    // canonical receipt projection in the existing subject fence, atomically
+    // with the actual consent record. It cannot independently grant consent.
+    if (purpose === "data.export") transaction.set(deletionFenceRef, {
+      uid,
+      exportConsentStatus: parsed.data.status,
+      exportConsentReceiptHash: receiptHash,
+      exportConsentPolicyVersion: CONSENT_DECISION_POLICY_VERSION,
+      exportConsentExpiresAt: effectiveExpiresAt
+        ? Timestamp.fromMillis(Date.parse(effectiveExpiresAt)) : FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
     transaction.set(eventRef, {
       ...receipt,
       consentRecordId: recordId,
@@ -163,6 +174,7 @@ export const setCanonicalConsent = onCall(async (request) => {
     });
   });
 
+  await actor.requireCurrent();
   return {
     consentId: recordId,
     consentEventId: eventRef.id,
@@ -178,16 +190,30 @@ export const setCanonicalConsent = onCall(async (request) => {
 });
 
 export const evaluateCanonicalConsent = onCall(async (request) => {
-  const actorUid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const actorUid = actor.uid;
   const parsed = decisionSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
   const purpose = canonicalPurpose(parsed.data.purpose);
   const targetUid = parsed.data.targetUid ?? actorUid;
-  const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthority(request.auth?.token);
-  if (!authority) {
-    throw new HttpsError("permission-denied", "Owner, administrator, or a consumer-bound trusted system authority is required.");
-  }
+  const requireCurrentAuthority = async () => {
+    const current = await actor.requireCurrent();
+    const authority = targetUid === actorUid
+      ? { role: "user" as const, consumerId: null } : crossUserAuthority(current.token);
+    if (!authority) {
+      throw new HttpsError("permission-denied", "Current owner, administrator, or consumer-bound trusted system authority is required.");
+    }
+    return authority;
+  };
+  const initialAuthority = await requireCurrentAuthority();
+  const requireUnchangedAuthority = async () => {
+    const current = await requireCurrentAuthority();
+    if (current.role !== initialAuthority.role || current.consumerId !== initialAuthority.consumerId) {
+      throw new HttpsError("permission-denied", "Consent decision actor authority changed.");
+    }
+    return current;
+  };
 
   const recordId = consentRecordId(targetUid, purpose);
   const recordRef = db.collection("consentRecords").doc(recordId);
@@ -198,10 +224,17 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
       transaction.get(recordRef),
       transaction.get(tombstoneRef)
     ]);
+    // A restored or incorrectly bound document cannot supply another owner's
+    // consent or make an unknown deletion fence look inactive.
+    if ((snapshot.exists && snapshot.data()?.uid !== targetUid)
+      || (deletionFence.exists && deletionFence.data()?.uid !== targetUid)) {
+      throw new HttpsError("failed-precondition", "Consent or deletion authority does not belong to the target account.");
+    }
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent decisions are blocked.");
     }
 
+    const authority = await requireUnchangedAuthority();
     const evaluated = evaluateConsentDecision({
       purpose,
       record: snapshot.exists ? snapshot.data() : null
@@ -234,5 +267,7 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     return evaluated;
   });
 
+  await requireUnchangedAuthority();
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
 });
+

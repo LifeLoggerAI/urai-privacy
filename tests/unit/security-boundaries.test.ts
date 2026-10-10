@@ -64,7 +64,9 @@ describe("privacy security boundaries", () => {
     expect(functionsSource).toContain("DELETION_EXECUTION_LEASE_MS");
     expect(functionsSource).toContain("deletionExecutionLeaseUntil");
     expect(functionsSource).toContain("deleteDocumentIds(collectionName, currentPlan.targets[collectionName]");
-    expect(functionsSource).toContain('bucket.file(objectName).delete({ ignoreNotFound: true })');
+    expect(functionsSource).toContain('bucket.file(objectName).delete({ ignoreNotFound: true, ifGenerationMatch: generation })');
+    expect(functionsSource).toContain('current.storageObjectGenerations[name] !== approved.storageObjectGenerations[name]');
+    expect(functionsSource).toContain('Deletion target ownership or version changed after approval. Re-run the dry run before continuing.');
     expect(functionsSource).toContain("await auth.deleteUser(args.uid)");
   });
 
@@ -162,7 +164,7 @@ describe("privacy security boundaries", () => {
     expect(exportRequest).toContain('import { collectNestedRows, collectPaginatedRows } from "./export-pagination";');
     expect(exportRequest).toContain("collectPaginatedRows<DocumentData>");
     expect(exportRequest).toContain("collectNestedRows({");
-    expect(exportRequest).toContain('listSubcollectionDocuments("consentRevocationOutbox", outbox.id, "acknowledgements")');
+    expect(exportRequest).toContain('listSubcollectionDocuments("consentRevocationOutbox", outbox.id, "acknowledgements", requireCurrent)');
     expect(exportRequest).toContain(".orderBy(FieldPath.documentId())");
     expect(exportRequest).toContain(".limit(limit)");
     expect(exportRequest).toContain("query = query.startAfter(cursor)");
@@ -192,8 +194,10 @@ describe("privacy security boundaries", () => {
     expect(lifecycle).toContain("artifactCleanupLeaseToken: cleanupToken");
     expect(exportRequest).toContain('status === "artifact_cleanup"');
     expect(lifecycle).toContain("cleanupFailedJob(document)");
-    expect(storageRules).toContain("activeExportPackage(uid, jobId)");
-    expect(storageRules).toContain("packageExpiresAt > request.time");
+    expect(storageRules).toMatch(/match \/exports\/\{uid\}\/\{allPaths=\*\*\}\s*\{\s*allow read, write: if false;/);
+    expect(lifecycle).toContain("packageExpiresAt <= now");
+    expect(lifecycle).toContain("verifyIdToken(bearer, true)");
+    expect(lifecycle).toContain("pipeline(stream, guardedChunks, response)");
   });
 
   it("does not claim privacy certification from queue counts alone", () => {

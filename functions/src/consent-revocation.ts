@@ -4,6 +4,7 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { selectConsentRevocationSource } from "./consent-revocation-transition";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
 
 const db = getFirestore();
 const REVOCATION_SCHEMA_VERSION = "consent.revoked.v1";
@@ -20,11 +21,9 @@ function digest(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-function boundConsumerAuthority(request: { auth?: { uid?: string; token?: Record<string, unknown> } }) {
-  const actorUid = request.auth?.uid;
-  if (!actorUid) throw new HttpsError("unauthenticated", "Authentication is required.");
-
-  const token = request.auth?.token;
+function boundConsumerAuthority(actor: { uid: string; token: Record<string, unknown> }) {
+  const actorUid = actor.uid;
+  const token = actor.token;
   const system = token?.system === true || token?.role === "system";
   const consumerId = typeof token?.consumerId === "string" ? token.consumerId.trim() : "";
   if (!system || !/^[a-zA-Z0-9._-]{2,120}$/.test(consumerId)) {
@@ -83,7 +82,14 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
 });
 
 export const acknowledgeConsentRevocation = onCall(async (request) => {
-  const authority = boundConsumerAuthority(request);
+  const actor = await createPrivacyActorGuard(request);
+  const authority = boundConsumerAuthority(await actor.requireCurrent());
+  const requireUnchangedAuthority = async () => {
+    const current = boundConsumerAuthority(await actor.requireCurrent());
+    if (current.actorUid !== authority.actorUid || current.consumerId !== authority.consumerId) {
+      throw new HttpsError("permission-denied", "Revocation acknowledgement consumer authority changed.");
+    }
+  };
   const parsed = acknowledgementSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
   if (parsed.data.consumerId !== authority.consumerId) {
@@ -97,6 +103,10 @@ export const acknowledgeConsentRevocation = onCall(async (request) => {
   const result = await db.runTransaction(async (transaction) => {
     const outbox = await transaction.get(outboxRef);
     const existingAck = await transaction.get(ackRef);
+    // Existing acknowledgements are also protected responses. Check current
+    // account and signed/current consumer binding after both awaited reads,
+    // before returning a replay or staging any acknowledgement/audit writes.
+    await requireUnchangedAuthority();
 
     if (!outbox.exists) throw new HttpsError("not-found", "Revocation event was not found.");
     const outboxData = outbox.data() ?? {};
@@ -154,6 +164,7 @@ export const acknowledgeConsentRevocation = onCall(async (request) => {
     return { idempotent: false, auditId: auditRef.id as string | null };
   });
 
+  await requireUnchangedAuthority();
   return {
     eventId: parsed.data.eventId,
     consumerId: authority.consumerId,

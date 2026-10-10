@@ -4,7 +4,7 @@
   "private": true,
   "description": "URAI Privacy standalone Firebase and Next.js privacy product scaffold.",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -14,15 +14,15 @@
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration --passWithNoTests",
-    "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --minWorkers=1 --passWithNoTests",
+    "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --passWithNoTests",
     "test:e2e": "node scripts/smoke-routes.mjs",
     "test:rules": "vitest run tests/rules",
-    "test:rules:emulated": "vitest run tests/rules --pool=forks --maxWorkers=1 --minWorkers=1",
+    "test:rules:emulated": "vitest run tests/rules --pool=forks --maxWorkers=1",
     "test:rules:static": "node scripts/validate-rules.mjs",
     "test:smoke": "node scripts/smoke-routes.mjs",
     "test:smoke:live": "node scripts/smoke-live.mjs",
     "test:live-auth-proof": "node scripts/verify-authenticated-live-proof.mjs",
-    "test:emulators": "firebase emulators:exec --config firebase.emulators.json --project urai-privacy-integration-test --only auth,firestore,storage,functions \"npm run test:rules:emulated && npm run test:integration:emulated\"",
+    "test:emulators": "firebase emulators:exec --config firebase.emulators.json --project urai-privacy-integration-test --only auth,firestore,storage,functions \"node scripts/check-functions-emulator-loaded.mjs && npm run test:rules:emulated && npm run test:integration:emulated\"",
     "check:java": "node scripts/check-java.mjs",
     "audit:privacy": "node scripts/urai_privacy_adoption_check.mjs",
     "audit:tier-one": "node scripts/audit-tier-one.mjs",
@@ -37,11 +37,13 @@
     "verify:release": "bash scripts/verify-release.sh",
     "final:production-lock": "bash scripts/final-production-lock.sh",
     "test:export:contract": "node scripts/check-complete-export-contract.mjs",
-    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs"
+    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs",
+    "pretest:emulators": "npm --prefix functions run build",
+    "test:dependency-security": "node --test scripts/dependency-security.behavior.node-test.cjs"
   },
   "dependencies": {
     "firebase": "^12.13.0",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.13.3",
@@ -49,24 +51,46 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
-    "@types/node": "20.19.41",
+    "@types/node": "22.20.5",
     "@types/react": "18.3.28",
     "@types/react-dom": "^18.3.1",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
     "eslint": "^9.39.1",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "firebase-admin": "^13.10.0",
-    "firebase-tools": "15.24.0",
+    "firebase-tools": "15.32.1",
     "typescript": "5.9.3",
-    "vitest": "^2.1.4"
+    "vitest": "5.0.3",
+    "vite": "8.3.3",
+    "braces": "file:vendor/braces"
   },
   "overrides": {
     "postcss": "^8.5.10",
-    "undici": "^7.16.0",
+    "undici": "7.29.1",
     "@tootallnate/once": "^3.0.1",
-    "@firebase/firestore": {
-      "@grpc/grpc-js": "^1.14.4"
-    }
+    "source-map-js": "1.2.2",
+    "braces": "file:vendor/braces",
+    "uuid": "11.1.1",
+    "proxy-addr": "2.0.8",
+    "qs": "6.16.0",
+    "@grpc/grpc-js": "1.14.5",
+    "csv-parse": "7.0.2",
+    "@opentelemetry/core": "2.8.0",
+    "basic-ftp": "6.2.1",
+    "js-yaml": "4.3.2",
+    "@fastify/busboy": "3.2.2",
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "compression": "1.8.2",
+    "fast-uri": "3.1.8",
+    "ip-address": "10.7.1",
+    "re2": "1.26.1",
+    "hono": "4.13.7",
+    "@hono/node-server": "1.19.15",
+    "morgan": "1.12.1",
+    "brace-expansion@1": "1.1.21",
+    "brace-expansion@2": "2.1.7",
+    "brace-expansion@5": "5.0.12",
+    "form-data@2": "2.5.6"
   }
 }

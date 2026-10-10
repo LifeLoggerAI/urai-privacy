@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20.19.5'
+          node-version: '22.23.3'
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -50,13 +50,13 @@ jobs:
         run: |
           set +e
           mkdir -p artifacts/dependency-remediation
-          npm audit --omit=dev --json > artifacts/dependency-remediation/root-before.json
+          npm audit --json > artifacts/dependency-remediation/root-before.json
           printf '%s\n' "$?" > artifacts/dependency-remediation/root-before-exit.txt
-          npm --prefix functions audit --omit=dev --json > artifacts/dependency-remediation/functions-before.json
+          npm --prefix functions audit --json > artifacts/dependency-remediation/functions-before.json
           printf '%s\n' "$?" > artifacts/dependency-remediation/functions-before-exit.txt
           exit 0
 
-      - name: Verify committed production audit state without rewriting locks
+      - name: Verify complete committed audit state without rewriting locks
         shell: bash
         run: |
           set -euo pipefail
@@ -64,19 +64,22 @@ jobs:
           const fs = require('node:fs');
           for (const scope of ['root', 'functions']) {
             const report = JSON.parse(fs.readFileSync(`artifacts/dependency-remediation/${scope}-before.json`, 'utf8'));
-            const counts = report?.metadata?.vulnerabilities ?? {};
-            const high = Number(counts.high ?? 0);
-            const critical = Number(counts.critical ?? 0);
-            console.log(`${scope}: high=${high} critical=${critical}`);
-            if (high !== 0 || critical !== 0) process.exitCode = 1;
+            const counts = report?.metadata?.vulnerabilities;
+            for (const severity of ['low', 'moderate', 'high', 'critical']) {
+              const count = counts?.[severity];
+              if (!Number.isSafeInteger(count) || count !== 0) {
+                console.error(`${scope}: unresolved or invalid ${severity} count=${count}`);
+                process.exitCode = 1;
+              }
+            }
           }
           NODE
           test -z "$(git diff -- package-lock.json functions/package-lock.json)"
           : > artifacts/dependency-remediation/lockfile.patch
           printf '0\n' > artifacts/dependency-remediation/root-fix-exit.txt
           printf '0\n' > artifacts/dependency-remediation/functions-fix-exit.txt
-          printf '%s\n' 'No lockfile rewrite performed; production audit state verified read-only.' > artifacts/dependency-remediation/root-fix.log
-          printf '%s\n' 'No lockfile rewrite performed; production audit state verified read-only.' > artifacts/dependency-remediation/functions-fix.log
+          printf '%s\n' 'No lockfile rewrite performed; complete audit state verified read-only.' > artifacts/dependency-remediation/root-fix.log
+          printf '%s\n' 'No lockfile rewrite performed; complete audit state verified read-only.' > artifacts/dependency-remediation/functions-fix.log
 
       - name: Install committed remediated locks
         shell: bash
@@ -85,28 +88,34 @@ jobs:
           npm ci
           npm --prefix functions ci
 
+      - name: Exercise installed dependency consumers and security boundaries
+        run: npm run test:dependency-security
+
       - name: Capture after-audit evidence
         shell: bash
         run: |
           set +e
-          npm audit --omit=dev --json > artifacts/dependency-remediation/root-after.json
+          npm audit --json > artifacts/dependency-remediation/root-after.json
           printf '%s\n' "$?" > artifacts/dependency-remediation/root-after-exit.txt
-          npm --prefix functions audit --omit=dev --json > artifacts/dependency-remediation/functions-after.json
+          npm --prefix functions audit --json > artifacts/dependency-remediation/functions-after.json
           printf '%s\n' "$?" > artifacts/dependency-remediation/functions-after-exit.txt
           exit 0
 
-      - name: Enforce no unresolved high or critical production advisories
+      - name: Enforce no unresolved dependency advisories
         shell: bash
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
           for (const scope of ['root', 'functions']) {
             const report = JSON.parse(fs.readFileSync(`artifacts/dependency-remediation/${scope}-after.json`, 'utf8'));
-            const counts = report?.metadata?.vulnerabilities ?? {};
-            const high = Number(counts.high ?? 0);
-            const critical = Number(counts.critical ?? 0);
-            console.log(`${scope}: high=${high} critical=${critical}`);
-            if (high !== 0 || critical !== 0) process.exitCode = 1;
+            const counts = report?.metadata?.vulnerabilities;
+            for (const severity of ['low', 'moderate', 'high', 'critical']) {
+              const count = counts?.[severity];
+              if (!Number.isSafeInteger(count) || count !== 0) {
+                console.error(`${scope}: unresolved or invalid ${severity} count=${count}`);
+                process.exitCode = 1;
+              }
+            }
           }
           NODE
 
@@ -141,7 +150,7 @@ jobs:
             workflowRunId: process.env.GITHUB_RUN_ID,
             jobStatus: process.env.JOB_STATUS,
             committedLocksCurrent: fs.statSync('artifacts/dependency-remediation/lockfile.patch').size === 0,
-            sourcePackageFilesChanged: false,
+            sourcePackageFilesMutatedByThisRun: false,
             rootLockSha256: digest('package-lock.json'),
             functionsLockSha256: digest('functions/package-lock.json'),
             certification: false,
