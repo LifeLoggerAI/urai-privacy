@@ -5,6 +5,7 @@ import { FieldPath, FieldValue, getFirestore, type DocumentData, type Transactio
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
 
 initializeApp();
 const db = getFirestore();
@@ -155,9 +156,12 @@ async function writeAudit(args: {
   requestId?: string;
   source: "function" | "admin" | "web" | "system";
   metadata?: Record<string, unknown>;
-}) {
+}, transaction?: Transaction) {
   const ref = db.collection("auditLogs").doc();
-  await ref.set({ ...args, timestamp: FieldValue.serverTimestamp(), metadata: args.metadata ?? {}, integrityHash: sha256({ ...args, id: ref.id }) });
+  const fields = Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined));
+  const record = { ...fields, timestamp: FieldValue.serverTimestamp(), metadata: args.metadata ?? {}, integrityHash: sha256({ ...args, id: ref.id }) };
+  if (transaction) transaction.create(ref, record);
+  else await ref.set(record);
   return ref.id;
 }
 
@@ -532,19 +536,22 @@ async function executeDeletion(args: {
 }
 
 export const createExportRequest = onCall(async (request) => {
-  const uid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const uid = actor.uid;
   const now = FieldValue.serverTimestamp();
   const reqRef = db.collection("privacyRequests").doc();
   const jobRef = db.collection("exportJobs").doc();
-  await db.runTransaction(async (tx) => {
+  const auditId = await db.runTransaction(async (tx) => {
     const deletionFence = await tx.get(db.collection("privacyDeletionTombstones").doc(uid));
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; new export requests are blocked.");
     }
+    await actor.requireCurrent();
     tx.set(reqRef, { uid, type: "export", status: "pending", createdAt: now, updatedAt: now });
     tx.set(jobRef, { uid, requestId: reqRef.id, status: "pending", createdAt: now, updatedAt: now, recordCount: 0 });
+    return writeAudit({ actorUid: uid, actorRole: "user", action: "export_request_created", targetUid: uid, requestId: reqRef.id, source: "function" }, tx);
   });
-  const auditId = await writeAudit({ actorUid: uid, actorRole: "user", action: "export_request_created", targetUid: uid, requestId: reqRef.id, source: "function" });
+  await actor.requireCurrent();
   return { requestId: reqRef.id, exportJobId: jobRef.id, auditId, status: "pending" };
 });
 
@@ -668,14 +675,16 @@ export const getExportDownloadUrl = onCall(async (request) => {
 });
 
 export const createDeletionRequest = onCall(async (request) => {
-  const uid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const uid = actor.uid;
   const { reason } = parseOrThrow(createDeletionSchema, request.data);
   const ref = db.collection("deletionRequests").doc();
-  await db.runTransaction(async (tx) => {
+  const auditId = await db.runTransaction(async (tx) => {
     const deletionFence = await tx.get(db.collection("privacyDeletionTombstones").doc(uid));
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; new deletion requests are blocked.");
     }
+    await actor.requireCurrent();
     tx.create(ref, {
       uid,
       status: "pending",
@@ -686,8 +695,9 @@ export const createDeletionRequest = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
     });
+    return writeAudit({ actorUid: uid, actorRole: "user", action: "deletion_request_created", targetUid: uid, requestId: ref.id, source: "function" }, tx);
   });
-  const auditId = await writeAudit({ actorUid: uid, actorRole: "user", action: "deletion_request_created", targetUid: uid, requestId: ref.id, source: "function" });
+  await actor.requireCurrent();
   return { requestId: ref.id, status: "pending", auditId };
 });
 
@@ -1027,29 +1037,40 @@ export const executeDeletionRequest = onCall(async (request) => {
 });
 
 export const writeAuditLog = onCall(async (request) => {
-  const adminUid = await requireAdmin(request);
+  const actor = await createPrivacyActorGuard(request, true);
+  const adminUid = actor.uid;
   const { action, targetUid, requestId } = parseOrThrow(auditLogSchema, request.data);
-  const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action, targetUid, requestId, source: "admin", metadata: { manual: true } });
+  const auditId = await db.runTransaction(async (tx) => {
+    await actor.requireCurrent();
+    return writeAudit({ actorUid: adminUid, actorRole: "admin", action, targetUid, requestId, source: "admin", metadata: { manual: true } }, tx);
+  });
+  await actor.requireCurrent();
   return { auditId };
 });
 
 export const recordAdminAction = onCall(async (request) => {
-  const adminUid = await requireAdmin(request);
+  const actor = await createPrivacyActorGuard(request, true);
+  const adminUid = actor.uid;
   const { action, targetUid, requestId, notes } = parseOrThrow(adminActionSchema, request.data);
   const ref = db.collection("adminActions").doc();
-  await ref.set({ adminUid, action, targetUid: targetUid ?? null, requestId: requestId ?? null, notes: notes ?? null, timestamp: FieldValue.serverTimestamp() });
-  const auditId = await writeAudit({ actorUid: adminUid, actorRole: "admin", action: "admin_changed_request_status", targetUid, requestId, source: "admin", metadata: { adminActionId: ref.id } });
+  const auditId = await db.runTransaction(async (tx) => {
+    await actor.requireCurrent();
+    tx.create(ref, { adminUid, action, targetUid: targetUid ?? null, requestId: requestId ?? null, notes: notes ?? null, timestamp: FieldValue.serverTimestamp() });
+    return writeAudit({ actorUid: adminUid, actorRole: "admin", action: "admin_changed_request_status", targetUid, requestId, source: "admin", metadata: { adminActionId: ref.id } }, tx);
+  });
+  await actor.requireCurrent();
   return { adminActionId: ref.id, auditId };
 });
 
 export const getPrivacyHealthReport = onCall(async (request) => {
-  await requireAdmin(request);
+  const actor = await createPrivacyActorGuard(request, true);
   const [exportsSnap, deletionsSnap, policiesSnap, auditsSnap] = await Promise.all([
     db.collection("privacyRequests").where("type", "==", "export").where("status", "in", ["pending", "approved", "processing"]).get(),
     db.collection("deletionRequests").where("status", "in", ["pending", "approved", "processing"]).get(),
     db.collection("retentionPolicies").get(),
     db.collection("auditLogs").limit(100).get()
   ]);
+  await actor.requireCurrent();
   const operationalState = exportsSnap.size > 50 || deletionsSnap.size > 25 ? "needs_review" : "nominal";
   return {
     generatedAt: new Date().toISOString(),

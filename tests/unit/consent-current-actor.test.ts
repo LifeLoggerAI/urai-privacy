@@ -14,7 +14,8 @@ const fixture = vi.hoisted(() => ({
   creationTime: "2026-10-01T00:00:00.000Z",
   verificationChecks: [] as boolean[],
   afterRead: null as null | (() => void),
-  afterCommit: null as null | (() => void)
+  afterCommit: null as null | (() => void),
+  rejectWritePrefix: null as null | string
 }));
 const firestoreMock = vi.hoisted(() => {
   const DELETE = { kind: "delete" };
@@ -22,14 +23,30 @@ const firestoreMock = vi.hoisted(() => {
   const reference: (path: string) => SyntheticReference = (path) => ({
     path, id: path.split("/").at(-1)!, collection: (name: string) => ({ doc: (id?: string) => reference(`${path}/${name}/${id ?? `synthetic-${++fixture.serial}`}`) })
   });
+  type SyntheticCollection = {
+    doc: (id?: string) => SyntheticReference;
+    where: (...args: unknown[]) => SyntheticCollection;
+    limit: (count: number) => SyntheticCollection;
+    get: () => Promise<{ size: number; docs: unknown[] }>;
+  };
+  const collection = (name: string): SyntheticCollection => {
+    const value: SyntheticCollection = {
+      doc: (id?: string) => reference(`${name}/${id ?? `synthetic-${++fixture.serial}`}`),
+      where: () => value, limit: () => value,
+      get: async () => { fixture.reads.push(`query/${name}`); fixture.afterRead?.(); return { size: 0, docs: [] }; }
+    };
+    return value;
+  };
   return {
     FieldValue: { serverTimestamp: () => "synthetic-server-timestamp", delete: () => DELETE },
     Timestamp: { fromMillis: (millis: number) => ({ toMillis: () => millis }) },
     getFirestore: () => ({
-      collection: (name: string) => ({ doc: (id?: string) => reference(`${name}/${id ?? `synthetic-${++fixture.serial}`}`) }),
+      collection,
       runTransaction: async (fn: (transaction: unknown) => unknown) => {
         const writes: Array<{ path: string; value: Record<string, unknown>; merge: boolean }> = [];
         const stage = (target: { path: string }, value: Record<string, unknown>, options?: { merge?: boolean }) => {
+          if (fixture.rejectWritePrefix && target.path.startsWith(fixture.rejectWritePrefix)) throw new Error("Synthetic audit write failure.");
+          if (Object.values(value).some((entry) => entry === undefined)) throw new Error("Synthetic Firestore rejects undefined fields.");
           writes.push({ path: target.path, value, merge: options?.merge ?? false });
         };
         const result = await fn({
@@ -76,13 +93,23 @@ vi.mock("firebase-functions/v2/https", () => httpsMock);
 vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/https.js", () => httpsMock);
 vi.mock("firebase-functions/v2/firestore", () => ({ onDocumentWritten: (_path: string, handler: unknown) => handler }));
 vi.mock("../../functions/node_modules/firebase-functions/lib/v2/providers/firestore.js", () => ({ onDocumentWritten: (_path: string, handler: unknown) => handler }));
+vi.mock("firebase-admin/app", () => ({ initializeApp: () => ({}) }));
+vi.mock("../../functions/node_modules/firebase-admin/lib/esm/app/index.js", () => ({ initializeApp: () => ({}) }));
+vi.mock("firebase-admin/storage", () => ({ getStorage: () => ({ bucket: () => ({}) }) }));
+vi.mock("../../functions/node_modules/firebase-admin/lib/esm/storage/index.js", () => ({ getStorage: () => ({ bucket: () => ({}) }) }));
 
 import { setCanonicalConsent, evaluateCanonicalConsent } from "../../functions/src/consent-api";
 import { acknowledgeConsentRevocation } from "../../functions/src/consent-revocation";
+import { createExportRequest, createDeletionRequest, writeAuditLog, recordAdminAction, getPrivacyHealthReport } from "../../functions/src/index";
 type SyntheticRequest = { auth?: { uid: string; token: Record<string, unknown> }; data: Record<string, unknown>; rawRequest?: { get: () => string } };
 const set = setCanonicalConsent as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
 const evaluate = evaluateCanonicalConsent as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
 const acknowledge = acknowledgeConsentRevocation as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
+const createExport = createExportRequest as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
+const createDeletion = createDeletionRequest as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
+const manualAudit = writeAuditLog as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
+const adminAction = recordAdminAction as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
+const health = getPrivacyHealthReport as unknown as (request: SyntheticRequest) => Promise<Record<string, unknown>>;
 const eventId = "a".repeat(64);
 const acknowledgementPath = `consentRevocationOutbox/${eventId}/acknowledgements/urai-jobs`;
 const ackData = () => ({ eventId, consumerId: "urai-jobs", status: "applied", correlationId: "synthetic-ack-correlation", detailHash: "b".repeat(64) });
@@ -90,6 +117,92 @@ const ack = () => acknowledge(request(ackData()));
 const request = (data: Record<string, unknown>): SyntheticRequest => ({
   auth: { uid: fixture.uid, token: { ...fixture.signedClaims } }, data,
   rawRequest: { get: () => "Bearer synthetic-current-actor" }
+});
+
+describe("actual exported request and administrator entry handlers keep current authority", () => {
+  const ownerOperations = [
+    ["export", () => createExport(request({}))],
+    ["deletion", () => createDeletion(request({ reason: "Synthetic deletion request" }))]
+  ] as const;
+  const adminOperations = [
+    ["audit", () => manualAudit(request({ action: "synthetic_review" }))],
+    ["action", () => adminAction(request({ action: "synthetic_review", notes: "Synthetic note" }))],
+    ["health", () => health(request({}))]
+  ] as const;
+
+  it.each(ownerOperations)("creates the current owner's %s request and its atomic audit", async (_name, operation) => {
+    const reply = await operation();
+    expect(reply.status).toBe("pending");
+    expect(fixture.records.get(`auditLogs/${reply.auditId}`)).toMatchObject({ actorUid: "owner-a", actorRole: "user", requestId: reply.requestId });
+    expect(fixture.writes.length).toBe(_name === "export" ? 3 : 2);
+    expect(fixture.verificationChecks.length).toBeGreaterThan(0);
+  });
+  it.each(adminOperations)("preserves the current signed administrator's %s operation", async (name, operation) => {
+    admin(); const reply = await operation();
+    if (name === "health") expect(reply).toMatchObject({ verdict: "evidence_incomplete", certification: "not_certified" });
+    else expect(fixture.records.get(`auditLogs/${reply.auditId}`)).toMatchObject({ actorUid: "admin-a", actorRole: "admin" });
+    expect(fixture.verificationChecks.length).toBeGreaterThan(0);
+  });
+  it.each([...ownerOperations, ...adminOperations])("requires the original Bearer authentication for the %s entry handler", async (name) => {
+    admin(); const withoutBearer = { ...request({ action: "synthetic_review" }), rawRequest: undefined };
+    const operation = name === "export" ? createExport : name === "deletion" ? createDeletion
+      : name === "audit" ? manualAudit : name === "action" ? adminAction : health;
+    await expect(operation(withoutBearer)).rejects.toMatchObject({ code: "unauthenticated" });
+    expect(fixture.reads).toEqual([]); expect(fixture.writes).toEqual([]);
+  });
+  it.each([...ownerOperations, adminOperations[1]])("aborts the %s record together with a failed audit write", async (_name, operation) => {
+    admin(); fixture.rejectWritePrefix = "auditLogs/";
+    await expect(operation()).rejects.toThrow("Synthetic audit write failure.");
+    expect(fixture.writes).toEqual([]);
+  });
+  for (const [name, operation] of ownerOperations) {
+    it.each(["disabled", "revoked"])("rejects an initially %s owner before its " + name + " request", async (state) => {
+      fixture[state as "disabled" | "revoked"] = true;
+      await expect(operation()).rejects.toMatchObject({ code: "unauthenticated" });
+      expect(fixture.reads).toEqual([]); expect(fixture.writes).toEqual([]);
+    });
+    it.each(["disabled", "revoked", "recreated", "switched"])("blocks a " + name + " request when its owner becomes %s during the fence read", async (state) => {
+      fixture.afterRead = () => {
+        if (state === "disabled") fixture.disabled = true;
+        else if (state === "revoked") fixture.revoked = true;
+        else if (state === "recreated") fixture.creationTime = "2026-10-08T00:00:00.000Z";
+        else fixture.uid = "owner-b";
+      };
+      await expect(operation()).rejects.toMatchObject({ code: state === "switched" ? "permission-denied" : "unauthenticated" });
+      expect(fixture.writes).toEqual([]);
+    });
+    it("withholds " + name + " request success after an authorized commit when the owner is disabled", async () => {
+      fixture.afterCommit = () => { fixture.disabled = true; };
+      await expect(operation()).rejects.toMatchObject({ code: "unauthenticated" });
+      expect(fixture.writes).toHaveLength(name === "export" ? 3 : 2);
+    });
+  }
+  for (const [name, operation] of adminOperations) {
+    it.each(["removed", "unsigned", "disabled", "revoked"])("rejects a %s administrator before the " + name + " operation", async (state) => {
+      admin();
+      if (state === "removed") fixture.currentClaims = {};
+      else if (state === "unsigned") fixture.signedClaims = {};
+      else fixture[state as "disabled" | "revoked"] = true;
+      await expect(operation()).rejects.toMatchObject({ code: ["disabled", "revoked"].includes(state) ? "unauthenticated" : "permission-denied" });
+      expect(fixture.reads).toEqual([]); expect(fixture.writes).toEqual([]);
+    });
+  }
+  it.each(["removed", "disabled", "revoked", "recreated", "switched"])("withholds health results when its administrator becomes %s during a query", async (state) => {
+    admin(); fixture.afterRead = () => {
+      if (state === "removed") fixture.currentClaims = {};
+      else if (state === "disabled") fixture.disabled = true;
+      else if (state === "revoked") fixture.revoked = true;
+      else if (state === "recreated") fixture.creationTime = "2026-10-08T00:00:00.000Z";
+      else fixture.uid = "admin-b";
+    };
+    await expect(health(request({}))).rejects.toMatchObject({ code: ["removed", "switched"].includes(state) ? "permission-denied" : "unauthenticated" });
+    expect(fixture.writes).toEqual([]);
+  });
+  it.each(adminOperations.slice(0, 2))("withholds %s success after an authorized transaction when administrator authority is removed", async (name, operation) => {
+    admin(); fixture.afterCommit = () => { fixture.currentClaims = {}; };
+    await expect(operation()).rejects.toMatchObject({ code: "permission-denied" });
+    expect(fixture.writes).toHaveLength(name === "audit" ? 1 : 2);
+  });
 });
 const grant = () => set(request({ purpose: "data.export", status: "granted" }));
 const decision = (targetUid = "owner-a") => evaluate(request({
@@ -111,7 +224,7 @@ beforeEach(() => {
   fixture.uid = "owner-a"; fixture.signedClaims = {}; fixture.currentClaims = {};
   fixture.revoked = false; fixture.disabled = false;
   fixture.creationTime = "2026-10-01T00:00:00.000Z";
-  fixture.verificationChecks = []; fixture.afterRead = null; fixture.afterCommit = null;
+  fixture.verificationChecks = []; fixture.afterRead = null; fixture.afterCommit = null; fixture.rejectWritePrefix = null;
   fixture.records.set("privacyDeletionTombstones/owner-a", { uid: "owner-a", active: false });
   fixture.records.set("consentRecords/owner-a_data_export", {
     uid: "owner-a", purpose: "data.export", consentTier: "C7", status: "granted",

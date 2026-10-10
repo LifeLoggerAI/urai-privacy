@@ -45,7 +45,8 @@ async function actor(label: string, claims: Record<string, unknown> = {}): Promi
   return result;
 }
 
-async function call(name: "setCanonicalConsent" | "evaluateCanonicalConsent" | "processExportRequest" | "acknowledgeConsentRevocation", actor: Actor, data: Record<string, unknown>) {
+async function call(name: "setCanonicalConsent" | "evaluateCanonicalConsent" | "processExportRequest" | "acknowledgeConsentRevocation"
+  | "createExportRequest" | "createDeletionRequest" | "writeAuditLog" | "recordAdminAction" | "getPrivacyHealthReport", actor: Actor, data: Record<string, unknown>) {
   const response = await fetch(`http://127.0.0.1:5001/${PROJECT}/us-central1/${name}`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${actor.token}` },
     body: JSON.stringify({ data })
@@ -118,7 +119,8 @@ async function deniedAcknowledgement(subject: Actor, eventId: string, status = 4
     for (const actor of actors) {
       for (const [collection, field] of [
         ["consentRecords", "uid"], ["consentEvents", "uid"],
-        ["dataAccessEvents", "actorUid"], ["auditLogs", "actorUid"]
+        ["dataAccessEvents", "actorUid"], ["auditLogs", "actorUid"],
+        ["privacyRequests", "uid"], ["exportJobs", "uid"], ["deletionRequests", "uid"], ["adminActions", "adminUid"]
       ]) {
         const rows = await db.collection(collection).where(field, "==", actor.uid).get();
         for (const row of rows.docs) await row.ref.delete();
@@ -205,6 +207,54 @@ async function deniedAcknowledgement(subject: Actor, eventId: string, status = 4
     const eventId = await revocationEvent();
     await auth.updateUser(subject.uid, { disabled: true });
     await deniedAcknowledgement(subject, eventId, 401);
+  });
+  it("creates the real current owner's export and deletion requests with their corresponding audit records", async () => {
+    const subject = await actor("request-current");
+    const exported = await call("createExportRequest", subject, {});
+    expect(exported.status).toBe(200); expect(exported.result?.status).toBe("pending");
+    expect((await db.collection("privacyRequests").doc(String(exported.result?.requestId)).get()).data()).toMatchObject({ uid: subject.uid, type: "export", status: "pending" });
+    expect((await db.collection("exportJobs").doc(String(exported.result?.exportJobId)).get()).data()).toMatchObject({ uid: subject.uid, requestId: exported.result?.requestId });
+    expect((await db.collection("auditLogs").doc(String(exported.result?.auditId)).get()).data()).toMatchObject({ actorUid: subject.uid, requestId: exported.result?.requestId });
+    const deletion = await call("createDeletionRequest", subject, { reason: "Synthetic callable deletion request" });
+    expect(deletion.status).toBe(200); expect(deletion.result?.status).toBe("pending");
+    expect((await db.collection("deletionRequests").doc(String(deletion.result?.requestId)).get()).data()).toMatchObject({ uid: subject.uid, scope: "account", status: "pending" });
+    expect((await db.collection("auditLogs").doc(String(deletion.result?.auditId)).get()).data()).toMatchObject({ actorUid: subject.uid, requestId: deletion.result?.requestId });
+  });
+  it("preserves real signed and current admin audit, action and incomplete health responses", async () => {
+    const subject = await actor("entry-admin-current", { admin: true });
+    const audited = await call("writeAuditLog", subject, { action: "synthetic_review" });
+    expect(audited.status).toBe(200);
+    const record = (await db.collection("auditLogs").doc(String(audited.result?.auditId)).get()).data();
+    expect(record).toMatchObject({ actorUid: subject.uid, actorRole: "admin", action: "synthetic_review" });
+    expect(record?.targetUid).toBeUndefined(); expect(record?.requestId).toBeUndefined();
+    const action = await call("recordAdminAction", subject, { action: "synthetic_review", notes: "Synthetic callable note" });
+    expect(action.status).toBe(200);
+    expect((await db.collection("adminActions").doc(String(action.result?.adminActionId)).get()).data()).toMatchObject({ adminUid: subject.uid, notes: "Synthetic callable note" });
+    expect((await db.collection("auditLogs").doc(String(action.result?.auditId)).get()).data()?.metadata.adminActionId).toBe(action.result?.adminActionId);
+    const health = await call("getPrivacyHealthReport", subject, {});
+    expect(health.status).toBe(200);
+    expect(health.result).toMatchObject({ verdict: "evidence_incomplete", certification: "not_certified" });
+  });
+  it("denies a disabled request owner without creating requests, jobs or audit records", async () => {
+    const subject = await actor("entry-owner-disabled");
+    await auth.updateUser(subject.uid, { disabled: true });
+    for (const name of ["createExportRequest", "createDeletionRequest"] as const) {
+      const reply = await call(name, subject, { reason: "Synthetic disabled owner request" });
+      expect(reply.status).toBe(401); expect(reply.error).toBe("UNAUTHENTICATED"); expect(reply.result).toBeUndefined();
+    }
+    for (const [collection, field] of [["privacyRequests", "uid"], ["exportJobs", "uid"], ["deletionRequests", "uid"], ["auditLogs", "actorUid"]]) {
+      expect((await db.collection(collection).where(field, "==", subject.uid).get()).size).toBe(0);
+    }
+  });
+  it.each(["removed", "unsigned"])("denies a %s administrator across real audit, action and health handlers without effects", async (state) => {
+    const subject = await actor(`entry-admin-${state}`, state === "removed" ? { admin: true } : {});
+    await auth.setCustomUserClaims(subject.uid, state === "removed" ? {} : { admin: true });
+    for (const name of ["writeAuditLog", "recordAdminAction", "getPrivacyHealthReport"] as const) {
+      const reply = await call(name, subject, { action: "synthetic_review" });
+      expect(reply.status).toBe(403); expect(reply.error).toBe("PERMISSION_DENIED"); expect(reply.result).toBeUndefined();
+    }
+    expect((await db.collection("auditLogs").where("actorUid", "==", subject.uid).get()).size).toBe(0);
+    expect((await db.collection("adminActions").where("adminUid", "==", subject.uid).get()).size).toBe(0);
   });
   it("denies a disabled owner without changing its existing consent receipt", async () => {
     const ref = db.collection("consentRecords").doc(`${owner.uid}_data_export`);
