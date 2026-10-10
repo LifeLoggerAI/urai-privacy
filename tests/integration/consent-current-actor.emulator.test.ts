@@ -138,6 +138,26 @@ async function deniedAcknowledgement(subject: Actor, eventId: string, status = 4
     expect(reply.status).toBe(200); expect(reply.result?.allowed).toBe(true);
     expect(await accessCount(owner)).toBe(1);
   });
+  it.each([
+    ["consentRecords", "foreign"], ["consentRecords", "missing"],
+    ["privacyDeletionTombstones", "foreign"], ["privacyDeletionTombstones", "missing"]
+  ])("denies a %s document with %s owner binding through loaded callable middleware", async (collection, binding) => {
+    const ref = db.collection(collection).doc(collection === "consentRecords" ? `${owner.uid}_data_export` : owner.uid);
+    const prior = await ref.get();
+    const value = { ...(prior.data() ?? { uid: owner.uid, active: false }) };
+    if (binding === "foreign") value.uid = administrator.uid;
+    else delete value.uid;
+    const before = await accessCount(owner);
+    try {
+      await ref.set(value);
+      const reply = await decide(owner);
+      expect(reply.status).toBe(400); expect(reply.error).toBe("FAILED_PRECONDITION");
+      expect(await accessCount(owner)).toBe(before);
+    } finally {
+      if (prior.exists) await ref.set(prior.data()!);
+      else await ref.delete();
+    }
+  });
   it("allows the signed and currently authorized administrator", async () => {
     const reply = await decide(administrator);
     expect(reply.status).toBe(200); expect(reply.result?.allowed).toBe(true);

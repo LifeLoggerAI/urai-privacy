@@ -224,6 +224,12 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
       transaction.get(recordRef),
       transaction.get(tombstoneRef)
     ]);
+    // A restored or incorrectly bound document cannot supply another owner's
+    // consent or make an unknown deletion fence look inactive.
+    if ((snapshot.exists && snapshot.data()?.uid !== targetUid)
+      || (deletionFence.exists && deletionFence.data()?.uid !== targetUid)) {
+      throw new HttpsError("failed-precondition", "Consent or deletion authority does not belong to the target account.");
+    }
     if (deletionFence.data()?.active === true) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent decisions are blocked.");
     }

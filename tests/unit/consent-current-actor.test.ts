@@ -234,6 +234,20 @@ beforeEach(() => {
 });
 
 describe("actual canonical consent handlers keep current actor authority", () => {
+  it.each(["foreign-owner", "missing-owner"])("rejects a %s consent record stored at the target-owner path", async (binding) => {
+    const path = "consentRecords/owner-a_data_export";
+    const record = { ...fixture.records.get(path)! };
+    if (binding === "foreign-owner") record.uid = "owner-b";
+    else delete record.uid;
+    fixture.records.set(path, record);
+    await expect(decision()).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(fixture.writes).toEqual([]);
+  });
+  it.each(["foreign-owner", "missing-owner"])("rejects a %s inactive deletion fence rather than treating it as permission", async (binding) => {
+    fixture.records.set("privacyDeletionTombstones/owner-a", binding === "foreign-owner" ? { uid: "owner-b", active: false } : { active: false });
+    await expect(decision()).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(fixture.writes).toEqual([]);
+  });
   it("preserves the owner grant and its atomic receipt/projection/event/audit writes", async () => {
     const result = await grant();
     expect(result.status).toBe("granted");
