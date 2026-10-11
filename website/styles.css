@@ -38,7 +38,8 @@ body::before {
 a { color: inherit; }
 
 a:focus-visible,
-.button:focus-visible {
+.button:focus-visible,
+.table-wrap:focus-visible {
   outline: 3px solid var(--accent-2);
   outline-offset: 4px;
 }

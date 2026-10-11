@@ -45,7 +45,7 @@ export default function HomePage() {
         <a className="button" href="/privacy-center/delete">Export or delete data</a>
       </p>
 
-      <div className="grid" aria-label="Privacy controls">
+      <div className="grid" role="group" aria-label="Privacy controls">
         {pillars.map((pillar) => (
           <article className="card" key={pillar.title}>
             <h2>{pillar.title}</h2>
