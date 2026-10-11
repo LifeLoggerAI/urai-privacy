@@ -28,6 +28,7 @@ async function hasAdminClaim(user: User) {
 }
 
 export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
+  const Heading = adminOnly ? "h1" : "h2";
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<GateStatus>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +146,7 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
         className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-slate-300"
         aria-live="polite"
       >
+        {adminOnly ? <h1>Privacy administration</h1> : null}
         Preparing secure privacy session...
       </section>
     );
@@ -153,7 +155,7 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
   if (status === "signed-out") {
     return (
       <section className="rounded-3xl border border-cyan-300/20 bg-cyan-950/25 p-6 text-cyan-50">
-        <h2 className="text-lg font-semibold">Sign in required</h2>
+        <Heading className="text-lg font-semibold">Sign in required</Heading>
         <p className="mt-2 text-sm text-cyan-100/80">
           Privacy exports, deletion requests, consent changes, and audit logs require an explicit
           signed-in account. Anonymous sessions are not used for these workflows.
@@ -176,7 +178,7 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
         className="rounded-3xl border border-amber-300/20 bg-amber-950/30 p-6 text-amber-100"
         role="alert"
       >
-        <h2 className="text-lg font-semibold">Admin access required</h2>
+        <Heading className="text-lg font-semibold">Admin access required</Heading>
         <p className="mt-2 text-sm text-amber-100/80">
           This privacy administration surface requires a Firebase Auth admin custom claim. A public
           environment variable is not accepted as proof of admin authorization.
@@ -194,7 +196,7 @@ export function AuthGate({ children, adminOnly = false }: AuthGateProps) {
         className="rounded-3xl border border-red-300/20 bg-red-950/30 p-6 text-red-100"
         role="alert"
       >
-        <h2 className="text-lg font-semibold">Authentication unavailable</h2>
+        <Heading className="text-lg font-semibold">Authentication unavailable</Heading>
         <p className="mt-2 text-sm text-red-100/80">
           {error ?? "A signed-in user is required."}
         </p>
