@@ -90,14 +90,16 @@ describe("actual privacy client current-session lifecycle", () => {
   });
 
   it("does not save private bytes when another owner signs in during body delivery", async () => {
-    const body = deferred<Blob>();
-    const response = new Response(null, { headers: { "Content-Type": "application/json" } });
-    response.blob = vi.fn(() => body.promise);
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) { stream = controller; }
+    }), { headers: { "Content-Type": "application/json" } });
     state.fetch.mockResolvedValue(response);
     const operation = downloadExportPackage({ jobId: "synthetic" });
-    await vi.waitFor(() => expect(response.blob).toHaveBeenCalled());
+    await vi.waitFor(() => expect(state.fetch).toHaveBeenCalledTimes(1));
     state.auth.currentUser = { ...owner(), uid: "owner-b" };
-    body.resolve(new Blob(['{"private":"synthetic-old-owner"}']));
+    stream.enqueue(new TextEncoder().encode('{"private":"synthetic-old-owner"}'));
+    stream.close();
     await expect(operation).rejects.toThrow(/authentication|session/i);
     expect(state.createObjectURL).not.toHaveBeenCalled();
     expect(state.clicks).not.toHaveBeenCalled();
