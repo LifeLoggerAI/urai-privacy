@@ -62,6 +62,10 @@ describe("canonical consent decision engine", () => {
     ["expired status", { ...grantedMemory, status: "expired" }, "EXPIRED"],
     ["expired timestamp", { ...grantedMemory, expiresAt: "2026-07-06T11:59:59.000Z" }, "EXPIRED"],
     ["missing expiry", { ...grantedMemory, expiresAt: null }, "EXPIRED"],
+    ["invalid Date expiry", { ...grantedMemory, expiresAt: new Date(NaN) }, "EXPIRED"],
+    ["nonfinite timestamp expiry", { ...grantedMemory, expiresAt: { toMillis: () => NaN } }, "EXPIRED"],
+    ["infinite seconds expiry", { ...grantedMemory, expiresAt: { seconds: Infinity } }, "EXPIRED"],
+    ["throwing timestamp expiry", { ...grantedMemory, expiresAt: { toMillis: () => { throw new Error("malformed"); } } }, "EXPIRED"],
     ["wrong tier", { ...grantedMemory, consentTier: "C4" }, "TIER_MISMATCH"],
     ["wrong policy", { ...grantedMemory, policyVersion: "0.1.0-draft" }, "POLICY_VERSION_MISMATCH"],
     ["wrong purpose", { ...grantedMemory, purpose: "location.context" }, "PURPOSE_MISMATCH"]
@@ -75,6 +79,11 @@ describe("canonical consent decision engine", () => {
       reason: "UNKNOWN_PURPOSE",
       requiredTier: null
     });
+  });
+
+  it.each(["constructor", "toString", "__proto__"])("does not inherit the unknown purpose %s from Object.prototype", (purpose) => {
+    expect(evaluateConsentDecision({ purpose, record: { ...grantedMemory, purpose, consentTier: undefined }, now }))
+      .toMatchObject({ allowed: false, reason: "UNKNOWN_PURPOSE", requiredTier: null });
   });
 
   it("prevents provider work after a denied decision", async () => {

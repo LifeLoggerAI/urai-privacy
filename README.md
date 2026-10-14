@@ -152,7 +152,7 @@ A URAI feature is not release-ready unless it has:
 
 Required runtime:
 
-- Node.js `>=20.19.0`
+- Node.js `>=22.12.0` (the current CI and `.nvmrc` use `22.23.3`)
 - npm
 - Java 21 for Firebase emulator-backed rules/integration tests
 - Firebase CLI for emulator/deploy flows

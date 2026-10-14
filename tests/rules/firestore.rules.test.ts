@@ -7,6 +7,7 @@ import {
   type RulesTestEnvironment
 } from "@firebase/rules-unit-testing";
 import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { canonicalConsentFixture } from "../fixtures/canonical-consent";
 
 const PROJECT_ID = process.env.FIREBASE_TEST_PROJECT_ID ?? process.env.GCLOUD_PROJECT ?? "urai-privacy-integration-test";
 const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080";
@@ -51,7 +52,7 @@ beforeEach(async ({ skip }) => {
     await setDoc(doc(db, "privacyRequests/preq-a"), { uid: "user-a", type: "export", status: "pending" });
     await setDoc(doc(db, "exportJobs/export-a"), { uid: "user-a", requestId: "preq-a", status: "pending" });
     await setDoc(doc(db, "deletionRequests/del-a"), { uid: "user-a", status: "pending" });
-    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
+    await setDoc(doc(db, "consentRecords/consent-a"), canonicalConsentFixture("user-a"));
     await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
     await setDoc(doc(db, "consentRevocationOutbox/revoke-a"), { uid: "user-a", purpose: "ai.personalization", status: "pending" });
     await setDoc(doc(db, "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a"), { consumerId: "consumer-a", status: "acknowledged" });

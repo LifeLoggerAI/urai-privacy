@@ -15,7 +15,7 @@ fi
 if command -v node >/dev/null 2>&1; then
   echo "[setup-dev-env] Node: $(node --version)"
 else
-  echo "[setup-dev-env] Node is not available. dev.nix includes pkgs.nodejs_20."
+  echo "[setup-dev-env] Node is not available. dev.nix includes pkgs.nodejs_22."
 fi
 
 if command -v npm >/dev/null 2>&1; then

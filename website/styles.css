@@ -38,7 +38,8 @@ body::before {
 a { color: inherit; }
 
 a:focus-visible,
-.button:focus-visible {
+.button:focus-visible,
+.table-wrap:focus-visible {
   outline: 3px solid var(--accent-2);
   outline-offset: 4px;
 }
@@ -264,6 +265,7 @@ th { color: var(--text); }
 @media (max-width: 720px) {
   .nav { align-items: flex-start; flex-direction: column; }
   main { padding-top: 42px; }
+  .hero h1 { font-size: clamp(32px, 7vw, 42px); overflow-wrap: anywhere; }
   .actions { flex-direction: column; }
   .button { width: 100%; }
 }

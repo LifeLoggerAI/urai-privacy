@@ -23,6 +23,15 @@ const protectedLayouts = [
 ];
 
 const failures = [];
+const home = readFileSync("app/page.tsx", "utf8");
+const homePaths = new Set(
+  Array.from(home.matchAll(/href\s*(?:=|:)\s*["'](\/[^"']*)["']/g), (match) => match[1].split(/[?#]/, 1)[0])
+);
+for (const path of homePaths) {
+  const routeFile = path === "/" ? "app/page.tsx" : `app${path.replace(/\/$/, "")}/page.tsx`;
+  if (!existsSync(routeFile)) failures.push(`Homepage link has no route: ${path}`);
+}
+
 for (const route of requiredRoutes) {
   if (!existsSync(route)) {
     failures.push(`Missing route file: ${route}`);
@@ -53,4 +62,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log("[smoke-routes] OK: required product routes and protected route boundaries are present");
+console.log(`[smoke-routes] OK: ${homePaths.size} homepage targets, required product routes and protected route boundaries are present`);

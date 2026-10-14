@@ -27,14 +27,20 @@ const firestoreChecks = [
   "allow create, update, delete: if false"
 ];
 const storageChecks = [
-  "match /exports/{uid}/{jobId}/{fileName}",
-  "activeExportPackage(uid, jobId)",
-  "packageExpiresAt > request.time",
+  "match /exports/{uid}/{allPaths=**}",
+  "allow read, write: if false",
   "match /evidence/{allPaths=**}",
   "request.auth.token.admin == true",
   "request.auth.token.role == 'admin'"
 ];
 
+if (!/match \/exports\/\{uid\}\/\{allPaths=\*\*\}\s*\{\s*allow read, write: if false;/.test(storage)) {
+  failures.push("private exports must deny direct client reads and writes")
+}
+const exportLifecycle = readFileSync("functions/src/export-lifecycle-functions.ts", "utf8");
+for (const check of ["packageExpiresAt <= now", "verifyIdToken(bearer, true)", "pipeline(stream, guardedChunks, response)"]) {
+  if (!exportLifecycle.includes(check)) failures.push(`guarded export delivery missing ${check}`)
+}
 for (const check of firestoreChecks) if (!firestore.includes(check)) failures.push(`firestore missing ${check}`);
 for (const check of storageChecks) if (!storage.includes(check)) failures.push(`storage missing ${check}`);
 if (!firestore.includes("match /{document=**}")) failures.push("firestore missing fallback match");

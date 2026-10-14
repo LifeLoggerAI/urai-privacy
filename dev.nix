@@ -2,7 +2,7 @@
 
 {
   packages = [
-    pkgs.nodejs_20
+    pkgs.nodejs_22
     pkgs.firebase-tools
     pkgs.jdk21
   ];

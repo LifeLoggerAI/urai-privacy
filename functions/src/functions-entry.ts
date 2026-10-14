@@ -6,7 +6,7 @@ export {
   getPrivacyHealthReport
 } from "./index";
 
-export { getExportDownloadUrl, cleanupExpiredExportPackages } from "./export-lifecycle-functions";
+export { getExportDownloadUrl, downloadExportPackage, cleanupExpiredExportPackages } from "./export-lifecycle-functions";
 export { processDeletionRequest, executeDeletionRequest } from "./deletion-mutation-guard";
 export { processExportRequest } from "./export-request";
 export { setCanonicalConsent, evaluateCanonicalConsent } from "./consent-api";

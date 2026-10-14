@@ -2,7 +2,7 @@ const pillars = [
   {
     title: "Passport",
     body: "See the identity, provenance, permissions, connected services, and data relationships URAI can use on your behalf.",
-    href: "/privacy-center/passport",
+    href: "/passport",
   },
   {
     title: "Permissions",
@@ -12,7 +12,7 @@ const pillars = [
   {
     title: "Your data",
     body: "Understand what information is retained, where it comes from, and the controls available for storage and connected services.",
-    href: "/privacy-center/data",
+    href: "/data-controls",
   },
   {
     title: "Export and deletion",
@@ -22,12 +22,12 @@ const pillars = [
   {
     title: "Responsible AI",
     body: "Review the principles URAI uses for inference, uncertainty, emotional sensitivity, accessibility, and human oversight.",
-    href: "/privacy-center/responsible-ai",
+    href: "/responsible-ai",
   },
   {
     title: "Privacy requests",
     body: "Find the right path for questions, access requests, corrections, or concerns without exposing internal review tools.",
-    href: "/privacy-center/requests",
+    href: "/privacy-center",
   },
 ];
 
@@ -45,7 +45,7 @@ export default function HomePage() {
         <a className="button" href="/privacy-center/delete">Export or delete data</a>
       </p>
 
-      <div className="grid" aria-label="Privacy controls">
+      <div className="grid" role="group" aria-label="Privacy controls">
         {pillars.map((pillar) => (
           <article className="card" key={pillar.title}>
             <h2>{pillar.title}</h2>

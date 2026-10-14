@@ -40,7 +40,7 @@ export function blockedExportFields() {
   return [...blockedFieldNames].sort();
 }
 
-function timestampIso(value: unknown): string | null {
+export function timestampIso(value: unknown): string | null {
   if (value instanceof Date) return value.toISOString();
   if (!value || typeof value !== "object") return null;
 
