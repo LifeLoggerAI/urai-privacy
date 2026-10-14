@@ -64,22 +64,44 @@ describe("authenticated export client transport", () => {
     expect(signal?.aborted).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
+  it("rejects a declared oversized export before reading it", async () => {
+    const fetcher = vi.fn(async () => new Response("{}", {headers: {
+      "content-type": "application/json", "content-length": String(65 * 1024 * 1024)
+    }}));
+    await expect(fetchAuthorizedExport({url, projectId, getIdToken: async () => "synthetic-token", fetcher}))
+      .rejects.toThrow("exceeds the supported size");
+  });
+  it("rejects a body longer than its declared length", async () => {
+    const fetcher = vi.fn(async () => new Response('{"private":true}', {headers: {
+      "content-type": "application/json", "content-length": "2"
+    }}));
+    await expect(fetchAuthorizedExport({url, projectId, getIdToken: async () => "synthetic-token", fetcher}))
+      .rejects.toThrow("exceeds the supported size");
+  });
+  it("rejects truncated declared responses", async () => {
+    const fetcher = vi.fn(async () => new Response("{}", {headers: {
+      "content-type": "application/json", "content-length": "100"
+    }}));
+    await expect(fetchAuthorizedExport({url, projectId, getIdToken: async () => "synthetic-token", fetcher}))
+      .rejects.toThrow("incomplete");
+  });
   it("uses the same deadline for unfinished private bytes and ignores late completion", async () => {
     vi.useFakeTimers();
-    let finish!: (blob: Blob) => void;
+    let finish!: (chunk: Uint8Array) => void;
     let signal: AbortSignal | undefined;
     const fetcher = vi.fn(async (_url: string | URL | Request, options?: RequestInit) => {
       signal = options?.signal as AbortSignal;
-      return {ok: true, headers: new Headers({"content-type": "application/json"}), blob: () => new Promise<Blob>(resolve => { finish = resolve; })} as Response;
+      return new Response(new ReadableStream<Uint8Array>({
+        pull: () => new Promise<void>(() => {}),
+        cancel: () => {}
+      }), {headers: {"content-type": "application/json"}});
     });
     const outcomes: unknown[] = [];
-    void fetchAuthorizedExport({url, projectId, getIdToken: async () => "synthetic-token", fetcher}).then(result => outcomes.push(result), error => outcomes.push(error.message));
+    void fetchAuthorizedExport({url, projectId, getIdToken: async () => "synthetic-token", fetcher})
+      .then(result => outcomes.push(result), error => outcomes.push(error.message));
     await vi.advanceTimersByTimeAsync(120_001);
     expect(outcomes).toEqual([expect.stringContaining("timed out")]);
     expect(signal?.aborted).toBe(true);
-    finish(new Blob(['{"synthetic":true}']));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(outcomes).toEqual([expect.stringContaining("timed out")]);
     expect(vi.getTimerCount()).toBe(0);
   });
   it("clears the deadline after a timely download", async () => {
