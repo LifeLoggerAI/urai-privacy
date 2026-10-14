@@ -87,13 +87,14 @@ describe("authenticated export client transport", () => {
   });
   it("uses the same deadline for unfinished private bytes and ignores late completion", async () => {
     vi.useFakeTimers();
-    let finish!: (chunk: Uint8Array) => void;
     let signal: AbortSignal | undefined;
     const fetcher = vi.fn(async (_url: string | URL | Request, options?: RequestInit) => {
       signal = options?.signal as AbortSignal;
       return new Response(new ReadableStream<Uint8Array>({
-        pull: () => new Promise<void>(() => {}),
-        cancel: () => {}
+        start(controller) {
+          signal?.addEventListener("abort", () => controller.error(new Error("aborted")), { once: true });
+        },
+        pull: () => new Promise<void>(() => {})
       }), {headers: {"content-type": "application/json"}});
     });
     const outcomes: unknown[] = [];
