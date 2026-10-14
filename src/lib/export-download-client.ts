@@ -29,7 +29,39 @@ export async function fetchAuthorizedExport(args: {
       if (!response.headers.get("content-type")?.startsWith("application/json")) {
         throw new Error("The export download did not return the expected data format.");
       }
-      return response.blob();
+      // Bound private export bytes even when the upstream omits or forges Content-Length.
+      const MAX_EXPORT_BYTES = 64 * 1024 * 1024;
+      const declared = response.headers.get("content-length");
+      if (declared !== null && (!/^[0-9]+$/.test(declared)
+        || !Number.isSafeInteger(Number(declared)) || Number(declared) > MAX_EXPORT_BYTES)) {
+        await response.body?.cancel();
+        throw new Error("The export download exceeds the supported size.");
+      }
+      if (!response.body) throw new Error("The export download is unavailable.");
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+      try {
+        while (true) {
+          if (controller.signal.aborted) throw new Error(timeoutMessage);
+          const next = await reader.read();
+          if (controller.signal.aborted) throw new Error(timeoutMessage);
+          if (next.done) break;
+          received += next.value.byteLength;
+          if (received > MAX_EXPORT_BYTES
+            || (declared !== null && received > Number(declared))) {
+            throw new Error("The export download exceeds the supported size.");
+          }
+          chunks.push(next.value);
+        }
+        if (!received || (declared !== null && received !== Number(declared))) {
+          throw new Error("The export download is incomplete.");
+        }
+        return new Blob(chunks as BlobPart[], { type: "application/json" });
+      } finally {
+        await reader.cancel().catch(() => {});
+        reader.releaseLock();
+      }
     })();
     return await Promise.race([download, deadline]);
   } finally {
