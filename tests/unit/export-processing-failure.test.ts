@@ -285,6 +285,50 @@ describe("export attempt maintenance recovery", () => {
   });
 });
 
+describe("export attempt cleanup ledger completeness", () => {
+  it.each(["processing", "completed"])("blocks partial %s ledgers before Storage deletion", async (status) => {
+    const { now, paths } = seedExpiredAttempt(status);
+    fixture.documents.set(attempt()[0], { ...attempt()[1], paths: [paths[0]] });
+    expect(await cleanupExportArtifactAttempts(now)).toEqual({ cleaned: 0, failed: 0 });
+    expect(attempt()[1].status).toBe("cleanup_blocked");
+    expect(attempt()[1].cleanupDueAt).toBeUndefined();
+    expect(fixture.deletes).toEqual([]);
+    expect([...fixture.objects.keys()].sort()).toEqual([...paths].sort());
+  });
+
+  it("retries only an outstanding verified manifest and preserves other attempts", async () => {
+    const { now, paths } = seedExpiredAttempt();
+    fixture.objects.delete(paths[0]);
+    fixture.documents.set(attempt()[0], { ...attempt()[1], status: "cleanup_pending", paths: [paths[1]] });
+    const nextAttempt = "exports/user-a/job-a/00000000-0000-4000-8000-000000000002/export.json";
+    fixture.objects.set(nextAttempt, "successor-bytes");
+    expect(await cleanupExportArtifactAttempts(now)).toEqual({ cleaned: 1, failed: 0 });
+    expect(attempt()[1].status).toBe("cleaned");
+    expect(fixture.deletes).toEqual([paths[1]]);
+    expect([...fixture.objects.entries()]).toEqual([[nextAttempt, "successor-bytes"]]);
+  });
+
+  it("blocks an empty partial cleanup ledger instead of declaring successful removal", async () => {
+    const { now, paths } = seedExpiredAttempt();
+    fixture.documents.set(attempt()[0], { ...attempt()[1], status: "cleanup_pending", paths: [] });
+    expect(await cleanupExportArtifactAttempts(now)).toEqual({ cleaned: 0, failed: 0 });
+    expect(attempt()[1].status).toBe("cleanup_blocked");
+    expect(fixture.deletes).toEqual([]);
+    expect([...fixture.objects.keys()].sort()).toEqual([...paths].sort());
+  });
+
+  it("retires a stale already-cleaned cursor without retrying deleted objects", async () => {
+    const { now } = seedExpiredAttempt();
+    fixture.documents.set(attempt()[0], { ...attempt()[1], status: "cleaned", paths: [] });
+    fixture.documents.set("exportJobs/job-a", { ...job(), status: "failed" });
+    fixture.objects.clear();
+    expect(await cleanupExportArtifactAttempts(now)).toEqual({ cleaned: 0, failed: 0 });
+    expect(attempt()[1].status).toBe("cleaned");
+    expect(attempt()[1].cleanupDueAt).toBeUndefined();
+    expect(fixture.deletes).toEqual([]);
+  });
+});
+
 describe("export callable failure and concurrency behavior", () => {
   it("publishes artifacts and completion audit atomically with one attempt identity", async () => {
     const result = await run(adminRequest);
