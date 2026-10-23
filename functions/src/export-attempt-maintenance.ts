@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { FieldPath, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
+import { inspectExportCleanupTargets } from "./export-cleanup-path-authority";
 import { EXPORT_CLEANUP_MAX_PAGES, EXPORT_CLEANUP_PAGE_SIZE, timestampMillis } from "./export-lifecycle-contract";
 import { exportAttemptPaths } from "./export-processing-authority";
 
@@ -43,15 +44,28 @@ export async function cleanupExportArtifactAttempts(now: number) {
               expectedPaths = [paths.exportPath, paths.manifestPath];
             } catch { /* Invalid metadata remains blocked and visible. */ }
           }
-          const paths = Array.isArray(attempt.paths) ? attempt.paths : null;
-          if (expectedPaths.length !== 2 || token !== document.id || !paths
-            || paths.some((path) => typeof path !== "string" || !expectedPaths.includes(path))) {
+          // A first cleanup must carry both known artifacts; only a verified
+          // partial retry may carry a subset. Do not silently mark an incomplete
+          // processing/completed ledger as successfully cleaned.
+          const targetDecision = expectedPaths.length === 2 && token === document.id
+            ? inspectExportCleanupTargets(attempt.status, attempt.paths, expectedPaths)
+            : { kind: "blocked" as const };
+          if (targetDecision.kind === "cleaned") {
+            // The original failed-job cleanup may have already removed both
+            // objects. Retire its stale scheduled cursor without re-deleting.
+            tx.update(document.ref, {
+              cleanupDueAt: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp()
+            });
+            return null;
+          }
+          if (targetDecision.kind !== "cleanup") {
             tx.update(document.ref, {
               status: "cleanup_blocked", cleanupDueAt: FieldValue.delete(),
               cleanupReason: "INVALID_EXPORT_ATTEMPT", updatedAt: FieldValue.serverTimestamp()
             });
             return null;
           }
+          const paths = targetDecision.paths;
           const jobRef = db.collection("exportJobs").doc(jobId);
           const requestRef = db.collection("privacyRequests").doc(requestId);
           const fenceRef = db.collection("privacyDeletionTombstones").doc(uid);
