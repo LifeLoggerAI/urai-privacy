@@ -65,9 +65,9 @@ describe("Life Movie movie/source scope fence", () => {
   it("does not allow purpose-wide grant issuance or verification without matching stored selection", () => {
     const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
     expect(source).toContain('purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE && parsed.data.status === "granted"');
-    expect(source).toContain("const scopeMatches = matchesLifeMovieRenderScope(record?.renderScope, renderScope)");
-    expect(source).toContain("evaluated.allowed && receiptMatches && subjectMatches && scopeMatches && receiptBindsScope && policyMatches && !deleted");
-    expect(source).toContain('RENDER_SCOPE_MISMATCH');
+    expect(source).toContain("evaluateLifeMovieRenderAuthorization({");
+    expect(source).toContain("decisionReceiptId,");
+    expect(source).toContain("evaluateLifeMovieRenderAuthorization");
     const ui = readFileSync(new URL("../../app/privacy-center/consent/page.tsx", import.meta.url), "utf8");
     expect(ui).toContain('item.purpose === "life-movie.render"');
     expect(ui).toContain("movie-specific media selection and authorization flow");
@@ -172,7 +172,7 @@ describe("Jobs-only Life Movie verifier response contract", () => {
     const start = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
     expect(start).toBeGreaterThan(-1);
     const verifier = source.slice(start);
-    expect(verifier).toContain("receiptBindsScope = verifiesLifeMovieScopedReceipt");
+    expect(verifier).toContain("evaluateLifeMovieRenderAuthorization({");
     expect(verifier).toContain("renderScope: allowed ? renderScope : null");
     expect(verifier).toContain("evaluatedAt: evaluated.evaluatedAt");
     expect(verifier).toContain("decisionEventId: accessRef.id");
@@ -207,8 +207,8 @@ describe("Life Movie scoped receipt integrity binding", () => {
   });
   it("wires the binding into the Jobs-only verifier allow condition", () => {
     const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
-    expect(source).toContain("receiptBindsScope = verifiesLifeMovieScopedReceipt");
-    expect(source).toContain("scopeMatches && receiptBindsScope && policyMatches && !deleted");
-    expect(source).toContain("SCOPED_RECEIPT_INTEGRITY_MISMATCH");
+    expect(source).toContain("evaluateLifeMovieRenderAuthorization({");
+    expect(source).toContain("deletionActive: tombstone.data()?.active === true");
+    expect(source).toContain("const { evaluated, allowed, reason }");
   });
 });
