@@ -97,6 +97,20 @@ describe("canonical Life Movie audit receipt policy linkage", () => {
   });
 });
 
+describe("Jobs-only Life Movie verifier response contract", () => {
+  it("returns the exact checked scope and evaluation time only with an allowed decision", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
+    expect(start).toBeGreaterThan(-1);
+    const verifier = source.slice(start);
+    expect(verifier).toContain("receiptBindsScope = verifiesLifeMovieScopedReceipt");
+    expect(verifier).toContain("renderScope: allowed ? renderScope : null");
+    expect(verifier).toContain("evaluatedAt: evaluated.evaluatedAt");
+    expect(verifier).toContain("decisionEventId: accessRef.id");
+    expect(verifier).toContain("receiptHash: allowed ? decisionReceiptId : null");
+  });
+});
+
 describe("Life Movie scoped receipt integrity binding", () => {
   const scope = { projectId: "movie-owner-one", renderPlanDigest: "a".repeat(64), sourceSetDigest: "b".repeat(64) };
   const receipt = {

@@ -324,6 +324,10 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
       policyVersion: evaluated.policyVersion, requiredTier: evaluated.requiredTier,
       receiptHash: allowed ? decisionReceiptId : null,
       expiresAt: allowed ? record?.expiresAt : null,
+      // Echo only the scope checked by the dedicated verifier. This is an
+      // authenticated result binding, not a new bearer capability or grant.
+      renderScope: allowed ? renderScope : null,
+      evaluatedAt: evaluated.evaluatedAt,
       decisionEventId: accessRef.id
     };
   });
