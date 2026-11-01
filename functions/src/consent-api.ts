@@ -14,7 +14,7 @@ import {
   type ConsentPurpose
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
-import { verifiesLifeMovieScopedReceipt } from "./life-movie-scoped-receipt";
+import { evaluateLifeMovieRenderAuthorization } from "./life-movie-render-authorization";
 import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
 
 const db = getFirestore();
@@ -303,27 +303,11 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
       transaction.get(recordRef), transaction.get(tombstoneRef)
     ]);
     const record = recordSnapshot.exists ? recordSnapshot.data() : null;
-    const evaluated = evaluateConsentDecision({ purpose, record });
-    const receiptMatches = typeof record?.receiptHash === "string"
-      && /^[0-9a-f]{64}$/.test(record.receiptHash)
-      && record.receiptHash === decisionReceiptId;
-    const subjectMatches = record?.uid === subjectUid;
-    // Neither an old purpose-wide grant nor a caller-supplied hash is sufficient.
-    const scopeMatches = matchesLifeMovieRenderScope(record?.renderScope, renderScope);
-    // A matching loose scope does not prove the original grant committed it.
-    const receiptBindsScope = verifiesLifeMovieScopedReceipt(record, {
-      subjectUid, tenantId, decisionReceiptId, renderScope
+    const { evaluated, allowed, reason } = evaluateLifeMovieRenderAuthorization({
+      record, deletionActive: tombstone.data()?.active === true,
+      subjectUid, tenantId, correlationId, decisionReceiptId,
+      policyVersion, renderScope
     });
-    const policyMatches = policyVersion === policyVersionForPurpose(purpose);
-    const deleted = tombstone.data()?.active === true;
-    // Tenant membership and source rights remain independent Jobs/Studio checks.
-    const allowed = evaluated.allowed && receiptMatches && subjectMatches && scopeMatches && receiptBindsScope && policyMatches && !deleted;
-    const reason = deleted ? "ACCOUNT_DELETED"
-      : !subjectMatches ? "SUBJECT_MISMATCH"
-      : !scopeMatches ? "RENDER_SCOPE_MISMATCH"
-      : !receiptBindsScope ? "SCOPED_RECEIPT_INTEGRITY_MISMATCH"
-      : !receiptMatches ? "RECEIPT_MISMATCH"
-      : !policyMatches ? "POLICY_VERSION_MISMATCH" : evaluated.reason;
     transaction.create(accessRef, {
       uid: subjectUid, actorUid, actorRole: "system", consumerId: authority.consumerId,
       tenantId, purpose, correlationId, decision: allowed ? "allow" : "deny",
