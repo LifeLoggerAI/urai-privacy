@@ -62,6 +62,11 @@ describe("canonical consent decision engine", () => {
     ["expired status", { ...grantedMemory, status: "expired" }, "EXPIRED"],
     ["expired timestamp", { ...grantedMemory, expiresAt: "2026-07-06T11:59:59.000Z" }, "EXPIRED"],
     ["missing expiry", { ...grantedMemory, expiresAt: null }, "EXPIRED"],
+    ["invalid Date", { ...grantedMemory, expiresAt: new Date(Number.NaN) }, "EXPIRED"],
+    ["non-finite millis", { ...grantedMemory, expiresAt: { toMillis: () => Number.POSITIVE_INFINITY } }, "EXPIRED"],
+    ["invalid Firestore nanos", { ...grantedMemory, expiresAt: { seconds: 1780000000, nanoseconds: Number.NaN } }, "EXPIRED"],
+    ["out-of-range nanos", { ...grantedMemory, expiresAt: { seconds: 1780000000, nanoseconds: 1000000000 } }, "EXPIRED"],
+    ["unsafe seconds", { ...grantedMemory, expiresAt: { seconds: Number.MAX_SAFE_INTEGER + 1 } }, "EXPIRED"],
     ["wrong tier", { ...grantedMemory, consentTier: "C4" }, "TIER_MISMATCH"],
     ["wrong policy", { ...grantedMemory, policyVersion: "0.1.0-draft" }, "POLICY_VERSION_MISMATCH"],
     ["wrong purpose", { ...grantedMemory, purpose: "location.context" }, "PURPOSE_MISMATCH"]
