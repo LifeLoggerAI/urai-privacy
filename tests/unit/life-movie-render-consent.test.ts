@@ -57,6 +57,9 @@ describe("Life Movie movie/source scope fence", () => {
     expect(matchesLifeMovieRenderScope({ ...requestedScope, sourceSetDigest: "c".repeat(64) }, requestedScope)).toBe(false);
     expect(matchesLifeMovieRenderScope({ ...requestedScope, projectId: "different-movie" }, requestedScope)).toBe(false);
     expect(matchesLifeMovieRenderScope(Object.create(requestedScope), requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope({ ...requestedScope, extraAuthorization: true }, requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope(Object.defineProperty({ ...requestedScope }, "hiddenAuthorization", { value: true, enumerable: false }), requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope({ ...requestedScope, [Symbol("critical")]: true }, requestedScope)).toBe(false);
   });
   it("does not allow purpose-wide grant issuance or verification without matching stored selection", () => {
     const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");

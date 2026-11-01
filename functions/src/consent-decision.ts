@@ -17,6 +17,9 @@ export type LifeMovieRenderScope = Readonly<{
 export function matchesLifeMovieRenderScope(recordScope: unknown, requestedScope: LifeMovieRenderScope): boolean {
   if (!recordScope || typeof recordScope !== "object" || Array.isArray(recordScope)) return false;
   const scoped = recordScope as Record<string, unknown>;
+  // Reject additional critical fields, including non-enumerable and symbol keys.
+  // A Life Movie scope is precisely the three contract-defined own properties.
+  if (Reflect.ownKeys(scoped).length !== 3) return false;
   return Object.prototype.hasOwnProperty.call(scoped, "projectId")
     && Object.prototype.hasOwnProperty.call(scoped, "renderPlanDigest")
     && Object.prototype.hasOwnProperty.call(scoped, "sourceSetDigest")
