@@ -1,4 +1,7 @@
 export const CONSENT_DECISION_POLICY_VERSION = "1.0.0";
+// A purpose-scoped policy revision avoids silently invalidating unrelated grants.
+export const LIFE_MOVIE_RENDER_CONSENT_PURPOSE = "life-movie.render";
+export const LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION = "1.1.0";
 
 export const consentPurposeRegistry = {
   "memory.storage": { requiredTier: "C1", dataCategories: ["memories", "user-content"] },
@@ -7,6 +10,8 @@ export const consentPurposeRegistry = {
   "inference.sensitive": { requiredTier: "C4", dataCategories: ["sensitive-inference"] },
   "biometric.identity": { requiredTier: "C5", dataCategories: ["biometric-identity"] },
   "ai.personalization": { requiredTier: "C6", dataCategories: ["companion-memory", "personalization"] },
+  // Independent opt-in: private rendering is not authorized by storage or personalization consent.
+  "life-movie.render": { requiredTier: "C6", dataCategories: ["owner-selected-private-media", "derived-private-movie"] },
   "data.export": { requiredTier: "C7", dataCategories: ["structured-records", "consent-history"] },
   "research.public-good.aggregate": {
     requiredTier: "C8",
@@ -17,6 +22,12 @@ export const consentPurposeRegistry = {
 
 export type ConsentPurpose = keyof typeof consentPurposeRegistry;
 export type ConsentTier = (typeof consentPurposeRegistry)[ConsentPurpose]["requiredTier"];
+
+export function policyVersionForPurpose(purpose: string): string {
+  return purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE
+    ? LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION
+    : CONSENT_DECISION_POLICY_VERSION;
+}
 export type ConsentRecordSnapshot = {
   purpose?: unknown;
   consentTier?: unknown;
@@ -65,7 +76,7 @@ function epoch(value: unknown): number | null {
 }
 
 function deny(purpose: string, reason: Exclude<ConsentDecisionReason, "ALLOWED">, requiredTier: ConsentTier | null, evaluatedAt: string): ConsentDecision {
-  return { allowed: false, reason, purpose, requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, evaluatedAt };
+  return { allowed: false, reason, purpose, requiredTier, policyVersion: policyVersionForPurpose(purpose), evaluatedAt };
 }
 
 export function evaluateConsentDecision(args: { purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date }): ConsentDecision {
@@ -76,18 +87,37 @@ export function evaluateConsentDecision(args: { purpose: string; record: Consent
   if (!args.record) return deny(args.purpose, "MISSING_CONSENT", definition.requiredTier, evaluatedAt);
   if (args.record.purpose !== args.purpose) return deny(args.purpose, "PURPOSE_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.consentTier !== definition.requiredTier) return deny(args.purpose, "TIER_MISMATCH", definition.requiredTier, evaluatedAt);
-  if (args.record.policyVersion !== CONSENT_DECISION_POLICY_VERSION) return deny(args.purpose, "POLICY_VERSION_MISMATCH", definition.requiredTier, evaluatedAt);
+  if (args.record.policyVersion !== policyVersionForPurpose(args.purpose)) return deny(args.purpose, "POLICY_VERSION_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.status === "denied") return deny(args.purpose, "DENIED", definition.requiredTier, evaluatedAt);
   if (args.record.status === "revoked") return deny(args.purpose, "REVOKED", definition.requiredTier, evaluatedAt);
   if (args.record.status === "expired") return deny(args.purpose, "EXPIRED", definition.requiredTier, evaluatedAt);
   if (args.record.status !== "granted") return deny(args.purpose, "INVALID_STATUS", definition.requiredTier, evaluatedAt);
   const expiresAt = epoch(args.record.expiresAt);
   if (expiresAt === null || expiresAt <= now.getTime()) return deny(args.purpose, "EXPIRED", definition.requiredTier, evaluatedAt);
-  return { allowed: true, reason: "ALLOWED", purpose: args.purpose, requiredTier: definition.requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, evaluatedAt };
+  return { allowed: true, reason: "ALLOWED", purpose: args.purpose, requiredTier: definition.requiredTier, policyVersion: policyVersionForPurpose(args.purpose), evaluatedAt };
 }
 
 export async function runWithConsent<T>(args: { purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date; operation: () => Promise<T> | T }): Promise<T> {
   const decision = evaluateConsentDecision(args);
   if (!decision.allowed) throw new Error(`CONSENT_REQUIRED:${decision.reason}`);
   return await args.operation();
+}
+
+/**
+ * Keep the audit event on the same purpose-specific policy as the canonical
+ * consent record. Historical purposes stay on 1.0.0; Life Movies use 1.1.0.
+ * This is evidence consistency, not a consent decision or rendering grant.
+ */
+export type CanonicalConsentAuditMetadataInput = {
+  purpose: string;
+  status: "granted" | "denied" | "revoked";
+  consentTier: ConsentTier;
+  consentRecordId: string;
+  consentEventId: string;
+  evidenceHash: string;
+  updatedAt: string;
+};
+
+export function canonicalConsentAuditMetadata(input: CanonicalConsentAuditMetadataInput) {
+  return { ...input, policyVersion: policyVersionForPurpose(input.purpose) };
 }

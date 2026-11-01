@@ -12,6 +12,7 @@ const consentPurposes = [
   { purpose: "inference.sensitive", label: "Sensitive inference", tier: "C4", description: "Create sensitive inferences only when explicitly allowed." },
   { purpose: "biometric.identity", label: "Biometric identity", tier: "C5", description: "Use biometric identity data for approved identity features." },
   { purpose: "ai.personalization", label: "AI personalization", tier: "C6", description: "Use companion memory and personalization context." },
+  { purpose: "life-movie.render", label: "Private Life Movie rendering", tier: "C6", description: "Separately opt in to create a private Life Movie from your selected authorized media. You can revoke this permission." },
   { purpose: "data.export", label: "Data export", tier: "C7", description: "Prepare structured records and consent history for export." },
   { purpose: "research.public-good.aggregate", label: "Public-good population signals", tier: "C8", description: "Voluntarily contribute privacy-protected, de-identified aggregate signals for public-interest research and regional well-being insights. This is separate from personalization and monetization." },
   { purpose: "data.monetization.anonymized", label: "Anonymized monetization", tier: "C8", description: "Separately allow approved de-identified patterns for monetization. This is not required for public-good research participation." }
