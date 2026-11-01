@@ -74,6 +74,21 @@ describe("canonical consent decision engine", () => {
     expect(evaluateConsentDecision({ purpose: "memory.storage", record, now })).toMatchObject({ allowed: false, reason });
   });
 
+  it.each(["toString", "constructor", "__proto__", "hasOwnProperty"])("rejects inherited object property %s as an unregistered purpose", (purpose) => {
+    const maliciousRecord = {
+      purpose,
+      consentTier: undefined,
+      status: "granted",
+      policyVersion: CONSENT_DECISION_POLICY_VERSION,
+      expiresAt: "2026-08-06T12:00:00.000Z"
+    };
+    expect(evaluateConsentDecision({ purpose, record: maliciousRecord, now })).toMatchObject({
+      allowed: false,
+      reason: "UNKNOWN_PURPOSE",
+      requiredTier: null
+    });
+  });
+
   it("denies unknown purposes", () => {
     expect(evaluateConsentDecision({ purpose: "provider.unregistered", record: grantedMemory, now })).toMatchObject({
       allowed: false,
