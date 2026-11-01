@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { hashLifeMovieScopedReceipt, verifiesLifeMovieScopedReceipt } from "../../functions/src/life-movie-scoped-receipt";
+import { isTrustedJobsConsentCaller } from "../../functions/src/life-movie-jobs-identity";
 import {
   CONSENT_DECISION_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION,
@@ -94,6 +95,32 @@ describe("canonical Life Movie audit receipt policy linkage", () => {
     const auditMetadata = source.match(/action: "canonical_consent_updated"[\s\S]*?metadata: \{([\s\S]*?)\n      \},/);
     expect(auditMetadata?.[1]).toContain("policyVersion: receipt.policyVersion");
     expect(auditMetadata?.[1]).not.toContain("policyVersion: CONSENT_DECISION_POLICY_VERSION");
+  });
+});
+
+describe("Jobs-only verifier authenticated UID pin", () => {
+  const uid = "urai-jobs-service-uid";
+  const claims = {
+    system: true, role: "system", consumerId: "urai-jobs",
+    firebase: { sign_in_provider: "custom" }
+  };
+  it("rejects absent pins, cross-service tokens, normal users and forged metadata", () => {
+    expect(isTrustedJobsConsentCaller({ uid, token: claims }, uid)).toBe(true);
+    expect(isTrustedJobsConsentCaller({ uid, token: claims }, undefined)).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: claims }, "different-uid")).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: { ...claims, role: "admin" } }, uid)).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: { ...claims, system: false } }, uid)).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: { ...claims, consumerId: "other" } }, uid)).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: { ...claims, firebase: { sign_in_provider: "password" } } }, uid)).toBe(false);
+    expect(isTrustedJobsConsentCaller(null, uid)).toBe(false);
+  });
+  it("wires the pin into the Jobs-only callable without changing general consent", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
+    const verifier = source.slice(start);
+    expect(verifier).toContain("process.env.URAI_PRIVACY_JOBS_VERIFIER_UID");
+    expect(verifier).toContain("isTrustedJobsConsentCaller");
+    expect(source.slice(0, start)).not.toContain("process.env.URAI_PRIVACY_JOBS_VERIFIER_UID");
   });
 });
 

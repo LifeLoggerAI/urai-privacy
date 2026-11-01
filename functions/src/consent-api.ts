@@ -14,6 +14,7 @@ import {
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
 import { verifiesLifeMovieScopedReceipt } from "./life-movie-scoped-receipt";
+import { isTrustedJobsConsentCaller } from "./life-movie-jobs-identity";
 
 const db = getFirestore();
 
@@ -273,8 +274,9 @@ const lifeMovieVerificationSchema = z.object({
 export const verifyLifeMovieRenderConsent = onCall(async (request) => {
   const actorUid = uidFrom(request);
   const authority = crossUserAuthority(request.auth?.token);
-  if (!authority || authority.role !== "system" || authority.consumerId !== "urai-jobs") {
-    throw new HttpsError("permission-denied", "A dedicated Jobs system identity is required.");
+  if (!authority || authority.role !== "system" || authority.consumerId !== "urai-jobs" ||
+      !isTrustedJobsConsentCaller({ uid: actorUid, token: request.auth?.token }, process.env.URAI_PRIVACY_JOBS_VERIFIER_UID)) {
+    throw new HttpsError("permission-denied", "A dedicated verified Jobs system identity is required.");
   }
   const parsed = lifeMovieVerificationSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid Life Movie verification request.");
