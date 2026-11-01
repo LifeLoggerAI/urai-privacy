@@ -62,7 +62,7 @@ describe("Life Movie movie/source scope fence", () => {
     const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
     expect(source).toContain('purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE && parsed.data.status === "granted"');
     expect(source).toContain("const scopeMatches = matchesLifeMovieRenderScope(record?.renderScope, renderScope)");
-    expect(source).toContain("evaluated.allowed && receiptMatches && subjectMatches && scopeMatches && policyMatches && !deleted");
+    expect(source).toContain("evaluated.allowed && receiptMatches && subjectMatches && scopeMatches && receiptBindsScope && policyMatches && !deleted");
     expect(source).toContain('RENDER_SCOPE_MISMATCH');
     const ui = readFileSync(new URL("../../app/privacy-center/consent/page.tsx", import.meta.url), "utf8");
     expect(ui).toContain('item.purpose === "life-movie.render"');
