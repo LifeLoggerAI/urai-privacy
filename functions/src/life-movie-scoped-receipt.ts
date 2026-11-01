@@ -88,7 +88,7 @@ export function verifiesLifeMovieScopedReceipt(
   if (source.uid !== expected.subjectUid || source.tenantId !== expected.tenantId
     || source.purpose !== "life-movie.render" || source.consentTier !== "C6"
     || source.status !== "granted" || source.policyVersion !== "1.1.0") return false;
-  if (typeof source.receiptHash !== "string" || !SHA256_HEX.test(source.receiptHash)
+  if (!hasOwn(source, "receiptHash") || typeof source.receiptHash !== "string" || !SHA256_HEX.test(source.receiptHash)
     || source.receiptHash !== expected.decisionReceiptId) return false;
 
   const scope = source.renderScope;
