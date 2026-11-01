@@ -68,7 +68,11 @@ function ConsentPanel({ user }: { user: User }) {
             <p className="muted">{item.description}</p>
             <p><span className="status warn">{activeStatus}</span></p>
             <p className="muted">Tier: {item.tier}</p>
-            <button className="button" disabled={busyKey !== null} type="button" onClick={() => submit(item.purpose, "granted")}>Grant</button>
+            {item.purpose === "life-movie.render" ? (
+              <p className="muted" role="status">Granting is unavailable here until the reviewed, movie-specific media selection and authorization flow is integrated. Existing consent can still be denied or revoked.</p>
+            ) : (
+              <button className="button" disabled={busyKey !== null} type="button" onClick={() => submit(item.purpose, "granted")}>Grant</button>
+            )}
             <button className="button" disabled={busyKey !== null} type="button" onClick={() => submit(item.purpose, "denied")}>Deny</button>
             <button className="button" disabled={busyKey !== null} type="button" onClick={() => submit(item.purpose, "revoked")}>Revoke</button>
           </article>
