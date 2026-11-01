@@ -13,6 +13,7 @@ import {
   type ConsentPurpose
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
+import { verifiesLifeMovieScopedReceipt } from "./life-movie-scoped-receipt";
 
 const db = getFirestore();
 
@@ -289,13 +290,18 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
     const subjectMatches = record?.uid === subjectUid;
     // Neither an old purpose-wide grant nor a caller-supplied hash is sufficient.
     const scopeMatches = matchesLifeMovieRenderScope(record?.renderScope, renderScope);
+    // A matching loose scope does not prove the original grant committed it.
+    const receiptBindsScope = verifiesLifeMovieScopedReceipt(record, {
+      subjectUid, tenantId, decisionReceiptId, renderScope
+    });
     const policyMatches = policyVersion === policyVersionForPurpose(purpose);
     const deleted = tombstone.data()?.active === true;
     // Tenant membership and source rights remain independent Jobs/Studio checks.
-    const allowed = evaluated.allowed && receiptMatches && subjectMatches && scopeMatches && policyMatches && !deleted;
+    const allowed = evaluated.allowed && receiptMatches && subjectMatches && scopeMatches && receiptBindsScope && policyMatches && !deleted;
     const reason = deleted ? "ACCOUNT_DELETED"
       : !subjectMatches ? "SUBJECT_MISMATCH"
       : !scopeMatches ? "RENDER_SCOPE_MISMATCH"
+      : !receiptBindsScope ? "SCOPED_RECEIPT_INTEGRITY_MISMATCH"
       : !receiptMatches ? "RECEIPT_MISMATCH"
       : !policyMatches ? "POLICY_VERSION_MISMATCH" : evaluated.reason;
     transaction.create(accessRef, {
