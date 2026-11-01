@@ -200,6 +200,9 @@ describe("Life Movie scoped receipt integrity binding", () => {
     expect(verifiesLifeMovieScopedReceipt({ ...authorized, noticeHash: "f".repeat(64) }, expected)).toBe(false);
     expect(verifiesLifeMovieScopedReceipt({ ...authorized, expiresAt: "2026-12-02T08:00:00.000Z" }, expected)).toBe(false);
     expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: undefined }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt(Object.defineProperty({ ...authorized, renderScope: { ...scope } }, "hiddenAudit", { value: true, enumerable: false }), expected)).toBe(true);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: Object.defineProperty({ ...scope }, "hiddenAuthorization", { value: true, enumerable: false }) }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: { ...scope, [Symbol("elevated")]: true } }, expected)).toBe(false);
     expect(verifiesLifeMovieScopedReceipt(Object.assign(Object.create({ uid: receipt.uid }), { ...authorized, uid: undefined }), expected)).toBe(false);
   });
   it("wires the binding into the Jobs-only verifier allow condition", () => {
