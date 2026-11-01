@@ -3,6 +3,28 @@ export const CONSENT_DECISION_POLICY_VERSION = "1.0.0";
 export const LIFE_MOVIE_RENDER_CONSENT_PURPOSE = "life-movie.render";
 export const LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION = "1.1.0";
 
+/**
+ * A Life Movie receipt must identify the selected movie and exact immutable media
+ * selection, not merely the global purpose. The trusted Jobs consumer must
+ * independently recompute/verify these digests and check source ownership.
+ */
+export type LifeMovieRenderScope = Readonly<{
+  projectId: string;
+  renderPlanDigest: string;
+  sourceSetDigest: string;
+}>;
+
+export function matchesLifeMovieRenderScope(recordScope: unknown, requestedScope: LifeMovieRenderScope): boolean {
+  if (!recordScope || typeof recordScope !== "object" || Array.isArray(recordScope)) return false;
+  const scoped = recordScope as Record<string, unknown>;
+  return Object.prototype.hasOwnProperty.call(scoped, "projectId")
+    && Object.prototype.hasOwnProperty.call(scoped, "renderPlanDigest")
+    && Object.prototype.hasOwnProperty.call(scoped, "sourceSetDigest")
+    && scoped.projectId === requestedScope.projectId
+    && scoped.renderPlanDigest === requestedScope.renderPlanDigest
+    && scoped.sourceSetDigest === requestedScope.sourceSetDigest;
+}
+
 export const consentPurposeRegistry = {
   "memory.storage": { requiredTier: "C1", dataCategories: ["memories", "user-content"] },
   "behavior.passive-context": { requiredTier: "C2", dataCategories: ["app-metadata", "interaction-rhythms"] },
