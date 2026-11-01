@@ -4,6 +4,8 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import {
   CONSENT_DECISION_POLICY_VERSION,
+  LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
+  policyVersionForPurpose,
   consentPurposeRegistry,
   evaluateConsentDecision,
   type ConsentPurpose
@@ -102,7 +104,7 @@ export const setCanonicalConsent = onCall(async (request) => {
     jurisdiction: parsed.data.jurisdiction,
     noticeVersion: CANONICAL_CONSENT_NOTICE.version,
     noticeHash: CANONICAL_CONSENT_NOTICE.hash,
-    policyVersion: CONSENT_DECISION_POLICY_VERSION,
+    policyVersion: policyVersionForPurpose(purpose),
     expiresAt: effectiveExpiresAt
   };
   const evidenceHash = hash(evidence);
@@ -111,7 +113,7 @@ export const setCanonicalConsent = onCall(async (request) => {
     purpose,
     consentTier: definition.requiredTier,
     status: parsed.data.status,
-    policyVersion: CONSENT_DECISION_POLICY_VERSION,
+    policyVersion: policyVersionForPurpose(purpose),
     expiresAt: effectiveExpiresAt,
     surface: parsed.data.surface,
     jurisdiction: parsed.data.jurisdiction,
@@ -169,7 +171,7 @@ export const setCanonicalConsent = onCall(async (request) => {
     auditId: auditRef.id,
     status: parsed.data.status,
     consentTier: definition.requiredTier,
-    policyVersion: CONSENT_DECISION_POLICY_VERSION,
+    policyVersion: policyVersionForPurpose(purpose),
     expiresAt: effectiveExpiresAt,
     updatedAt: now,
     evidenceHash,
@@ -235,4 +237,64 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
   });
 
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
+});
+
+const lifeMovieVerificationSchema = z.object({
+  subjectUid: z.string().trim().min(1).max(160),
+  tenantId: z.string().trim().min(1).max(160),
+  correlationId: z.string().trim().min(8).max(160),
+  decisionReceiptId: z.string().regex(/^[0-9a-f]{64}$/),
+  policyVersion: z.string().trim().min(1).max(80)
+}).strict();
+
+/** Jobs-only current decision, never a reusable capability or render-enablement flag. */
+export const verifyLifeMovieRenderConsent = onCall(async (request) => {
+  const actorUid = uidFrom(request);
+  const authority = crossUserAuthority(request.auth?.token);
+  if (!authority || authority.role !== "system" || authority.consumerId !== "urai-jobs") {
+    throw new HttpsError("permission-denied", "A dedicated Jobs system identity is required.");
+  }
+  const parsed = lifeMovieVerificationSchema.safeParse(request.data ?? {});
+  if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid Life Movie verification request.");
+  const { subjectUid, tenantId, correlationId, decisionReceiptId, policyVersion } = parsed.data;
+  const purpose = LIFE_MOVIE_RENDER_CONSENT_PURPOSE;
+  const recordId = consentRecordId(subjectUid, purpose);
+  const recordRef = db.collection("consentRecords").doc(recordId);
+  const tombstoneRef = db.collection("privacyDeletionTombstones").doc(subjectUid);
+  const accessRef = db.collection("dataAccessEvents").doc();
+  return await db.runTransaction(async (transaction) => {
+    const [recordSnapshot, tombstone] = await Promise.all([
+      transaction.get(recordRef), transaction.get(tombstoneRef)
+    ]);
+    const record = recordSnapshot.exists ? recordSnapshot.data() : null;
+    const evaluated = evaluateConsentDecision({ purpose, record });
+    const receiptMatches = typeof record?.receiptHash === "string"
+      && /^[0-9a-f]{64}$/.test(record.receiptHash)
+      && record.receiptHash === decisionReceiptId;
+    const subjectMatches = record?.uid === subjectUid;
+    const policyMatches = policyVersion === policyVersionForPurpose(purpose);
+    const deleted = tombstone.data()?.active === true;
+    // Tenant membership and source rights remain independent Jobs/Studio checks.
+    const allowed = evaluated.allowed && receiptMatches && subjectMatches && policyMatches && !deleted;
+    const reason = deleted ? "ACCOUNT_DELETED"
+      : !subjectMatches ? "SUBJECT_MISMATCH"
+      : !receiptMatches ? "RECEIPT_MISMATCH"
+      : !policyMatches ? "POLICY_VERSION_MISMATCH" : evaluated.reason;
+    transaction.create(accessRef, {
+      uid: subjectUid, actorUid, actorRole: "system", consumerId: authority.consumerId,
+      tenantId, purpose, correlationId, decision: allowed ? "allow" : "deny",
+      reason, policyVersion: evaluated.policyVersion,
+      consentRecordId: recordSnapshot.exists ? recordId : null,
+      evaluatedAt: FieldValue.serverTimestamp(),
+      integrityHash: hash({ subjectUid, actorUid, tenantId, purpose, correlationId,
+        receiptHash: decisionReceiptId, allowed, reason, eventId: accessRef.id })
+    });
+    return {
+      allowed, reason, subjectUid, tenantId, purpose, correlationId,
+      policyVersion: evaluated.policyVersion, requiredTier: evaluated.requiredTier,
+      receiptHash: allowed ? decisionReceiptId : null,
+      expiresAt: allowed ? record?.expiresAt : null,
+      decisionEventId: accessRef.id
+    };
+  });
 });
