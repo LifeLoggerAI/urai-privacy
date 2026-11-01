@@ -4,7 +4,7 @@ import {
   CONSENT_DECISION_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
-  evaluateConsentDecision, policyVersionForPurpose
+  evaluateConsentDecision, policyVersionForPurpose, matchesLifeMovieRenderScope
 } from "../../functions/src/consent-decision";
 
 const now = new Date("2026-11-01T08:00:00.000Z");
@@ -43,6 +43,31 @@ describe("separate Life Movie render grant", () => {
   });
 });
 
+
+describe("Life Movie movie/source scope fence", () => {
+  const requestedScope = {
+    projectId: "movie-owner-one",
+    renderPlanDigest: "a".repeat(64),
+    sourceSetDigest: "b".repeat(64)
+  };
+  it("matches only an exact, own-field scope", () => {
+    expect(matchesLifeMovieRenderScope({ ...requestedScope }, requestedScope)).toBe(true);
+    expect(matchesLifeMovieRenderScope(null, requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope({ ...requestedScope, sourceSetDigest: "c".repeat(64) }, requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope({ ...requestedScope, projectId: "different-movie" }, requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope(Object.create(requestedScope), requestedScope)).toBe(false);
+  });
+  it("does not allow purpose-wide grant issuance or verification without matching stored selection", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    expect(source).toContain('purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE && parsed.data.status === "granted"');
+    expect(source).toContain("const scopeMatches = matchesLifeMovieRenderScope(record?.renderScope, renderScope)");
+    expect(source).toContain("evaluated.allowed && receiptMatches && subjectMatches && scopeMatches && policyMatches && !deleted");
+    expect(source).toContain('RENDER_SCOPE_MISMATCH');
+    const ui = readFileSync(new URL("../../app/privacy-center/consent/page.tsx", import.meta.url), "utf8");
+    expect(ui).toContain('item.purpose === "life-movie.render"');
+    expect(ui).toContain("movie-specific media selection and authorization flow");
+  });
+});
 
 describe("canonical Life Movie audit receipt policy linkage", () => {
   it("records the purpose-specific receipt policy version in consent-update audit metadata", () => {
