@@ -38,3 +38,14 @@ Every create, queue lease, dispatch, segment, assembly, resume, download, playba
 6. Complete privacy notice, duration, retention, export/delete registry and legal/privacy review before enabling an opt-in in hosted environments.
 
 **Release: NO-GO. No deployment, merge, runtime enablement, user grants, or hosted playback is claimed.**
+
+
+## R307 child: selection-scoped consent admission fence (proposed / not deployed)
+
+The prior purpose-wide Privacy Center Grant action could issue an ordinary `life-movie.render` receipt without identifying any movie or immutable selected source set. That is incompatible with the owner's selection-scoped consent terms. This child draft deliberately prevents that unscoped grant action in both server `setCanonicalConsent` and the Privacy Center UI; Deny/Revoke remain reachable.
+
+The proposed `verifyLifeMovieRenderConsent` request now requires `renderScope: { projectId, renderPlanDigest, sourceSetDigest }`. Its transaction requires an own-field exact match with `record.renderScope`, in addition to existing current grant / receipt / subject / tier / policy / expiry / tombstone checks. Old unscoped records are denied with `RENDER_SCOPE_MISMATCH`. **The current general-purpose grant writer does not issue any scoped Life Movie grant; therefore there is no new positive render authorization path and the verifier remains incapable of allowing one from this UI.**
+
+This is a deliberate interim safety fence, **not** a completed UX or end-to-end integration. Jobs #232 still supplies only a receipt reference and is not yet updated to send the new `renderScope` request; Studio, Jobs, and Privacy must agree on how `sourceSetDigest` is computed from ordered, immutable bucket/object generation selections and how the trusted verifier recomputes it. Future scoped issuer must commit this scope into the canonical signed/hashed grant receipt and corresponding user-visible reviewed notice; a loose Firestore field or caller-controlled scope is insufficient. Authenticate the exact Jobs workload and tenant/source rights independently. Retest grant, revocation, old receipt, owner switching, altered source generation, chosen movie scope, expiry, delivery, and replay under protected staging before any enabling change.
+
+**GO/NO-GO: NO-GO.** No production changes, grants, deploys, or user material processed by this child draft.
