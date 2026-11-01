@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   CONSENT_DECISION_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
+  matchesLifeMovieRenderScope,
   policyVersionForPurpose,
   consentPurposeRegistry,
   isCanonicalConsentPurpose,
@@ -79,6 +80,11 @@ export const setCanonicalConsent = onCall(async (request) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
   const purpose = canonicalPurpose(parsed.data.purpose);
+  // Global, unscoped Life Movie grants are not an acceptable render authority.
+  // Scoped issuance requires an approved selection/notice flow, not this general toggle.
+  if (purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE && parsed.data.status === "granted") {
+    throw new HttpsError("failed-precondition", "Life Movie consent requires an approved, movie-specific source selection flow.");
+  }
   const definition = consentPurposeRegistry[purpose];
   const nowMillis = Date.now();
   let effectiveExpiresAt: string | null;
@@ -241,12 +247,19 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
 });
 
+const lifeMovieRenderScopeSchema = z.object({
+  projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
+  renderPlanDigest: z.string().regex(/^[0-9a-f]{64}$/),
+  sourceSetDigest: z.string().regex(/^[0-9a-f]{64}$/)
+}).strict();
+
 const lifeMovieVerificationSchema = z.object({
   subjectUid: z.string().trim().min(1).max(160),
   tenantId: z.string().trim().min(1).max(160),
   correlationId: z.string().trim().min(8).max(160),
   decisionReceiptId: z.string().regex(/^[0-9a-f]{64}$/),
-  policyVersion: z.string().trim().min(1).max(80)
+  policyVersion: z.string().trim().min(1).max(80),
+  renderScope: lifeMovieRenderScopeSchema
 }).strict();
 
 /** Jobs-only current decision, never a reusable capability or render-enablement flag. */
@@ -258,7 +271,7 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
   }
   const parsed = lifeMovieVerificationSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid Life Movie verification request.");
-  const { subjectUid, tenantId, correlationId, decisionReceiptId, policyVersion } = parsed.data;
+  const { subjectUid, tenantId, correlationId, decisionReceiptId, policyVersion, renderScope } = parsed.data;
   const purpose = LIFE_MOVIE_RENDER_CONSENT_PURPOSE;
   const recordId = consentRecordId(subjectUid, purpose);
   const recordRef = db.collection("consentRecords").doc(recordId);
@@ -274,22 +287,25 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
       && /^[0-9a-f]{64}$/.test(record.receiptHash)
       && record.receiptHash === decisionReceiptId;
     const subjectMatches = record?.uid === subjectUid;
+    // Neither an old purpose-wide grant nor a caller-supplied hash is sufficient.
+    const scopeMatches = matchesLifeMovieRenderScope(record?.renderScope, renderScope);
     const policyMatches = policyVersion === policyVersionForPurpose(purpose);
     const deleted = tombstone.data()?.active === true;
     // Tenant membership and source rights remain independent Jobs/Studio checks.
-    const allowed = evaluated.allowed && receiptMatches && subjectMatches && policyMatches && !deleted;
+    const allowed = evaluated.allowed && receiptMatches && subjectMatches && scopeMatches && policyMatches && !deleted;
     const reason = deleted ? "ACCOUNT_DELETED"
       : !subjectMatches ? "SUBJECT_MISMATCH"
+      : !scopeMatches ? "RENDER_SCOPE_MISMATCH"
       : !receiptMatches ? "RECEIPT_MISMATCH"
       : !policyMatches ? "POLICY_VERSION_MISMATCH" : evaluated.reason;
     transaction.create(accessRef, {
       uid: subjectUid, actorUid, actorRole: "system", consumerId: authority.consumerId,
       tenantId, purpose, correlationId, decision: allowed ? "allow" : "deny",
-      reason, policyVersion: evaluated.policyVersion,
+      reason, policyVersion: evaluated.policyVersion, renderScopeHash: hash(renderScope),
       consentRecordId: recordSnapshot.exists ? recordId : null,
       evaluatedAt: FieldValue.serverTimestamp(),
       integrityHash: hash({ subjectUid, actorUid, tenantId, purpose, correlationId,
-        receiptHash: decisionReceiptId, allowed, reason, eventId: accessRef.id })
+        receiptHash: decisionReceiptId, renderScopeHash: hash(renderScope), allowed, reason, eventId: accessRef.id })
     });
     return {
       allowed, reason, subjectUid, tenantId, purpose, correlationId,
