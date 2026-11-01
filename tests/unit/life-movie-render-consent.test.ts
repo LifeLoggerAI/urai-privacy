@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { hashLifeMovieScopedReceipt, verifiesLifeMovieScopedReceipt } from "../../functions/src/life-movie-scoped-receipt";
 import {
   CONSENT_DECISION_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION,
@@ -75,5 +76,35 @@ describe("canonical Life Movie audit receipt policy linkage", () => {
     const auditMetadata = source.match(/action: "canonical_consent_updated"[\s\S]*?metadata: \{([\s\S]*?)\n      \},/);
     expect(auditMetadata?.[1]).toContain("policyVersion: receipt.policyVersion");
     expect(auditMetadata?.[1]).not.toContain("policyVersion: CONSENT_DECISION_POLICY_VERSION");
+  });
+});
+
+describe("Life Movie scoped receipt integrity binding", () => {
+  const scope = { projectId: "movie-owner-one", renderPlanDigest: "a".repeat(64), sourceSetDigest: "b".repeat(64) };
+  const receipt = {
+    uid: "subject-1", tenantId: "tenant-1", purpose: "life-movie.render" as const,
+    consentTier: "C6" as const, status: "granted" as const, policyVersion: "1.1.0" as const,
+    expiresAt: "2026-12-01T08:00:00.000Z", surface: "movie-selection",
+    jurisdiction: "US", noticeVersion: "life-movie-render-v1",
+    noticeHash: "c".repeat(64), evidenceHash: "d".repeat(64),
+    renderScope: scope, updatedAt: "2026-11-01T08:00:00.000Z"
+  };
+  const authorized = { ...receipt, receiptHash: hashLifeMovieScopedReceipt(receipt) };
+  const expected = { subjectUid: receipt.uid, tenantId: receipt.tenantId, decisionReceiptId: authorized.receiptHash, renderScope: scope };
+  it("accepts only a complete internally consistent scoped receipt", () => {
+    expect(verifiesLifeMovieScopedReceipt(authorized, expected)).toBe(true);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: { ...scope, sourceSetDigest: "e".repeat(64) } }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, tenantId: "tenant-2" }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, receiptHash: "0".repeat(64) }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, noticeHash: "f".repeat(64) }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, expiresAt: "2026-12-02T08:00:00.000Z" }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: undefined }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt(Object.assign(Object.create({ uid: receipt.uid }), { ...authorized, uid: undefined }), expected)).toBe(false);
+  });
+  it("wires the binding into the Jobs-only verifier allow condition", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    expect(source).toContain("receiptBindsScope = verifiesLifeMovieScopedReceipt");
+    expect(source).toContain("scopeMatches && receiptBindsScope && policyMatches && !deleted");
+    expect(source).toContain("SCOPED_RECEIPT_INTEGRITY_MISMATCH");
   });
 });
