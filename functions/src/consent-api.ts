@@ -7,6 +7,7 @@ import {
   LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
   policyVersionForPurpose,
   consentPurposeRegistry,
+  isCanonicalConsentPurpose,
   evaluateConsentDecision,
   type ConsentPurpose
 } from "./consent-decision";
@@ -48,7 +49,7 @@ function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknow
 }
 
 function canonicalPurpose(value: string): ConsentPurpose {
-  if (!(value in consentPurposeRegistry)) {
+  if (!isCanonicalConsentPurpose(value)) {
     throw new HttpsError("failed-precondition", "Unknown consent purpose. Processing must fail closed until the purpose registry is updated.");
   }
   return value as ConsentPurpose;
@@ -155,7 +156,8 @@ export const setCanonicalConsent = onCall(async (request) => {
         purpose,
         status: parsed.data.status,
         consentTier: definition.requiredTier,
-        policyVersion: CONSENT_DECISION_POLICY_VERSION,
+        // Audit the exact per-purpose policy version committed in the consent receipt.
+        policyVersion: receipt.policyVersion,
         consentRecordId: recordId,
         consentEventId: eventRef.id,
         evidenceHash,

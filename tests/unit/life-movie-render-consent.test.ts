@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CONSENT_DECISION_POLICY_VERSION,
@@ -39,5 +40,15 @@ describe("separate Life Movie render grant", () => {
   it("rejects absent grants", () => {
     expect(evaluateConsentDecision({ purpose: LIFE_MOVIE_RENDER_CONSENT_PURPOSE, record: null, now }))
       .toMatchObject({ allowed: false, reason: "MISSING_CONSENT" });
+  });
+});
+
+
+describe("canonical Life Movie audit receipt policy linkage", () => {
+  it("records the purpose-specific receipt policy version in consent-update audit metadata", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const auditMetadata = source.match(/action: "canonical_consent_updated"[\s\S]*?metadata: \{([\s\S]*?)\n      \},/);
+    expect(auditMetadata?.[1]).toContain("policyVersion: receipt.policyVersion");
+    expect(auditMetadata?.[1]).not.toContain("policyVersion: CONSENT_DECISION_POLICY_VERSION");
   });
 });

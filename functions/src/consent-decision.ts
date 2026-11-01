@@ -21,6 +21,11 @@ export const consentPurposeRegistry = {
 } as const;
 
 export type ConsentPurpose = keyof typeof consentPurposeRegistry;
+
+/** Reject inherited Object prototype members as unknown consent purposes. */
+export function isCanonicalConsentPurpose(value: string): value is ConsentPurpose {
+  return Object.prototype.hasOwnProperty.call(consentPurposeRegistry, value);
+}
 export type ConsentTier = (typeof consentPurposeRegistry)[ConsentPurpose]["requiredTier"];
 
 export function policyVersionForPurpose(purpose: string): string {
@@ -57,19 +62,25 @@ export type ConsentDecision = {
   evaluatedAt: string;
 };
 
+function validEpochMillis(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Number.isFinite(new Date(value).getTime()) ? value : null;
+}
+
 function epoch(value: unknown): number | null {
   if (value == null) return null;
-  if (value instanceof Date) return value.getTime();
+  if (value instanceof Date) return validEpochMillis(value.getTime());
   if (typeof value === "string" || typeof value === "number") {
-    const parsed = new Date(value).getTime();
-    return Number.isFinite(parsed) ? parsed : null;
+    return validEpochMillis(new Date(value).getTime());
   }
   if (typeof value === "object") {
-    const candidate = value as { toMillis?: () => number; seconds?: unknown; nanoseconds?: unknown };
-    if (typeof candidate.toMillis === "function") return candidate.toMillis();
-    if (typeof candidate.seconds === "number") {
-      const nanos = typeof candidate.nanoseconds === "number" ? candidate.nanoseconds : 0;
-      return candidate.seconds * 1000 + Math.floor(nanos / 1_000_000);
+    const candidate = value as { toMillis?: () => unknown; seconds?: unknown; nanoseconds?: unknown };
+    if (typeof candidate.toMillis === "function") return validEpochMillis(candidate.toMillis());
+    if ("seconds" in candidate) {
+      if (typeof candidate.seconds !== "number" || !Number.isSafeInteger(candidate.seconds)) return null;
+      const nanos = candidate.nanoseconds === undefined ? 0 : candidate.nanoseconds;
+      if (typeof nanos !== "number" || !Number.isInteger(nanos) || nanos < 0 || nanos >= 1_000_000_000) return null;
+      return validEpochMillis(candidate.seconds * 1000 + Math.floor(nanos / 1_000_000));
     }
   }
   return null;
@@ -82,7 +93,9 @@ function deny(purpose: string, reason: Exclude<ConsentDecisionReason, "ALLOWED">
 export function evaluateConsentDecision(args: { purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date }): ConsentDecision {
   const now = args.now ?? new Date();
   const evaluatedAt = now.toISOString();
-  const definition = consentPurposeRegistry[args.purpose as ConsentPurpose];
+  const definition = isCanonicalConsentPurpose(args.purpose)
+    ? consentPurposeRegistry[args.purpose]
+    : undefined;
   if (!definition) return deny(args.purpose, "UNKNOWN_PURPOSE", null, evaluatedAt);
   if (!args.record) return deny(args.purpose, "MISSING_CONSENT", definition.requiredTier, evaluatedAt);
   if (args.record.purpose !== args.purpose) return deny(args.purpose, "PURPOSE_MISMATCH", definition.requiredTier, evaluatedAt);

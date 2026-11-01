@@ -62,11 +62,31 @@ describe("canonical consent decision engine", () => {
     ["expired status", { ...grantedMemory, status: "expired" }, "EXPIRED"],
     ["expired timestamp", { ...grantedMemory, expiresAt: "2026-07-06T11:59:59.000Z" }, "EXPIRED"],
     ["missing expiry", { ...grantedMemory, expiresAt: null }, "EXPIRED"],
+    ["invalid Date", { ...grantedMemory, expiresAt: new Date(Number.NaN) }, "EXPIRED"],
+    ["non-finite millis", { ...grantedMemory, expiresAt: { toMillis: () => Number.POSITIVE_INFINITY } }, "EXPIRED"],
+    ["invalid Firestore nanos", { ...grantedMemory, expiresAt: { seconds: 1780000000, nanoseconds: Number.NaN } }, "EXPIRED"],
+    ["out-of-range nanos", { ...grantedMemory, expiresAt: { seconds: 1780000000, nanoseconds: 1000000000 } }, "EXPIRED"],
+    ["unsafe seconds", { ...grantedMemory, expiresAt: { seconds: Number.MAX_SAFE_INTEGER + 1 } }, "EXPIRED"],
     ["wrong tier", { ...grantedMemory, consentTier: "C4" }, "TIER_MISMATCH"],
     ["wrong policy", { ...grantedMemory, policyVersion: "0.1.0-draft" }, "POLICY_VERSION_MISMATCH"],
     ["wrong purpose", { ...grantedMemory, purpose: "location.context" }, "PURPOSE_MISMATCH"]
   ])("denies %s consent", (_label, record, reason) => {
     expect(evaluateConsentDecision({ purpose: "memory.storage", record, now })).toMatchObject({ allowed: false, reason });
+  });
+
+  it.each(["toString", "constructor", "__proto__", "hasOwnProperty"])("rejects inherited object property %s as an unregistered purpose", (purpose) => {
+    const maliciousRecord = {
+      purpose,
+      consentTier: undefined,
+      status: "granted",
+      policyVersion: CONSENT_DECISION_POLICY_VERSION,
+      expiresAt: "2026-08-06T12:00:00.000Z"
+    };
+    expect(evaluateConsentDecision({ purpose, record: maliciousRecord, now })).toMatchObject({
+      allowed: false,
+      reason: "UNKNOWN_PURPOSE",
+      requiredTier: null
+    });
   });
 
   it("denies unknown purposes", () => {
