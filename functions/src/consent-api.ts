@@ -305,7 +305,7 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
     const record = recordSnapshot.exists ? recordSnapshot.data() : null;
     const { evaluated, allowed, reason } = evaluateLifeMovieRenderAuthorization({
       record, deletionActive: tombstone.data()?.active === true,
-      subjectUid, tenantId, correlationId, decisionReceiptId,
+      subjectUid, tenantId, decisionReceiptId,
       policyVersion, renderScope
     });
     transaction.create(accessRef, {
