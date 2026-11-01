@@ -159,6 +159,36 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a")));
   });
 
+  it("denies client access to server-owned Life Movie rights and approval records", async () => {
+    const serverPaths = [
+      "lifeMovieSourceRights/rights-a",
+      "lifeMovieSourceRightsDecisions/decision-a",
+      "lifeMovieScopedGrantApprovals/approval-a",
+      "lifeMovieSourceRights/rights-a/auditEvents/event-a"
+    ];
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      for (const documentPath of serverPaths) {
+        await setDoc(doc(db, documentPath), { ownerUid: "user-a", tenantId: "tenant-a", status: "verified" });
+      }
+    });
+    for (const db of [
+      anon(),
+      authed("user-a"),
+      authed("user-b"),
+      authed("claim-admin", { admin: true }),
+      authed("role-claim-admin", { role: "admin" })
+    ]) {
+      for (const documentPath of serverPaths) {
+        const protectedRef = doc(db, documentPath);
+        await assertFails(getDoc(protectedRef));
+        await assertFails(setDoc(protectedRef, { ownerUid: "user-a", status: "forged" }));
+        await assertFails(updateDoc(protectedRef, { status: "approved" }));
+        await assertFails(deleteDoc(protectedRef));
+      }
+    }
+  });
+
   it("denies anonymous access and unknown collections", async () => {
     await assertFails(getDoc(doc(anon(), "users/user-a")));
     await assertFails(setDoc(doc(authed("claim-admin", { admin: true }), "unknown/private"), { value: true }));
