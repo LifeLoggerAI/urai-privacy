@@ -25,3 +25,28 @@ export function isTrustedJobsConsentCaller(
     claims.consumerId === 'urai-jobs' &&
     authMetadata.sign_in_provider === 'custom';
 }
+
+/** Reverify the already-authenticated callable bearer with Firebase Admin
+ * checkRevoked=true. This rejects disabled users and revoked/expired tokens;
+ * the function's Firebase project remains the token's authoritative issuer.
+ * Never accept an inbound Studio token or a caller supplied token as Jobs.
+ */
+export async function isTrustedActiveJobsConsentCaller(
+  identity: JobsCallerIdentity | null | undefined,
+  pinnedUid: string | undefined,
+  bearerHeader: unknown,
+  verifyIdToken: (idToken: string, checkRevoked: boolean) => Promise<Record<string, unknown>>,
+): Promise<boolean> {
+  if (!isTrustedJobsConsentCaller(identity, pinnedUid) || typeof verifyIdToken !== 'function' ||
+      typeof bearerHeader !== 'string' || bearerHeader.length > 8192) return false;
+  const match = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.exec(bearerHeader);
+  if (!match) return false;
+  try {
+    const verified = await verifyIdToken(match[1], true);
+    if (!verified || typeof verified !== 'object') return false;
+    return isTrustedJobsConsentCaller({ uid: verified.uid, token: verified }, pinnedUid) &&
+      verified.uid === identity?.uid;
+  } catch {
+    return false;
+  }
+}

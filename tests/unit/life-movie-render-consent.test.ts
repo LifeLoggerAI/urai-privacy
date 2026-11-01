@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { hashLifeMovieScopedReceipt, verifiesLifeMovieScopedReceipt } from "../../functions/src/life-movie-scoped-receipt";
-import { isTrustedJobsConsentCaller } from "../../functions/src/life-movie-jobs-identity";
+import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "../../functions/src/life-movie-jobs-identity";
 import {
   CONSENT_DECISION_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION,
@@ -121,6 +121,48 @@ describe("Jobs-only verifier authenticated UID pin", () => {
     expect(verifier).toContain("process.env.URAI_PRIVACY_JOBS_VERIFIER_UID");
     expect(verifier).toContain("isTrustedJobsConsentCaller");
     expect(source.slice(0, start)).not.toContain("process.env.URAI_PRIVACY_JOBS_VERIFIER_UID");
+  });
+});
+
+describe("Jobs-only Firebase token revocation recheck", () => {
+  const uid = "urai-jobs-service-uid";
+  const token = { uid, system: true, role: "system", consumerId: "urai-jobs", firebase: { sign_in_provider: "custom" } };
+  const caller = { uid, token };
+  const bearer = "Bearer aaa.bbb.ccc";
+  it("requires a current signed token with the exact Jobs claims and checkRevoked", async () => {
+    let checks = 0;
+    expect(await isTrustedActiveJobsConsentCaller(caller, uid, bearer, async (jwt, checkRevoked) => {
+      expect(jwt).toBe("aaa.bbb.ccc");
+      expect(checkRevoked).toBe(true);
+      checks += 1;
+      return token;
+    })).toBe(true);
+    expect(checks).toBe(1);
+  });
+  it("denies missing configuration, wrong identity, malformed bearer and revoked accounts", async () => {
+    const accepted = async () => token;
+    const verify = (identity: typeof caller | null, pin: string | undefined, header: unknown,
+      fn: (idToken: string, checkRevoked: boolean) => Promise<Record<string, unknown>>) =>
+      isTrustedActiveJobsConsentCaller(identity, pin, header, fn);
+    expect(await verify(caller, undefined, bearer, accepted)).toBe(false);
+    expect(await verify(null, uid, bearer, accepted)).toBe(false);
+    expect(await verify(caller, "wrong-uid", bearer, accepted)).toBe(false);
+    expect(await verify(caller, uid, "Bearer malformed", accepted)).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => ({ ...token, uid: "wrong-uid" }))).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => ({ ...token, consumerId: "unknown" }))).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => { throw new Error("revoked"); })).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => { throw new Error("disabled"); })).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => { throw new Error("expired"); })).toBe(false);
+  });
+  it("wires the check only inside the dedicated verifier before scope evaluation", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
+    expect(start).toBeGreaterThan(-1);
+    const verifier = source.slice(start);
+    expect(verifier).toContain("isTrustedActiveJobsConsentCaller");
+    expect(verifier).toContain("getAuth().verifyIdToken(idToken, checkRevoked)");
+    expect(verifier.indexOf("isTrustedActiveJobsConsentCaller"))
+      .toBeLessThan(verifier.indexOf("db.runTransaction"));
   });
 });
 

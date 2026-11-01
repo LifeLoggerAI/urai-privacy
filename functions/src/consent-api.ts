@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
@@ -14,7 +15,7 @@ import {
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
 import { verifiesLifeMovieScopedReceipt } from "./life-movie-scoped-receipt";
-import { isTrustedJobsConsentCaller } from "./life-movie-jobs-identity";
+import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
 
 const db = getFirestore();
 
@@ -277,6 +278,17 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
   if (!authority || authority.role !== "system" || authority.consumerId !== "urai-jobs" ||
       !isTrustedJobsConsentCaller({ uid: actorUid, token: request.auth?.token }, process.env.URAI_PRIVACY_JOBS_VERIFIER_UID)) {
     throw new HttpsError("permission-denied", "A dedicated verified Jobs system identity is required.");
+  }
+  // The callable verified signature, issuer and audience. Explicitly recheck
+  // revocation/disabled status before any scoped consent record is read.
+  const currentJobsIdentity = await isTrustedActiveJobsConsentCaller(
+    { uid: actorUid, token: request.auth?.token },
+    process.env.URAI_PRIVACY_JOBS_VERIFIER_UID,
+    request.rawRequest?.headers.authorization,
+    (idToken, checkRevoked) => getAuth().verifyIdToken(idToken, checkRevoked),
+  );
+  if (!currentJobsIdentity) {
+    throw new HttpsError("permission-denied", "Current Jobs service identity verification is required.");
   }
   const parsed = lifeMovieVerificationSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid Life Movie verification request.");
