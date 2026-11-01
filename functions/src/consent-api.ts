@@ -155,7 +155,8 @@ export const setCanonicalConsent = onCall(async (request) => {
         purpose,
         status: parsed.data.status,
         consentTier: definition.requiredTier,
-        policyVersion: CONSENT_DECISION_POLICY_VERSION,
+        // Audit the exact per-purpose policy version committed in the consent receipt.
+        policyVersion: receipt.policyVersion,
         consentRecordId: recordId,
         consentEventId: eventRef.id,
         evidenceHash,
