@@ -3,7 +3,7 @@ import {
   CONSENT_DECISION_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
-  evaluateConsentDecision, policyVersionForPurpose
+  canonicalConsentAuditMetadata, evaluateConsentDecision, policyVersionForPurpose
 } from "../../functions/src/consent-decision";
 
 const now = new Date("2026-11-01T08:00:00.000Z");
@@ -39,5 +39,23 @@ describe("separate Life Movie render grant", () => {
   it("rejects absent grants", () => {
     expect(evaluateConsentDecision({ purpose: LIFE_MOVIE_RENDER_CONSENT_PURPOSE, record: null, now }))
       .toMatchObject({ allowed: false, reason: "MISSING_CONSENT" });
+  });
+  it("keeps canonical audit metadata on the exact purpose-specific policy", () => {
+    const input = {
+      purpose: LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
+      status: "granted" as const,
+      consentTier: "C6" as const,
+      consentRecordId: "owner_life-movie_render",
+      consentEventId: "consent-event-1",
+      evidenceHash: "a".repeat(64),
+      updatedAt: now.toISOString()
+    };
+    expect(canonicalConsentAuditMetadata(input)).toMatchObject({
+      ...input,
+      policyVersion: LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION
+    });
+    expect(canonicalConsentAuditMetadata({
+      ...input, purpose: "ai.personalization"
+    }).policyVersion).toBe(CONSENT_DECISION_POLICY_VERSION);
   });
 });

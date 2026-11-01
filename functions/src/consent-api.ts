@@ -7,6 +7,7 @@ import {
   LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
   policyVersionForPurpose,
   consentPurposeRegistry,
+  canonicalConsentAuditMetadata,
   evaluateConsentDecision,
   type ConsentPurpose
 } from "./consent-decision";
@@ -151,16 +152,15 @@ export const setCanonicalConsent = onCall(async (request) => {
       targetUid: uid,
       source: "function",
       timestamp: FieldValue.serverTimestamp(),
-      metadata: {
+      metadata: canonicalConsentAuditMetadata({
         purpose,
         status: parsed.data.status,
         consentTier: definition.requiredTier,
-        policyVersion: CONSENT_DECISION_POLICY_VERSION,
         consentRecordId: recordId,
         consentEventId: eventRef.id,
         evidenceHash,
         updatedAt: now
-      },
+      }),
       integrityHash: hash({ uid, purpose, status: parsed.data.status, consentRecordId: recordId, auditId: auditRef.id, evidenceHash, updatedAt: now })
     });
   });

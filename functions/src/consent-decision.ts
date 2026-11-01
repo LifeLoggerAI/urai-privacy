@@ -102,3 +102,22 @@ export async function runWithConsent<T>(args: { purpose: string; record: Consent
   if (!decision.allowed) throw new Error(`CONSENT_REQUIRED:${decision.reason}`);
   return await args.operation();
 }
+
+/**
+ * Keep the audit event on the same purpose-specific policy as the canonical
+ * consent record. Historical purposes stay on 1.0.0; Life Movies use 1.1.0.
+ * This is evidence consistency, not a consent decision or rendering grant.
+ */
+export type CanonicalConsentAuditMetadataInput = {
+  purpose: string;
+  status: "granted" | "denied" | "revoked";
+  consentTier: ConsentTier;
+  consentRecordId: string;
+  consentEventId: string;
+  evidenceHash: string;
+  updatedAt: string;
+};
+
+export function canonicalConsentAuditMetadata(input: CanonicalConsentAuditMetadataInput) {
+  return { ...input, policyVersion: policyVersionForPurpose(input.purpose) };
+}
