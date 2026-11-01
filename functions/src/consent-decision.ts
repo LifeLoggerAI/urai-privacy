@@ -21,6 +21,11 @@ export const consentPurposeRegistry = {
 } as const;
 
 export type ConsentPurpose = keyof typeof consentPurposeRegistry;
+
+/** Reject inherited Object prototype members as unknown consent purposes. */
+export function isCanonicalConsentPurpose(value: string): value is ConsentPurpose {
+  return Object.prototype.hasOwnProperty.call(consentPurposeRegistry, value);
+}
 export type ConsentTier = (typeof consentPurposeRegistry)[ConsentPurpose]["requiredTier"];
 
 export function policyVersionForPurpose(purpose: string): string {
@@ -88,7 +93,9 @@ function deny(purpose: string, reason: Exclude<ConsentDecisionReason, "ALLOWED">
 export function evaluateConsentDecision(args: { purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date }): ConsentDecision {
   const now = args.now ?? new Date();
   const evaluatedAt = now.toISOString();
-  const definition = consentPurposeRegistry[args.purpose as ConsentPurpose];
+  const definition = isCanonicalConsentPurpose(args.purpose)
+    ? consentPurposeRegistry[args.purpose]
+    : undefined;
   if (!definition) return deny(args.purpose, "UNKNOWN_PURPOSE", null, evaluatedAt);
   if (!args.record) return deny(args.purpose, "MISSING_CONSENT", definition.requiredTier, evaluatedAt);
   if (args.record.purpose !== args.purpose) return deny(args.purpose, "PURPOSE_MISMATCH", definition.requiredTier, evaluatedAt);
