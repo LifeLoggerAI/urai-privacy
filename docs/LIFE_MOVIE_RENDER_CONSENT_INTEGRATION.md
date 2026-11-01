@@ -1,0 +1,40 @@
+# Life Movie private rendering: canonical consent contract (draft / NO-GO)
+
+Source parent: Privacy main `1163d6f32a123ef9a6638e092a3eee5ec4a3b317`.
+Companion: Jobs draft PR #231, head `bbe74393d6defbf7352c59894325546f176708f8`.
+
+## Scope
+
+The canonical Privacy runtime registry is `functions/src/consent-decision.ts` (not the legacy `consent-policy.ts`). This draft registers the distinct purpose `life-movie.render`, tier C6, purpose-specific policy `1.1.0`. Existing purpose policy `1.0.0` remains unchanged. C6 is for explicitly selected private media rendering; it is not a substitute for independent biometric, sensitive inference, source/rights, or third-party consent where applicable. A general memory-storage or AI-personalization grant cannot authorize Life Movie rendering.
+
+A user must explicitly grant `life-movie.render` in the Privacy Center through `setCanonicalConsent`. The canonical transaction commits record, event and audit. No backfilling or migration automatically grants it.
+
+## Current decision
+
+`verifyLifeMovieRenderConsent` is a new Firebase callable, exported in `functions-entry.ts` but **not deployed here**. Require a Firebase-authenticated system caller with the Jobs-dedicated `consumerId=urai-jobs`; client/user identities, generic system tokens, and other consumers must fail. This is an intermediate source contract, NOT a complete secure workload-identity integration. The claim's trust provenance, service-credential issuance and endpoint authorization must be independently verified against hosted IAM before use.
+
+Request:
+```json
+{"subjectUid":"owner-uid","tenantId":"tenant-id","correlationId":"render-operation-id","decisionReceiptId":"64-character-lowercase-SHA256-receipt-hash","policyVersion":"1.1.0"}
+```
+The expected receipt hash is only a comparison value, never authority. The verifier transaction re-reads the canonical `consentRecords/{uid}_life-movie_render` document plus deletion tombstone, validates the subject, exact purpose, tier, policy, current grant, expiry and receipt hash, and appends a decision audit event. It returns an allow only when all conditions match; an allow is point-in-time, not a durable token. Jobs must also check tenant and source ownership independently. Provider authentication failure and network failure deny by default.
+
+Every create, queue lease, dispatch, segment, assembly, resume, download, playback, and delivery mint must recheck current grants as appropriate, with hard cancellation on revocation or invalidated ownership. No signed URL should outlive revoked authorization; storage/CDN/versioned-object backup and already-issued-link invalidation require separate review.
+
+## Integration state
+
+- **Privacy source only**: purpose, owner opt-in display, Jobs-only decision endpoint, policy tests. These are proposed changes requiring review, not a deployed consent service.
+- **Jobs**: intentionally unchanged. PR #231 retains `lifeMovieConsentAuthorityAvailable() === false`; the bridge, dispatcher, and Studio worker must remain hard-closed. Existing Jobs caller-supplied `decisionReceiptId` strings are arbitrary; consumers must change to an exact canonical receipt hash and use independently authenticated trusted service verification before rendering.
+- **Studio**: separate source, media generation, source ownership and worker life-cycle enforcement still need integration.
+- **Spatial**: existing read-only Life Movie manifest is not hosted FFmpeg render authority. Do not connect its client UI to the worker as a shortcut.
+
+## Still required
+
+1. Security review of source-bound identity, claim issuers, cross-project Firebase auth, tenant binding, replay/TOCTOU/latency, and disabled-path ordering.
+2. Update Jobs PR #231 without replacing it: service-to-service client, exact decision-event audit linkage, per-boundary verification, latest grant/revocation checks, and hard closed network errors. Integrate Studio worker + protected delivery. No environment switch granting authority.
+3. Test authenticated owner, nonowner, spoofed system, mismatched consumer, tampered or stale receipt hash, purpose/tier/policy mismatch, deleted subject, revoked while leased/in-flight, stale object generation, source removed/replaced, retry idempotency, storage cleanup, and signed-link invalidation.
+4. Run Privacy unit/build/typecheck, Jobs locked builds and existing 19 owner/deletion/race + 34 emulator cases, plus new three-repo end-to-end provider tests and exact-SHA CI.
+5. Obtain independent human privacy/security/release review, provider IAM/Storage/retention/deletion evidence, protected hosted staging playback and rollback proof. GitHub Actions billing runner-admission incident may prevent hosted CI.
+6. Complete privacy notice, duration, retention, export/delete registry and legal/privacy review before enabling an opt-in in hosted environments.
+
+**Release: NO-GO. No deployment, merge, runtime enablement, user grants, or hosted playback is claimed.**
