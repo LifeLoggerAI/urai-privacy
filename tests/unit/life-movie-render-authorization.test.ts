@@ -7,7 +7,7 @@ const scope = { projectId: "movie-1", renderPlanDigest: "a".repeat(64), sourceSe
 const receipt = {
   uid: "owner-1", tenantId: "tenant-1",
   purpose: "life-movie.render" as const, consentTier: "C6" as const,
-  status: "granted" as const, policyVersion: "1.1.0",
+  status: "granted" as const, policyVersion: "1.1.0" as const,
   expiresAt: "2026-11-30T15:00:00.000Z",
   surface: "movie-selection", jurisdiction: "US",
   noticeVersion: "movie-notice-v1", noticeHash: "c".repeat(64),
