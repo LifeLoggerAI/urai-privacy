@@ -194,6 +194,12 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
   const purpose = canonicalPurpose(parsed.data.purpose);
+  // A purpose-wide decision cannot authorize one particular private movie.
+  // Only verifyLifeMovieRenderConsent checks subject, tenant, reviewed receipt,
+  // immutable selected sources, expiry and revocation together.
+  if (purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE) {
+    throw new HttpsError("failed-precondition", "Life Movie rendering requires the dedicated movie-scoped consent verifier.");
+  }
   const targetUid = parsed.data.targetUid ?? actorUid;
   const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthority(request.auth?.token);
   if (!authority) {
