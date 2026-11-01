@@ -94,7 +94,7 @@ export function verifiesLifeMovieScopedReceipt(
   const scope = source.renderScope;
   if (!scope || typeof scope !== "object" || Array.isArray(scope)) return false;
   const selection = scope as Record<string, unknown>;
-  if (Object.keys(selection).length !== 3
+  if (Reflect.ownKeys(selection).length !== 3
     || !["projectId", "renderPlanDigest", "sourceSetDigest"].every((key) => hasOwn(selection, key))
     || typeof selection.projectId !== "string" || !SAFE_PROJECT.test(selection.projectId)
     || typeof selection.renderPlanDigest !== "string" || !SHA256_HEX.test(selection.renderPlanDigest)
