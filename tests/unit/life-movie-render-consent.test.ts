@@ -70,6 +70,21 @@ describe("Life Movie movie/source scope fence", () => {
   });
 });
 
+describe("generic consent evaluation is not Life Movie render authority", () => {
+  it("rejects movie rendering before the generic decision can evaluate a purpose-wide record", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const genericStart = source.indexOf("export const evaluateCanonicalConsent = onCall");
+    const verifierStart = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
+    expect(genericStart).toBeGreaterThan(-1);
+    expect(verifierStart).toBeGreaterThan(genericStart);
+    const generic = source.slice(genericStart, verifierStart);
+    expect(generic).toContain('if (purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE)');
+    expect(generic.indexOf('if (purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE)'))
+      .toBeLessThan(generic.indexOf('const recordId = consentRecordId(targetUid, purpose)'));
+    expect(generic).toContain('Life Movie rendering requires the dedicated movie-scoped consent verifier.');
+  });
+});
+
 describe("canonical Life Movie audit receipt policy linkage", () => {
   it("records the purpose-specific receipt policy version in consent-update audit metadata", () => {
     const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
