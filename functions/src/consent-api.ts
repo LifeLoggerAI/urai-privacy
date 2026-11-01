@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
+import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import {
   CONSENT_DECISION_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
+  matchesLifeMovieRenderScope,
   policyVersionForPurpose,
   consentPurposeRegistry,
   isCanonicalConsentPurpose,
@@ -12,6 +14,8 @@ import {
   type ConsentPurpose
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
+import { evaluateLifeMovieRenderAuthorization } from "./life-movie-render-authorization";
+import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
 
 const db = getFirestore();
 
@@ -79,6 +83,11 @@ export const setCanonicalConsent = onCall(async (request) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
   const purpose = canonicalPurpose(parsed.data.purpose);
+  // Global, unscoped Life Movie grants are not an acceptable render authority.
+  // Scoped issuance requires an approved selection/notice flow, not this general toggle.
+  if (purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE && parsed.data.status === "granted") {
+    throw new HttpsError("failed-precondition", "Life Movie consent requires an approved, movie-specific source selection flow.");
+  }
   const definition = consentPurposeRegistry[purpose];
   const nowMillis = Date.now();
   let effectiveExpiresAt: string | null;
@@ -187,6 +196,12 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
   const purpose = canonicalPurpose(parsed.data.purpose);
+  // A purpose-wide decision cannot authorize one particular private movie.
+  // Only verifyLifeMovieRenderConsent checks subject, tenant, reviewed receipt,
+  // immutable selected sources, expiry and revocation together.
+  if (purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE) {
+    throw new HttpsError("failed-precondition", "Life Movie rendering requires the dedicated movie-scoped consent verifier.");
+  }
   const targetUid = parsed.data.targetUid ?? actorUid;
   const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthority(request.auth?.token);
   if (!authority) {
@@ -241,24 +256,43 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
 });
 
+const lifeMovieRenderScopeSchema = z.object({
+  projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
+  renderPlanDigest: z.string().regex(/^[0-9a-f]{64}$/),
+  sourceSetDigest: z.string().regex(/^[0-9a-f]{64}$/)
+}).strict();
+
 const lifeMovieVerificationSchema = z.object({
   subjectUid: z.string().trim().min(1).max(160),
   tenantId: z.string().trim().min(1).max(160),
   correlationId: z.string().trim().min(8).max(160),
   decisionReceiptId: z.string().regex(/^[0-9a-f]{64}$/),
-  policyVersion: z.string().trim().min(1).max(80)
+  policyVersion: z.string().trim().min(1).max(80),
+  renderScope: lifeMovieRenderScopeSchema
 }).strict();
 
 /** Jobs-only current decision, never a reusable capability or render-enablement flag. */
 export const verifyLifeMovieRenderConsent = onCall(async (request) => {
   const actorUid = uidFrom(request);
   const authority = crossUserAuthority(request.auth?.token);
-  if (!authority || authority.role !== "system" || authority.consumerId !== "urai-jobs") {
-    throw new HttpsError("permission-denied", "A dedicated Jobs system identity is required.");
+  if (!authority || authority.role !== "system" || authority.consumerId !== "urai-jobs" ||
+      !isTrustedJobsConsentCaller({ uid: actorUid, token: request.auth?.token }, process.env.URAI_PRIVACY_JOBS_VERIFIER_UID)) {
+    throw new HttpsError("permission-denied", "A dedicated verified Jobs system identity is required.");
+  }
+  // The callable verified signature, issuer and audience. Explicitly recheck
+  // revocation/disabled status before any scoped consent record is read.
+  const currentJobsIdentity = await isTrustedActiveJobsConsentCaller(
+    { uid: actorUid, token: request.auth?.token },
+    process.env.URAI_PRIVACY_JOBS_VERIFIER_UID,
+    request.rawRequest?.headers.authorization,
+    (idToken, checkRevoked) => getAuth().verifyIdToken(idToken, checkRevoked),
+  );
+  if (!currentJobsIdentity) {
+    throw new HttpsError("permission-denied", "Current Jobs service identity verification is required.");
   }
   const parsed = lifeMovieVerificationSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid Life Movie verification request.");
-  const { subjectUid, tenantId, correlationId, decisionReceiptId, policyVersion } = parsed.data;
+  const { subjectUid, tenantId, correlationId, decisionReceiptId, policyVersion, renderScope } = parsed.data;
   const purpose = LIFE_MOVIE_RENDER_CONSENT_PURPOSE;
   const recordId = consentRecordId(subjectUid, purpose);
   const recordRef = db.collection("consentRecords").doc(recordId);
@@ -269,33 +303,29 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
       transaction.get(recordRef), transaction.get(tombstoneRef)
     ]);
     const record = recordSnapshot.exists ? recordSnapshot.data() : null;
-    const evaluated = evaluateConsentDecision({ purpose, record });
-    const receiptMatches = typeof record?.receiptHash === "string"
-      && /^[0-9a-f]{64}$/.test(record.receiptHash)
-      && record.receiptHash === decisionReceiptId;
-    const subjectMatches = record?.uid === subjectUid;
-    const policyMatches = policyVersion === policyVersionForPurpose(purpose);
-    const deleted = tombstone.data()?.active === true;
-    // Tenant membership and source rights remain independent Jobs/Studio checks.
-    const allowed = evaluated.allowed && receiptMatches && subjectMatches && policyMatches && !deleted;
-    const reason = deleted ? "ACCOUNT_DELETED"
-      : !subjectMatches ? "SUBJECT_MISMATCH"
-      : !receiptMatches ? "RECEIPT_MISMATCH"
-      : !policyMatches ? "POLICY_VERSION_MISMATCH" : evaluated.reason;
+    const { evaluated, allowed, reason } = evaluateLifeMovieRenderAuthorization({
+      record, deletionActive: tombstone.data()?.active === true,
+      subjectUid, tenantId, decisionReceiptId,
+      policyVersion, renderScope
+    });
     transaction.create(accessRef, {
       uid: subjectUid, actorUid, actorRole: "system", consumerId: authority.consumerId,
       tenantId, purpose, correlationId, decision: allowed ? "allow" : "deny",
-      reason, policyVersion: evaluated.policyVersion,
+      reason, policyVersion: evaluated.policyVersion, renderScopeHash: hash(renderScope),
       consentRecordId: recordSnapshot.exists ? recordId : null,
       evaluatedAt: FieldValue.serverTimestamp(),
       integrityHash: hash({ subjectUid, actorUid, tenantId, purpose, correlationId,
-        receiptHash: decisionReceiptId, allowed, reason, eventId: accessRef.id })
+        receiptHash: decisionReceiptId, renderScopeHash: hash(renderScope), allowed, reason, eventId: accessRef.id })
     });
     return {
       allowed, reason, subjectUid, tenantId, purpose, correlationId,
       policyVersion: evaluated.policyVersion, requiredTier: evaluated.requiredTier,
       receiptHash: allowed ? decisionReceiptId : null,
       expiresAt: allowed ? record?.expiresAt : null,
+      // Echo only the scope checked by the dedicated verifier. This is an
+      // authenticated result binding, not a new bearer capability or grant.
+      renderScope: allowed ? renderScope : null,
+      evaluatedAt: evaluated.evaluatedAt,
       decisionEventId: accessRef.id
     };
   });

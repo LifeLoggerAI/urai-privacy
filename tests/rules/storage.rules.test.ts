@@ -117,6 +117,31 @@ describe("Storage export and evidence rules", () => {
     await assertFails(uploadString(ref(storageFor("user-a"), "evidence/release-lock.json"), "{}"));
   });
 
+  it("keeps Life Movie source and render objects inaccessible to clients, including admins", async ({ skip }) => {
+    if (!storageRulesAvailable) return skip();
+    const privatePaths = [
+      "tenants/tenant-a/life-movies/project-a/renders/movie.mp4",
+      "tenants/tenant-a/life-movies/project-a/segments/0000/movie.mp4",
+      "studios/tenant-a/life-movies/project-a/final/movie.mp4",
+      "tenants/tenant-a/source-recordings/audio.wav"
+    ];
+    for (const objectPath of privatePaths) {
+      await seedStorage(objectPath, "private-fixture");
+      for (const client of [
+        anonStorage(),
+        storageFor("user-a"),
+        storageFor("user-b"),
+        storageFor("claim-admin", { admin: true }),
+        storageFor("role-claim-admin", { role: "admin" })
+      ]) {
+        const target = ref(client, objectPath);
+        await assertFails(getBytes(target));
+        await assertFails(uploadString(target, "forged"));
+        await assertFails(deleteObject(target));
+      }
+    }
+  });
+
   it("denies deletes and deny-default paths", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await seedStorage("exports/user-a/export-3/manifest.json");

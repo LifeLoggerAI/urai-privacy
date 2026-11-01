@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { hashLifeMovieScopedReceipt, verifiesLifeMovieScopedReceipt } from "../../functions/src/life-movie-scoped-receipt";
+import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "../../functions/src/life-movie-jobs-identity";
 import {
   CONSENT_DECISION_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION,
   LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
-  evaluateConsentDecision, policyVersionForPurpose
+  evaluateConsentDecision, policyVersionForPurpose, matchesLifeMovieRenderScope
 } from "../../functions/src/consent-decision";
 
 const now = new Date("2026-11-01T08:00:00.000Z");
@@ -44,11 +46,169 @@ describe("separate Life Movie render grant", () => {
 });
 
 
+describe("Life Movie movie/source scope fence", () => {
+  const requestedScope = {
+    projectId: "movie-owner-one",
+    renderPlanDigest: "a".repeat(64),
+    sourceSetDigest: "b".repeat(64)
+  };
+  it("matches only an exact, own-field scope", () => {
+    expect(matchesLifeMovieRenderScope({ ...requestedScope }, requestedScope)).toBe(true);
+    expect(matchesLifeMovieRenderScope(null, requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope({ ...requestedScope, sourceSetDigest: "c".repeat(64) }, requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope({ ...requestedScope, projectId: "different-movie" }, requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope(Object.create(requestedScope), requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope({ ...requestedScope, extraAuthorization: true }, requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope(Object.defineProperty({ ...requestedScope }, "hiddenAuthorization", { value: true, enumerable: false }), requestedScope)).toBe(false);
+    expect(matchesLifeMovieRenderScope({ ...requestedScope, [Symbol("critical")]: true }, requestedScope)).toBe(false);
+  });
+  it("does not allow purpose-wide grant issuance or verification without matching stored selection", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    expect(source).toContain('purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE && parsed.data.status === "granted"');
+    expect(source).toContain("evaluateLifeMovieRenderAuthorization({");
+    expect(source).toContain("decisionReceiptId,");
+    expect(source).toContain("evaluateLifeMovieRenderAuthorization");
+    const ui = readFileSync(new URL("../../app/privacy-center/consent/page.tsx", import.meta.url), "utf8");
+    expect(ui).toContain('item.purpose === "life-movie.render"');
+    expect(ui).toContain("movie-specific media selection and authorization flow");
+  });
+});
+
+describe("generic consent evaluation is not Life Movie render authority", () => {
+  it("rejects movie rendering before the generic decision can evaluate a purpose-wide record", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const genericStart = source.indexOf("export const evaluateCanonicalConsent = onCall");
+    const verifierStart = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
+    expect(genericStart).toBeGreaterThan(-1);
+    expect(verifierStart).toBeGreaterThan(genericStart);
+    const generic = source.slice(genericStart, verifierStart);
+    expect(generic).toContain('if (purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE)');
+    expect(generic.indexOf('if (purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE)'))
+      .toBeLessThan(generic.indexOf('const recordId = consentRecordId(targetUid, purpose)'));
+    expect(generic).toContain('Life Movie rendering requires the dedicated movie-scoped consent verifier.');
+  });
+});
+
 describe("canonical Life Movie audit receipt policy linkage", () => {
   it("records the purpose-specific receipt policy version in consent-update audit metadata", () => {
     const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
     const auditMetadata = source.match(/action: "canonical_consent_updated"[\s\S]*?metadata: \{([\s\S]*?)\n      \},/);
     expect(auditMetadata?.[1]).toContain("policyVersion: receipt.policyVersion");
     expect(auditMetadata?.[1]).not.toContain("policyVersion: CONSENT_DECISION_POLICY_VERSION");
+  });
+});
+
+describe("Jobs-only verifier authenticated UID pin", () => {
+  const uid = "urai-jobs-service-uid";
+  const claims = {
+    system: true, role: "system", consumerId: "urai-jobs",
+    firebase: { sign_in_provider: "custom" }
+  };
+  it("rejects absent pins, cross-service tokens, normal users and forged metadata", () => {
+    expect(isTrustedJobsConsentCaller({ uid, token: claims }, uid)).toBe(true);
+    expect(isTrustedJobsConsentCaller({ uid, token: claims }, undefined)).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: claims }, "different-uid")).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: { ...claims, role: "admin" } }, uid)).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: { ...claims, system: false } }, uid)).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: { ...claims, consumerId: "other" } }, uid)).toBe(false);
+    expect(isTrustedJobsConsentCaller({ uid, token: { ...claims, firebase: { sign_in_provider: "password" } } }, uid)).toBe(false);
+    expect(isTrustedJobsConsentCaller(null, uid)).toBe(false);
+  });
+  it("wires the pin into the Jobs-only callable without changing general consent", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
+    const verifier = source.slice(start);
+    expect(verifier).toContain("process.env.URAI_PRIVACY_JOBS_VERIFIER_UID");
+    expect(verifier).toContain("isTrustedJobsConsentCaller");
+    expect(source.slice(0, start)).not.toContain("process.env.URAI_PRIVACY_JOBS_VERIFIER_UID");
+  });
+});
+
+describe("Jobs-only Firebase token revocation recheck", () => {
+  const uid = "urai-jobs-service-uid";
+  const token = { uid, system: true, role: "system", consumerId: "urai-jobs", firebase: { sign_in_provider: "custom" } };
+  const caller = { uid, token };
+  const bearer = "Bearer aaa.bbb.ccc";
+  it("requires a current signed token with the exact Jobs claims and checkRevoked", async () => {
+    let checks = 0;
+    expect(await isTrustedActiveJobsConsentCaller(caller, uid, bearer, async (jwt, checkRevoked) => {
+      expect(jwt).toBe("aaa.bbb.ccc");
+      expect(checkRevoked).toBe(true);
+      checks += 1;
+      return token;
+    })).toBe(true);
+    expect(checks).toBe(1);
+  });
+  it("denies missing configuration, wrong identity, malformed bearer and revoked accounts", async () => {
+    const accepted = async () => token;
+    const verify = (identity: typeof caller | null, pin: string | undefined, header: unknown,
+      fn: (idToken: string, checkRevoked: boolean) => Promise<Record<string, unknown>>) =>
+      isTrustedActiveJobsConsentCaller(identity, pin, header, fn);
+    expect(await verify(caller, undefined, bearer, accepted)).toBe(false);
+    expect(await verify(null, uid, bearer, accepted)).toBe(false);
+    expect(await verify(caller, "wrong-uid", bearer, accepted)).toBe(false);
+    expect(await verify(caller, uid, "Bearer malformed", accepted)).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => ({ ...token, uid: "wrong-uid" }))).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => ({ ...token, consumerId: "unknown" }))).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => { throw new Error("revoked"); })).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => { throw new Error("disabled"); })).toBe(false);
+    expect(await verify(caller, uid, bearer, async () => { throw new Error("expired"); })).toBe(false);
+  });
+  it("wires the check only inside the dedicated verifier before scope evaluation", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
+    expect(start).toBeGreaterThan(-1);
+    const verifier = source.slice(start);
+    expect(verifier).toContain("isTrustedActiveJobsConsentCaller");
+    expect(verifier).toContain("getAuth().verifyIdToken(idToken, checkRevoked)");
+    expect(verifier.indexOf("isTrustedActiveJobsConsentCaller"))
+      .toBeLessThan(verifier.indexOf("db.runTransaction"));
+  });
+});
+
+describe("Jobs-only Life Movie verifier response contract", () => {
+  it("returns the exact checked scope and evaluation time only with an allowed decision", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    const start = source.indexOf("export const verifyLifeMovieRenderConsent = onCall");
+    expect(start).toBeGreaterThan(-1);
+    const verifier = source.slice(start);
+    expect(verifier).toContain("evaluateLifeMovieRenderAuthorization({");
+    expect(verifier).toContain("renderScope: allowed ? renderScope : null");
+    expect(verifier).toContain("evaluatedAt: evaluated.evaluatedAt");
+    expect(verifier).toContain("decisionEventId: accessRef.id");
+    expect(verifier).toContain("receiptHash: allowed ? decisionReceiptId : null");
+  });
+});
+
+describe("Life Movie scoped receipt integrity binding", () => {
+  const scope = { projectId: "movie-owner-one", renderPlanDigest: "a".repeat(64), sourceSetDigest: "b".repeat(64) };
+  const receipt = {
+    uid: "subject-1", tenantId: "tenant-1", purpose: "life-movie.render" as const,
+    consentTier: "C6" as const, status: "granted" as const, policyVersion: "1.1.0" as const,
+    expiresAt: "2026-12-01T08:00:00.000Z", surface: "movie-selection",
+    jurisdiction: "US", noticeVersion: "life-movie-render-v1",
+    noticeHash: "c".repeat(64), evidenceHash: "d".repeat(64),
+    renderScope: scope, updatedAt: "2026-11-01T08:00:00.000Z"
+  };
+  const authorized = { ...receipt, receiptHash: hashLifeMovieScopedReceipt(receipt) };
+  const expected = { subjectUid: receipt.uid, tenantId: receipt.tenantId, decisionReceiptId: authorized.receiptHash, renderScope: scope };
+  it("accepts only a complete internally consistent scoped receipt", () => {
+    expect(verifiesLifeMovieScopedReceipt(authorized, expected)).toBe(true);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: { ...scope, sourceSetDigest: "e".repeat(64) } }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, tenantId: "tenant-2" }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, receiptHash: "0".repeat(64) }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, noticeHash: "f".repeat(64) }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, expiresAt: "2026-12-02T08:00:00.000Z" }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: undefined }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt(Object.defineProperty({ ...authorized, renderScope: { ...scope } }, "hiddenAudit", { value: true, enumerable: false }), expected)).toBe(true);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: Object.defineProperty({ ...scope }, "hiddenAuthorization", { value: true, enumerable: false }) }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt({ ...authorized, renderScope: { ...scope, [Symbol("elevated")]: true } }, expected)).toBe(false);
+    expect(verifiesLifeMovieScopedReceipt(Object.assign(Object.create({ uid: receipt.uid }), { ...authorized, uid: undefined }), expected)).toBe(false);
+  });
+  it("wires the binding into the Jobs-only verifier allow condition", () => {
+    const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
+    expect(source).toContain("evaluateLifeMovieRenderAuthorization({");
+    expect(source).toContain("deletionActive: tombstone.data()?.active === true");
+    expect(source).toContain("const { evaluated, allowed, reason }");
   });
 });
