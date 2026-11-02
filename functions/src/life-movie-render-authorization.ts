@@ -17,7 +17,7 @@ import { verifiesLifeMovieScopedReceipt } from "./life-movie-scoped-receipt";
  */
 export type LifeMovieRenderAuthorizationRequest = Readonly<{
   record: unknown;
-  deletionActive: boolean;
+  deletionActive: unknown;
   subjectUid: string;
   tenantId: string;
   decisionReceiptId: string;
@@ -33,6 +33,29 @@ export type LifeMovieRenderAuthorizationResult = Readonly<{
 }>;
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+const DELETION_PLANNING_FIELDS = [
+  "deletionPlanningLeaseToken", "deletionPlanningLeaseUntil", "deletionPlanningLeaseRequestId",
+  "deletionPlanningLeaseOperation", "deletionPlanningLeaseBy"
+] as const;
+
+/**
+ * Decode deletion evidence from the Firestore snapshot read in the same trusted
+ * verifier transaction. A verified missing document means no tombstone exists;
+ * a present but incomplete tombstone (including a planning lease) is NOT clear.
+ */
+export function currentLifeMovieDeletionActive(snapshot: Readonly<{
+  exists: boolean;
+  data: () => Record<string, unknown> | undefined;
+}>): boolean | undefined {
+  if (snapshot.exists === false) return false;
+  if (snapshot.exists !== true) return undefined;
+  const data = snapshot.data();
+  if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
+  if (DELETION_PLANNING_FIELDS.some(key => Object.prototype.hasOwnProperty.call(data, key))) return undefined;
+  if (!Object.prototype.hasOwnProperty.call(data, "active")) return undefined;
+  return typeof data.active === "boolean" ? data.active : undefined;
+}
 
 export function evaluateLifeMovieRenderAuthorization(
   input: LifeMovieRenderAuthorizationRequest
