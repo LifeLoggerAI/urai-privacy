@@ -10,16 +10,25 @@ export type JobsCallerIdentity = Readonly<{
 }>;
 
 const UID = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/;
+const hasOwn = (value: object, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(value, key);
 
 export function isTrustedJobsConsentCaller(
   identity: JobsCallerIdentity | null | undefined,
   pinnedUid: string | undefined,
 ): boolean {
   if (typeof pinnedUid !== 'string' || !UID.test(pinnedUid) ||
-      !identity || identity.uid !== pinnedUid || !identity.token) return false;
+      !identity || typeof identity !== 'object' || Array.isArray(identity) ||
+      !hasOwn(identity, 'uid') || identity.uid !== pinnedUid ||
+      !hasOwn(identity, 'token') || !identity.token ||
+      typeof identity.token !== 'object' || Array.isArray(identity.token)) return false;
   const claims = identity.token;
+  // Never inherit privileged identity claims from a modified object prototype.
+  // This is defense in depth after Firebase has cryptographically verified the ID token.
+  if (!['system', 'role', 'consumerId', 'firebase'].every((key) => hasOwn(claims, key))) return false;
   const firebase = claims.firebase;
-  if (!firebase || typeof firebase !== 'object' || Array.isArray(firebase)) return false;
+  if (!firebase || typeof firebase !== 'object' || Array.isArray(firebase) ||
+      !hasOwn(firebase, 'sign_in_provider')) return false;
   const authMetadata = firebase as Record<string, unknown>;
   return claims.system === true && claims.role === 'system' &&
     claims.consumerId === 'urai-jobs' &&
@@ -43,7 +52,8 @@ export async function isTrustedActiveJobsConsentCaller(
   if (!match) return false;
   try {
     const verified = await verifyIdToken(match[1], true);
-    if (!verified || typeof verified !== 'object') return false;
+    if (!verified || typeof verified !== 'object' || Array.isArray(verified) ||
+        !hasOwn(verified, 'uid')) return false;
     return isTrustedJobsConsentCaller({ uid: verified.uid, token: verified }, pinnedUid) &&
       verified.uid === identity?.uid;
   } catch {
