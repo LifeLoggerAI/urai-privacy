@@ -65,8 +65,16 @@ export function parseArguments(argv) {
 export function assertCandidate({expectedSha, observedSha, origin, gitRoot, expectedRoot, status}) {
   assert.ok(SHA40.test(expectedSha), 'Expected SHA must be immutable 40-character hex');
   assert.equal(observedSha, expectedSha, 'Checkout HEAD must equal pinned expected SHA');
-  assert.match(origin.trim(), /(?:github\.com|ssh\.github\.com)[:/]LifeLoggerAI\/urai-privacy(?:\.git)?$/i,
-    'origin must be the owned LifeLoggerAI/urai-privacy repository');
+  // Anchor the entire remote, including the scheme/SSH user and exact host.
+  // A suffix search would accept evilgithub.com/..., a supply-chain identity bug.
+  const ownedRemotes = [
+    /^https:\/\/github\.com\/LifeLoggerAI\/urai-privacy(?:\.git)?$/i,
+    /^git@github\.com:LifeLoggerAI\/urai-privacy(?:\.git)?$/i,
+    /^ssh:\/\/git@github\.com(?::22)?\/LifeLoggerAI\/urai-privacy(?:\.git)?$/i,
+    /^ssh:\/\/git@ssh\.github\.com:443\/LifeLoggerAI\/urai-privacy(?:\.git)?$/i
+  ];
+  assert.ok(ownedRemotes.some(pattern => pattern.test(origin.trim())),
+    'origin must be the exact owned LifeLoggerAI/urai-privacy GitHub remote');
   const normalize = p => process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p);
   assert.equal(normalize(gitRoot), normalize(expectedRoot), 'Run at repository root');
   assert.equal(status.trim(), '', 'Repository must be clean before running original tests');
