@@ -16,6 +16,7 @@ import {
 import { resolveConsentExpiry } from "./consent-expiry";
 import { evaluateLifeMovieRenderAuthorization } from "./life-movie-render-authorization";
 import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
+import { crossUserAuthority } from "./cross-user-authority";
 
 const db = getFirestore();
 
@@ -61,20 +62,6 @@ function canonicalPurpose(value: string): ConsentPurpose {
 
 function consentRecordId(uid: string, purpose: string) {
   return `${uid}_${purpose.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-}
-
-function crossUserAuthority(token?: Record<string, unknown>) {
-  if (token?.admin === true || token?.role === "admin") {
-    return { role: "admin" as const, consumerId: null };
-  }
-
-  const system = token?.system === true || token?.role === "system";
-  const consumerId = typeof token?.consumerId === "string" ? token.consumerId.trim() : "";
-  if (system && /^[a-zA-Z0-9._-]{2,120}$/.test(consumerId)) {
-    return { role: "system" as const, consumerId };
-  }
-
-  return null;
 }
 
 export const setCanonicalConsent = onCall(async (request) => {
