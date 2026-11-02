@@ -17,15 +17,21 @@ export type LifeMovieRenderScope = Readonly<{
 export function matchesLifeMovieRenderScope(recordScope: unknown, requestedScope: LifeMovieRenderScope): boolean {
   if (!recordScope || typeof recordScope !== "object" || Array.isArray(recordScope)) return false;
   const scoped = recordScope as Record<string, unknown>;
-  // Reject additional critical fields, including non-enumerable and symbol keys.
-  // A Life Movie scope is precisely the three contract-defined own properties.
-  if (Reflect.ownKeys(scoped).length !== 3) return false;
-  return Object.prototype.hasOwnProperty.call(scoped, "projectId")
-    && Object.prototype.hasOwnProperty.call(scoped, "renderPlanDigest")
-    && Object.prototype.hasOwnProperty.call(scoped, "sourceSetDigest")
-    && scoped.projectId === requestedScope.projectId
-    && scoped.renderPlanDigest === requestedScope.renderPlanDigest
-    && scoped.sourceSetDigest === requestedScope.sourceSetDigest;
+  // An accessor-backed value is not stored scope evidence, even when its
+  // getter produces the expected digest. Inspect own data descriptors without
+  // executing untrusted getters or accepting hidden/symbol authorization.
+  try {
+    if (Reflect.ownKeys(scoped).length !== 3) return false;
+    const props = Object.getOwnPropertyDescriptors(scoped);
+    const required = ["projectId", "renderPlanDigest", "sourceSetDigest"] as const;
+    if (!required.every(key => Object.prototype.hasOwnProperty.call(props, key)
+      && Object.prototype.hasOwnProperty.call(props[key], "value"))) return false;
+    return props.projectId.value === requestedScope.projectId
+      && props.renderPlanDigest.value === requestedScope.renderPlanDigest
+      && props.sourceSetDigest.value === requestedScope.sourceSetDigest;
+  } catch {
+    return false;
+  }
 }
 
 export const consentPurposeRegistry = {
