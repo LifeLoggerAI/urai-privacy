@@ -99,6 +99,27 @@ describe("Storage export and evidence rules", () => {
     await assertFails(getBytes(ref(storageFor("user-a"), "exports/user-a/export-expired/manifest.json")));
   });
 
+  it("revokes all client export downloads after an active deletion tombstone", async ({ skip }) => {
+    if (!storageRulesAvailable) return skip();
+    await seedStorage("exports/user-a/export-deleting/manifest.json");
+    await seedStorage("exports/user-a/export-deleting/export.json");
+    await seedCompletedExport("user-a", "export-deleting");
+    await requireStorageEnv().withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), "privacyDeletionTombstones", "user-a"), {
+        active: true, uid: "user-a", reason: "user deletion",
+      });
+    });
+    for (const client of [
+      storageFor("user-a"),
+      storageFor("claim-admin", { admin: true }),
+      storageFor("role-claim-admin", { role: "admin" }),
+    ]) {
+      for (const name of ["manifest.json", "export.json"]) {
+        await assertFails(getBytes(ref(client, "exports/user-a/export-deleting/" + name)));
+      }
+    }
+  });
+
   it("denies other users and anonymous users from reading export paths", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await seedStorage("exports/user-a/export-1/manifest.json");
