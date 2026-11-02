@@ -44,4 +44,25 @@ describe("pure Life Movie scoped verifier authorization", () => {
   ])("denies %s", (_name, change, reason) => {
     expect(evaluateLifeMovieRenderAuthorization({ ...base, ...change })).toMatchObject({ allowed: false, reason });
   });
+
+  // A TypeScript boolean is not proof that the caller actually checked the
+  // current deletion fence: untrusted runtime values must fail closed.
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["number zero", 0],
+    ["string false", "false"],
+    ["string true", "true"],
+    ["empty object", {}],
+    ["empty array", []]
+  ])("denies unverified deletion state: %s", (_description, deletionState) => {
+    const result = evaluateLifeMovieRenderAuthorization({
+      ...base,
+      deletionActive: deletionState as unknown as boolean
+    });
+    expect(result).toMatchObject({
+      allowed: false,
+      reason: "ACCOUNT_DELETION_STATE_UNVERIFIED"
+    });
+  });
 });
