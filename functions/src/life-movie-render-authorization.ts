@@ -57,12 +57,16 @@ export function evaluateLifeMovieRenderAuthorization(
   });
   const policyMatches = input.policyVersion === policyVersionForPurpose(purpose);
   const deletionActive = input.deletionActive === true;
+  // Missing/malformed deletion evidence is not a verified all-clear. The caller
+  // must prove the current deletion fence has been checked and is inactive.
+  const deletionStateVerifiedClear = input.deletionActive === false;
   const allowed = evaluated.allowed && receiptMatches && subjectMatches
-    && scopeMatches && receiptBindsScope && policyMatches && !deletionActive;
+    && scopeMatches && receiptBindsScope && policyMatches && deletionStateVerifiedClear;
 
   // Preserve the actual revocation/expiry/denial reason in the audit record,
   // rather than incorrectly reporting an integrity mismatch for every denial.
   const reason = deletionActive ? "ACCOUNT_DELETED"
+    : !deletionStateVerifiedClear ? "ACCOUNT_DELETION_STATE_UNVERIFIED"
     : !evaluated.allowed ? evaluated.reason
     : !subjectMatches ? "SUBJECT_MISMATCH"
     : !scopeMatches ? "RENDER_SCOPE_MISMATCH"
