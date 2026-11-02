@@ -139,6 +139,32 @@ describe("Jobs-only Firebase token revocation recheck", () => {
     })).toBe(true);
     expect(checks).toBe(1);
   });
+  it("rejects unsigned Firebase Auth Emulator tokens and malformed bearer envelopes before re-verification", async () => {
+    // The Auth Emulator returns header.payload. with an intentionally empty
+    // signature segment. Never relax the production signed-JWT guard for it.
+    const unsignedEmulatorJwt = [
+      Buffer.from('{"alg":"none","typ":"JWT"}').toString("base64url"),
+      Buffer.from('{"sub":"synthetic-jobs","role":"system"}').toString("base64url"),
+      ""
+    ].join(".");
+    const headers = [
+      `Bearer ${unsignedEmulatorJwt}`,
+      "Bearer aaa.bbb",
+      "Bearer aaa.bbb.",
+      "Bearer aaa.bbb.ccc, Bearer ddd.eee.fff",
+      "bearer aaa.bbb.ccc",
+      "Bearer aaa.bbb.ccc\nX-Forged-Header: yes",
+      `Bearer ${"a".repeat(8200)}.bbb.ccc`
+    ];
+    let verificationCalls = 0;
+    for (const header of headers) {
+      expect(await isTrustedActiveJobsConsentCaller(caller, uid, header, async () => {
+        verificationCalls++;
+        return token;
+      })).toBe(false);
+    }
+    expect(verificationCalls).toBe(0);
+  });
   it("denies missing configuration, wrong identity, malformed bearer and revoked accounts", async () => {
     const accepted = async () => token;
     const verify = (identity: typeof caller | null, pin: string | undefined, header: unknown,
