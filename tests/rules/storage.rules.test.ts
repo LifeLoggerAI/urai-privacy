@@ -99,6 +99,61 @@ describe("Storage export and evidence rules", () => {
     await assertFails(getBytes(ref(storageFor("user-a"), "exports/user-a/export-expired/manifest.json")));
   });
 
+  it("revokes all client export downloads after an active deletion tombstone", async ({ skip }) => {
+    if (!storageRulesAvailable) return skip();
+    await seedStorage("exports/user-r326-deletion/export-deleting/manifest.json");
+    await seedStorage("exports/user-r326-deletion/export-deleting/export.json");
+    await seedCompletedExport("user-r326-deletion", "export-deleting");
+    await requireStorageEnv().withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), "privacyDeletionTombstones", "user-r326-deletion"), {
+        active: true, uid: "user-r326-deletion", reason: "user deletion",
+      });
+    });
+    for (const client of [
+      storageFor("user-r326-deletion"),
+      storageFor("claim-admin", { admin: true }),
+      storageFor("role-claim-admin", { role: "admin" }),
+    ]) {
+      for (const name of ["manifest.json", "export.json"]) {
+        await assertFails(getBytes(ref(client, "exports/user-r326-deletion/export-deleting/" + name)));
+      }
+    }
+  });
+
+  it("rejects admin-claim export artifact writes after deletion becomes active", async ({ skip }) => {
+    if (!storageRulesAvailable) return skip();
+    await seedStorage("exports/user-r327-deletion/delete-locked/manifest.json");
+    await seedCompletedExport("user-r327-deletion", "delete-locked");
+    await requireStorageEnv().withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), "privacyDeletionTombstones", "user-r327-deletion"), {
+        active: true, uid: "user-r327-deletion", reason: "user deletion",
+      });
+    });
+    for (const client of [
+      storageFor("claim-admin-after-delete", { admin: true }),
+      storageFor("role-admin-after-delete", { role: "admin" }),
+    ]) {
+      await assertFails(uploadString(ref(client, "exports/user-r327-deletion/delete-locked/manifest.json"), "forged-overwrite"));
+      await assertFails(uploadString(ref(client, "exports/user-r327-deletion/delete-locked/export.json"), "forged-new-export"));
+    }
+  });
+
+  it("rejects malformed deletion tombstones without an explicit inactive state", async ({ skip }) => {
+    if (!storageRulesAvailable) return skip();
+    await seedStorage("exports/user-r327-malformed/malformed-delete/manifest.json");
+    await seedCompletedExport("user-r327-malformed", "malformed-delete");
+    await requireStorageEnv().withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), "privacyDeletionTombstones", "user-r327-malformed"), {
+        uid: "user-r327-malformed", reason: "incomplete tombstone",
+      });
+    });
+    await assertFails(getBytes(ref(storageFor("user-r327-malformed"), "exports/user-r327-malformed/malformed-delete/manifest.json")));
+    await assertFails(uploadString(
+      ref(storageFor("claim-admin-malformed", { admin: true }), "exports/user-r327-malformed/malformed-delete/manifest.json"),
+      "forged-overwrite",
+    ));
+  });
+
   it("denies other users and anonymous users from reading export paths", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await seedStorage("exports/user-a/export-1/manifest.json");
@@ -115,6 +170,31 @@ describe("Storage export and evidence rules", () => {
     await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "evidence/release-lock.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "evidence/role-release-lock.json"), "{}"));
     await assertFails(uploadString(ref(storageFor("user-a"), "evidence/release-lock.json"), "{}"));
+  });
+
+  it("keeps Life Movie source and render objects inaccessible to clients, including admins", async ({ skip }) => {
+    if (!storageRulesAvailable) return skip();
+    const privatePaths = [
+      "tenants/tenant-a/life-movies/project-a/renders/movie.mp4",
+      "tenants/tenant-a/life-movies/project-a/segments/0000/movie.mp4",
+      "studios/tenant-a/life-movies/project-a/final/movie.mp4",
+      "tenants/tenant-a/source-recordings/audio.wav"
+    ];
+    for (const objectPath of privatePaths) {
+      await seedStorage(objectPath, "private-fixture");
+      for (const client of [
+        anonStorage(),
+        storageFor("user-a"),
+        storageFor("user-b"),
+        storageFor("claim-admin", { admin: true }),
+        storageFor("role-claim-admin", { role: "admin" })
+      ]) {
+        const target = ref(client, objectPath);
+        await assertFails(getBytes(target));
+        await assertFails(uploadString(target, "forged"));
+        await assertFails(deleteObject(target));
+      }
+    }
   });
 
   it("denies deletes and deny-default paths", async ({ skip }) => {

@@ -5,6 +5,7 @@ import { FieldPath, FieldValue, getFirestore, type DocumentData } from "firebase
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { crossUserAuthority } from "./cross-user-authority";
 
 initializeApp();
 const db = getFirestore();
@@ -87,7 +88,7 @@ function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknow
 }
 
 function isAdmin(token?: Record<string, unknown>) {
-  return token?.admin === true || token?.role === "admin";
+  return crossUserAuthority(token)?.role === "admin";
 }
 
 async function requireAdmin(request: { auth?: { uid?: string; token?: Record<string, unknown> } }) {

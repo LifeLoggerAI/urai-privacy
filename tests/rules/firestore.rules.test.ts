@@ -51,7 +51,7 @@ beforeEach(async ({ skip }) => {
     await setDoc(doc(db, "privacyRequests/preq-a"), { uid: "user-a", type: "export", status: "pending" });
     await setDoc(doc(db, "exportJobs/export-a"), { uid: "user-a", requestId: "preq-a", status: "pending" });
     await setDoc(doc(db, "deletionRequests/del-a"), { uid: "user-a", status: "pending" });
-    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
+    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "denied", purpose: "ai.personalization" });
     await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
     await setDoc(doc(db, "consentRevocationOutbox/revoke-a"), { uid: "user-a", purpose: "ai.personalization", status: "pending" });
     await setDoc(doc(db, "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a"), { consumerId: "consumer-a", status: "acknowledged" });
@@ -157,6 +157,36 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "legalHoldRecords/hold-a")));
     await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a")));
     await assertFails(deleteDoc(doc(authed("claim-admin", { admin: true }), "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a")));
+  });
+
+  it("denies client access to server-owned Life Movie rights and approval records", async () => {
+    const serverPaths = [
+      "lifeMovieSourceRights/rights-a",
+      "lifeMovieSourceRightsDecisions/decision-a",
+      "lifeMovieScopedGrantApprovals/approval-a",
+      "lifeMovieSourceRights/rights-a/auditEvents/event-a"
+    ];
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      for (const documentPath of serverPaths) {
+        await setDoc(doc(db, documentPath), { ownerUid: "user-a", tenantId: "tenant-a", status: "verified" });
+      }
+    });
+    for (const db of [
+      anon(),
+      authed("user-a"),
+      authed("user-b"),
+      authed("claim-admin", { admin: true }),
+      authed("role-claim-admin", { role: "admin" })
+    ]) {
+      for (const documentPath of serverPaths) {
+        const protectedRef = doc(db, documentPath);
+        await assertFails(getDoc(protectedRef));
+        await assertFails(setDoc(protectedRef, { ownerUid: "user-a", status: "forged" }));
+        await assertFails(updateDoc(protectedRef, { status: "approved" }));
+        await assertFails(deleteDoc(protectedRef));
+      }
+    }
   });
 
   it("denies anonymous access and unknown collections", async () => {

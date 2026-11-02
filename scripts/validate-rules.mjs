@@ -37,7 +37,21 @@ const storageChecks = [
 
 for (const check of firestoreChecks) if (!firestore.includes(check)) failures.push(`firestore missing ${check}`);
 for (const check of storageChecks) if (!storage.includes(check)) failures.push(`storage missing ${check}`);
-if (!firestore.includes("match /{document=**}")) failures.push("firestore missing fallback match");
+// Server-owned Life Movie rights and approval evidence must never become
+// client-writable or directly queryable through a future rules change.
+// Catch-all deny is required until a separately approved access policy exists.
+for (const collection of [
+  "lifeMovieSourceRights",
+  "lifeMovieSourceRightsDecisions",
+  "lifeMovieScopedGrantApprovals"
+]) {
+  const match = new RegExp("match\\s+/" + collection + "\\s*/\\{");
+  if (match.test(firestore)) {
+    failures.push("unreviewed direct Firestore rules for server-owned " + collection);
+  }
+}
+const catchAll = /match\s+\/\{document=\*\*\}\s*\{\s*allow\s+read\s*,\s*write\s*:\s*if\s+false\s*;\s*\}/;
+if (!catchAll.test(firestore)) failures.push("firestore catch-all must explicitly deny reads and writes");
 if (!storage.includes("match /{allPaths=**}")) failures.push("storage missing fallback match");
 if (firestore.includes("function isRoleAdmin()")) failures.push("firestore must not trust role documents for admin authority");
 if (firestore.includes("get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'")) {

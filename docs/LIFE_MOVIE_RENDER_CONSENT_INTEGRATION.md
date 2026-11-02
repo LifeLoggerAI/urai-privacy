@@ -38,3 +38,30 @@ Every create, queue lease, dispatch, segment, assembly, resume, download, playba
 6. Complete privacy notice, duration, retention, export/delete registry and legal/privacy review before enabling an opt-in in hosted environments.
 
 **Release: NO-GO. No deployment, merge, runtime enablement, user grants, or hosted playback is claimed.**
+
+
+## R307 child: selection-scoped consent admission fence (proposed / not deployed)
+
+The prior purpose-wide Privacy Center Grant action could issue an ordinary `life-movie.render` receipt without identifying any movie or immutable selected source set. That is incompatible with the owner's selection-scoped consent terms. This child draft deliberately prevents that unscoped grant action in both server `setCanonicalConsent` and the Privacy Center UI; Deny/Revoke remain reachable.
+
+The proposed `verifyLifeMovieRenderConsent` request now requires `renderScope: { projectId, renderPlanDigest, sourceSetDigest }`. Its transaction requires an own-field exact match with `record.renderScope`, in addition to existing current grant / receipt / subject / tier / policy / expiry / tombstone checks. Old unscoped records are denied with `RENDER_SCOPE_MISMATCH`. **The current general-purpose grant writer does not issue any scoped Life Movie grant; therefore there is no new positive render authorization path and the verifier remains incapable of allowing one from this UI.**
+
+This is a deliberate interim safety fence, **not** a completed UX or end-to-end integration. Jobs #232 still supplies only a receipt reference and is not yet updated to send the new `renderScope` request; Studio, Jobs, and Privacy must agree on how `sourceSetDigest` is computed from ordered, immutable bucket/object generation selections and how the trusted verifier recomputes it. Future scoped issuer must commit this scope into the canonical signed/hashed grant receipt and corresponding user-visible reviewed notice; a loose Firestore field or caller-controlled scope is insufficient. Authenticate the exact Jobs workload and tenant/source rights independently. Retest grant, revocation, old receipt, owner switching, altered source generation, chosen movie scope, expiry, delivery, and replay under protected staging before any enabling change.
+
+**GO/NO-GO: NO-GO.** No production changes, grants, deploys, or user material processed by this child draft.
+
+
+## R307 child: receipt must commit tenant and exact source selection (draft, fail-closed)
+
+The proposed scope fence in Privacy #183 initially compared a loose `record.renderScope` against a request and separately compared `record.receiptHash`. That did not prove the stored receipt committed the tenant, movie, render-plan digest and immutable source-set digest together.
+
+`functions/src/life-movie-scoped-receipt.ts` defines `hashLifeMovieScopedReceipt` and `verifiesLifeMovieScopedReceipt` for a single versioned, exact-order record covering subject UID, tenant, purpose/tier/status/policy, expiry, surface, jurisdiction, notice hashes, evidence hash, selected render scope and issuance timestamp. The Jobs-only verifier in `consent-api.ts` denies unless the complete stored record produces the same SHA-256 receipt hash, the exact request scope matches, and existing grant/expiry/deletion checks pass. This makes independently edited scope or tenant fields fail the check, not grant permission. Regression cases cover altered source selection, movie, tenant, notice, expiry, missing scope and mismatched hashes.
+
+**Crucial:** SHA-256 here is an internal consistency hash, **not a digital signature, bearer credential, proof of user intention, or source-rights authority**. A party with arbitrary write access to `consentRecords` could potentially recompute the hash. The security boundary must depend on trusted, reviewable server-side grant issuance, Firestore/IAM restrictions, audit immutability and service identities. **There is still no scoped grant issuer.** Ordinary `setCanonicalConsent` continues to deny all purpose-wide Life Movie grants, old records lack required scope/tenant and must deny, and Jobs/Studio remain hard closed.
+
+Before approval: independent privacy review of the actual consent text, per-film notice and cancellation UX; server-verified source rights, immutable bucket/object generation, plan digest, tenant affiliation, authenticated Jobs workload; grant transaction writing the exact same receipt schema; revocation race and deletion tests; full hosted exact-SHA checks and independent deployment approval. No code in this child permits a live render.
+
+
+## R307 generic decision authority fence
+
+The legacy `evaluateCanonicalConsent` endpoint assesses purposes without a movie/source selection. It must **never** be used as render authorization for `life-movie.render`, even if a preexisting general record appears current. The endpoint now responds `failed-precondition` for that specific purpose before fetching its record. Other purposes remain on the existing general-purpose decision path. The dedicated Jobs-only verifier is the sole proposed decision entrypoint for private movie rendering, and itself still denies without a trusted, scope-bound receipt. No new grant issuance or rendering is enabled.
