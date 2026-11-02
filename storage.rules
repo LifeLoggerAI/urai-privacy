@@ -16,7 +16,7 @@ service firebase.storage {
     }
     function deletionFenceIsInactive(uid) {
       return !firestore.exists(/databases/(default)/documents/privacyDeletionTombstones/$(uid))
-        || firestore.get(/databases/(default)/documents/privacyDeletionTombstones/$(uid)).data.active != true;
+        || firestore.get(/databases/(default)/documents/privacyDeletionTombstones/$(uid)).data.get('active', true) == false;
     }
     function activeExportPackage(uid, jobId) {
       return deletionFenceIsInactive(uid)
@@ -32,7 +32,7 @@ service firebase.storage {
       allow read: if (isOwner(uid) || isAdmin())
         && fileName in ["export.json", "manifest.json"]
         && activeExportPackage(uid, jobId);
-      allow write: if isAdmin() && isCreateOrUpdate();
+      allow write: if isAdmin() && isCreateOrUpdate() && deletionFenceIsInactive(uid);
     }
 
     match /evidence/{allPaths=**} {
