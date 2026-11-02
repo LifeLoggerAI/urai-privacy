@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { checkedLifeMovieDeletionState } from "../../functions/src/life-movie-deletion-fence";
 import { hashLifeMovieScopedReceipt } from "../../functions/src/life-movie-scoped-receipt";
-import { evaluateLifeMovieRenderAuthorization, currentLifeMovieDeletionActive } from "../../functions/src/life-movie-render-authorization";
+import { evaluateLifeMovieRenderAuthorization } from "../../functions/src/life-movie-render-authorization";
 
 const now = new Date("2026-11-01T15:00:00.000Z");
 const scope = { projectId: "movie-1", renderPlanDigest: "a".repeat(64), sourceSetDigest: "b".repeat(64) };
@@ -78,7 +79,7 @@ describe("pure Life Movie scoped verifier authorization", () => {
     ["null is not clearance", { exists: true, data: () => ({ active: null }) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"],
     ["unverified snapshot status", { exists: "false", data: () => ({ active: false }) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"]
   ])("keeps transactional deletion state closed: %s", (_name, snapshot, expected, reason) => {
-    const deletionActive = currentLifeMovieDeletionActive(snapshot as never);
+    const deletionActive = checkedLifeMovieDeletionState(snapshot as never);
     expect({ deletionActive }).toMatchObject({ deletionActive: expected });
     const decision = evaluateLifeMovieRenderAuthorization({ ...base, deletionActive });
     expect(decision).toMatchObject({ allowed: reason === "ALLOWED", reason });

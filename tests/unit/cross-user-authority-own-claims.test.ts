@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { crossUserAuthority } from "../../functions/src/cross-user-authority";
 
@@ -35,5 +36,12 @@ describe("cross-user consent authority own-claim boundary", () => {
     const inherited=Object.create(Object.defineProperty({},"role",{get(){calls++;return "admin";}}));
     expect(crossUserAuthority(inherited)).toBeNull();
     expect(calls).toBe(0);
+  });
+  it("routes real Privacy admin and owner-or-admin decisions through canonical own claims", () => {
+    const source = readFileSync(new URL("../../functions/src/index.ts", import.meta.url), "utf8");
+    expect(source).toContain('import { crossUserAuthority } from "./cross-user-authority";');
+    expect(source).toMatch(/function isAdmin\(token\?: Record<string, unknown>\) \{\s*return crossUserAuthority\(token\)\?\.role === "admin";\s*\}/);
+    expect(source).toContain('if (!isAdmin(request.auth?.token))');
+    expect(source).toContain('if (uid !== targetUid && !isAdmin(request.auth?.token))');
   });
 });
