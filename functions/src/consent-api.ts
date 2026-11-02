@@ -15,6 +15,7 @@ import {
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
 import { evaluateLifeMovieRenderAuthorization } from "./life-movie-render-authorization";
+import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
 import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
 import { crossUserAuthority } from "./cross-user-authority";
 
@@ -291,7 +292,7 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
     ]);
     const record = recordSnapshot.exists ? recordSnapshot.data() : null;
     const { evaluated, allowed, reason } = evaluateLifeMovieRenderAuthorization({
-      record, deletionActive: tombstone.data()?.active === true,
+      record, deletionActive: checkedLifeMovieDeletionState(tombstone),
       subjectUid, tenantId, decisionReceiptId,
       policyVersion, renderScope
     });
