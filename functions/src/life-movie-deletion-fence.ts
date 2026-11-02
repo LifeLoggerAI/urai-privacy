@@ -20,8 +20,17 @@ export function checkedLifeMovieDeletionState(
     const record = snapshot.data();
     if (!record || typeof record !== "object" || Array.isArray(record)) return undefined;
     const field = Object.getOwnPropertyDescriptor(record, "active");
-    return field && Object.prototype.hasOwnProperty.call(field, "value")
-      && typeof field.value === "boolean" ? field.value : undefined;
+    if (!field || !Object.prototype.hasOwnProperty.call(field, "value") ||
+        typeof field.value !== "boolean") return undefined;
+    if (field.value === true) return true;
+    // An in-flight deletion dry-run lease must not turn a literal `false`
+    // into render clearance until the lease has been reconciled.
+    const planningFields = [
+      "deletionPlanningLeaseToken", "deletionPlanningLeaseUntil", "deletionPlanningLeaseRequestId",
+      "deletionPlanningLeaseOperation", "deletionPlanningLeaseBy"
+    ];
+    if (planningFields.some(key => Object.prototype.hasOwnProperty.call(record, key))) return undefined;
+    return false;
   } catch {
     return undefined;
   }

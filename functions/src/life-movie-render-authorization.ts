@@ -17,7 +17,7 @@ import { verifiesLifeMovieScopedReceipt } from "./life-movie-scoped-receipt";
  */
 export type LifeMovieRenderAuthorizationRequest = Readonly<{
   record: unknown;
-  deletionActive: boolean;
+  deletionActive: boolean | undefined;
   subjectUid: string;
   tenantId: string;
   decisionReceiptId: string;

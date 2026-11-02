@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { checkedLifeMovieDeletionState } from "../../functions/src/life-movie-deletion-fence";
 import { hashLifeMovieScopedReceipt } from "../../functions/src/life-movie-scoped-receipt";
 import { evaluateLifeMovieRenderAuthorization } from "../../functions/src/life-movie-render-authorization";
 
@@ -44,4 +45,44 @@ describe("pure Life Movie scoped verifier authorization", () => {
   ])("denies %s", (_name, change, reason) => {
     expect(evaluateLifeMovieRenderAuthorization({ ...base, ...change })).toMatchObject({ allowed: false, reason });
   });
+
+  // A TypeScript boolean is not proof that the caller actually checked the
+  // current deletion fence: untrusted runtime values must fail closed.
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["number zero", 0],
+    ["string false", "false"],
+    ["string true", "true"],
+    ["empty object", {}],
+    ["empty array", []]
+  ])("denies unverified deletion state: %s", (_description, deletionState) => {
+    const result = evaluateLifeMovieRenderAuthorization({
+      ...base,
+      deletionActive: deletionState as unknown as boolean
+    });
+    expect(result).toMatchObject({
+      allowed: false,
+      reason: "ACCOUNT_DELETION_STATE_UNVERIFIED"
+    });
+  });
+
+  it.each([
+    ["transactionally verified absence", { exists: false, data: () => { throw Error("missing must not call data"); } }, false, "ALLOWED"],
+    ["verified inactive tombstone", { exists: true, data: () => ({ active: false }) }, false, "ALLOWED"],
+    ["active deletion", { exists: true, data: () => ({ active: true }) }, true, "ACCOUNT_DELETED"],
+    ["present tombstone with missing active", { exists: true, data: () => ({}) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"],
+    ["planning lease without active", { exists: true, data: () => ({ deletionPlanningLeaseToken: "lease" }) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"],
+    ["false with unfinished planning lease", { exists: true, data: () => ({ active: false, deletionPlanningLeaseUntil: 1000 }) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"],
+    ["string false is not clearance", { exists: true, data: () => ({ active: "false" }) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"],
+    ["numeric zero is not clearance", { exists: true, data: () => ({ active: 0 }) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"],
+    ["null is not clearance", { exists: true, data: () => ({ active: null }) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"],
+    ["unverified snapshot status", { exists: "false", data: () => ({ active: false }) }, undefined, "ACCOUNT_DELETION_STATE_UNVERIFIED"]
+  ])("keeps transactional deletion state closed: %s", (_name, snapshot, expected, reason) => {
+    const deletionActive = checkedLifeMovieDeletionState(snapshot as never);
+    expect({ deletionActive }).toMatchObject({ deletionActive: expected });
+    const decision = evaluateLifeMovieRenderAuthorization({ ...base, deletionActive });
+    expect(decision).toMatchObject({ allowed: reason === "ALLOWED", reason });
+  });
+
 });

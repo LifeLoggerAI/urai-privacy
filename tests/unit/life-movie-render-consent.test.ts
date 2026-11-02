@@ -234,7 +234,8 @@ describe("Life Movie scoped receipt integrity binding", () => {
   it("wires the binding into the Jobs-only verifier allow condition", () => {
     const source = readFileSync(new URL("../../functions/src/consent-api.ts", import.meta.url), "utf8");
     expect(source).toContain("evaluateLifeMovieRenderAuthorization({");
-    expect(source).toContain("deletionActive: tombstone.data()?.active === true");
+    expect(source).toContain("deletionActive: checkedLifeMovieDeletionState(tombstone)");
+    expect(source).not.toContain("deletionActive: tombstone.data()?.active === true");
     expect(source).toContain("const { evaluated, allowed, reason }");
   });
 });
