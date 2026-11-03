@@ -96,3 +96,20 @@ for(const [name,response] of [
  ['tampered acknowledgement',()=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify({...ack(),acknowledgement:{...ack().acknowledgement,ownerUid:'other'}})})],
  ['oversized body',()=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=> ' '.repeat(18000)})],
 ]) test(`transport rejects ${name}`,async()=>await assert.rejects(send(event,transport({request:async()=>response()}))));
+
+test('Jobs retry acknowledgement hash is stable across different valid cleanup summaries', async()=>{
+ const render={type:'consent.revoked.v2',eventId:'a'.repeat(64),ownerUid:'owner-1',purpose:'life-movie.render',
+  policyVersion:'1.1.0',correlationId:'revocation:'+'a'.repeat(64),revokedAt:'2026-11-03T04:00:00.000Z',sourceReceiptHash:'b'.repeat(64)};
+ const resp=(deleted)=>({ok:true, acknowledgement:{consumerId:'urai-jobs',eventType:render.type,eventId:render.eventId,
+  ownerUid:render.ownerUid,purpose:render.purpose,policyVersion:render.policyVersion,
+  correlationId:render.correlationId,revokedAt:render.revokedAt,sourceReceiptHash:render.sourceReceiptHash,
+  status:'blocked',integrityHash:ackHash(render),derivativeInvalidation:{purpose:render.purpose,
+   jobsScanned:2,jobsInvalidated:1,plansInvalidated:1,storageObjectsDeleted:deleted}}});
+ const invoke=(deleted)=>send(render,transport({request:async()=>({ok:true,status:200,
+  headers:{get:()=> 'application/json'},text:async()=>JSON.stringify(resp(deleted))})}));
+ const first=await invoke(2);const retry=await invoke(0);
+ assert.equal(first.eventId,retry.eventId);
+ assert.equal(first.acknowledgementHash,retry.acknowledgementHash,
+  'canonical revocation acknowledgement must not incorporate mutable cleanup counts');
+ assert.equal(first.acknowledgementHash,ackHash(render));
+});
