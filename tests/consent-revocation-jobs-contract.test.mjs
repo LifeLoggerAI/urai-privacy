@@ -11,7 +11,7 @@ const source = fs.readFileSync(new URL('../functions/src/consent-revocation-jobs
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true });
 assert.equal(compiled.diagnostics?.length, 0, 'TS transpile diagnostics');
 const exports = {};
-vm.runInNewContext(compiled.outputText, {exports, require, Buffer, Date, Number, Error, RegExp, Object, Array, String, URL, AbortSignal, fetch});
+vm.runInNewContext(compiled.outputText, {exports, require, Buffer, Date, Number, Error, RegExp, Object, Array, String, URL, AbortSignal, TextDecoder, fetch});
 const { buildJobsRevocationEventV2: build, jobsRevocationAckHash: ackHash, verifyJobsRevocationResponse: verify } = exports;
 const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const make = (changes={}) => {
@@ -131,6 +131,41 @@ test('bounds chunked Jobs ack streaming without draining the entire response',as
  await assert.rejects(send(event,transport({request:async()=>fakeResponse})),/PRIVACY_JOBS_ACK_OVERSIZE/);
  assert.equal(legacyTextCalls,0,'a real stream must be consumed with a bounded reader');
  assert.ok(pulls<25,`stream over-consumed: ${pulls} KB`);
+});
+
+test('rejects malformed UTF-8 in a valid-looking Jobs acknowledgement',async()=>{
+ // The original Buffer.toString() silently accepted this as a valid ack
+ // with an ignored replacement-character property. The wire bytes are bad.
+ const encoded=Buffer.concat([
+  Buffer.from(JSON.stringify(ack()).slice(0,-1)+',\"ignored\":\"'),
+  Buffer.from([0xff]),Buffer.from('\"}')
+ ]);
+ const body=new ReadableStream({start(controller){controller.enqueue(encoded);controller.close();}});
+ const response={ok:true,status:200,headers:{get:(key)=>key==='content-type'?'application/json':null},body,
+  text:async()=>{throw new Error('unbounded read was not expected')}};
+ await assert.rejects(send(event,transport({request:async()=>response})),/PRIVACY_JOBS_ACK_INVALID_UTF8/);
+});
+
+test('accepts valid multibyte JSON split across acknowledgement chunks',async()=>{
+ const leading=Buffer.from(JSON.stringify(ack()).slice(0,-1)+',\"ignored\":\"');
+ const body=new ReadableStream({start(controller){
+  controller.enqueue(leading);
+  controller.enqueue(Buffer.from([0xf0,0x9f]));
+  controller.enqueue(Buffer.from([0x98,0x80]));
+  controller.enqueue(Buffer.from('\"}'));controller.close();
+ }});
+ const response={ok:true,status:200,headers:{get:(key)=>key==='content-type'?'application/json':null},body,
+  text:async()=>{throw new Error('unbounded read was not expected')}};
+ assert.equal((await send(event,transport({request:async()=>response}))).consumerId,'urai-jobs');
+});
+
+test('preserves existing JSON BOM rejection for streamed acknowledgements',async()=>{
+ const body=new ReadableStream({start(controller){controller.enqueue(Buffer.concat([
+  Buffer.from([0xef,0xbb,0xbf]),Buffer.from(JSON.stringify(ack()))
+ ]));controller.close();}});
+ const response={ok:true,status:200,headers:{get:(key)=>key==='content-type'?'application/json':null},body,
+  text:async()=>{throw new Error('unbounded read was not expected')}};
+ await assert.rejects(send(event,transport({request:async()=>response})),/PRIVACY_JOBS_ACK_INVALID_JSON/);
 });
 
 test('reads and verifies a normal chunked Jobs acknowledgement',async()=>{

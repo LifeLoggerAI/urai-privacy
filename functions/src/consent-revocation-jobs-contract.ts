@@ -190,7 +190,15 @@ export async function sendJobsRevocationEvent(
         }
         chunks.push(Buffer.from(value));
       }
-      body = Buffer.concat(chunks, total).toString('utf8');
+      // Buffer.toString() replaces malformed UTF-8 with U+FFFD. Treat an
+      // acknowledgement as untrusted bytes: any lossy decoding invalidates
+      // its authority. Preserve existing JSON BOM rejection semantics.
+      try {
+        body = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+          .decode(Buffer.concat(chunks, total));
+      } catch {
+        throw new Error('PRIVACY_JOBS_ACK_INVALID_UTF8');
+      }
     } finally {
       reader.releaseLock();
     }
