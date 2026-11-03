@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const deny = (message) => {
-  console.error(\`[privacy-deploy-boundary] DENIED: \${message}\`);
+  console.error(`[privacy-deploy-boundary] DENIED: ${message}`);
   process.exit(2);
 };
 
@@ -27,7 +27,7 @@ for (let index = 0; index < args.length; index += 1) {
   } else if (arg === '--dry-run' && !dryRun) {
     dryRun = true;
   } else {
-    deny(\`unsupported argument \${JSON.stringify(arg)}; only --project ID and --dry-run are allowed\`);
+    deny(`unsupported argument ${JSON.stringify(arg)}; only --project ID and --dry-run are allowed`);
   }
 }
 
@@ -52,7 +52,7 @@ if (!codebases.some((item) => item?.codebase === 'privacy' && item?.source === '
 // Explicitly excludes hosting, Firestore, Storage and any other Functions codebase.
 const safeArgs = ['deploy', '--only', 'functions:privacy', '--project', project, '--non-interactive'];
 if (dryRun) {
-  console.log(\`[privacy-deploy-boundary] DRY RUN; no provider call: firebase \${safeArgs.join(' ')}\`);
+  console.log(`[privacy-deploy-boundary] DRY RUN; no provider call: firebase ${safeArgs.join(' ')}`);
   process.exit(0);
 }
 
@@ -75,5 +75,5 @@ if (status.status !== 0 || status.stdout.trim() !== '') {
 }
 
 const result = spawnSync('firebase', safeArgs, { cwd: root, stdio: 'inherit', shell: false });
-if (result.error) deny(\`Firebase CLI could not start: \${result.error.message}\`);
+if (result.error) deny(`Firebase CLI could not start: ${result.error.message}`);
 process.exit(result.status ?? 1);
