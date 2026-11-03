@@ -51,6 +51,9 @@ npm run test:revocation:jobs:contract
 printf '\n[verify-release] revocation publisher to Jobs outbox contract\n'
 npm run test:revocation:publisher
 
+printf '\n[verify-release] privacy revocation backlog health\n'
+npm run test:revocation:health
+
 printf '\n[verify-release] firebase rules static validation\n'
 npm run test:rules:static
 
