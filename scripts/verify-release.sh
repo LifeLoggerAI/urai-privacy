@@ -51,6 +51,9 @@ npm run test:revocation:jobs:contract
 printf '\n[verify-release] durable Jobs outbox dispatcher contract\n'
 npm run test:revocation:dispatcher
 
+printf '\n[verify-release] Jobs lease recovery and concurrent dispatcher ownership\n'
+npm run test:revocation:lease-recovery
+
 printf '\n[verify-release] current consent ordering during Jobs delivery\n'
 npm run test:revocation:authority
 

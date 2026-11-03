@@ -28,7 +28,7 @@
     "audit:tier-one": "node scripts/audit-tier-one.mjs",
     "urai:qa": "node scripts/urai-qa-checks.js out",
     "build": "next build",
-    "preflight": "npm run clean:legacy && npm run lint && npm run typecheck && npm run test:unit && npm run test:deploy:guard && npm run test:revocation:jobs:contract && npm run test:revocation:dispatcher && npm run test:revocation:authority && npm run test:revocation:publisher && npm run test:revocation:health && npm run test:rules:static && npm run test:export:contract && npm run test:deletion:contract && npm run test:e2e && npm run audit:privacy && npm run audit:tier-one && npm run build && npm run urai:qa",
+    "preflight": "npm run clean:legacy && npm run lint && npm run typecheck && npm run test:unit && npm run test:deploy:guard && npm run test:revocation:jobs:contract && npm run test:revocation:dispatcher && npm run test:revocation:lease-recovery && npm run test:revocation:authority && npm run test:revocation:publisher && npm run test:revocation:health && npm run test:rules:static && npm run test:export:contract && npm run test:deletion:contract && npm run test:e2e && npm run audit:privacy && npm run audit:tier-one && npm run build && npm run urai:qa",
     "preflight:production": "bash scripts/verify-release.sh",
     "security:gate": "bash scripts/security-gate.sh",
     "deploy": "node scripts/guard-firebase-deploy.mjs --execute",
@@ -44,7 +44,8 @@
     "test:revocation:publisher": "node --test tests/consent-revocation-publisher.test.mjs",
     "test:revocation:health": "node --test tests/privacy-revocation-health.test.mjs",
     "test:revocation:dispatcher": "node --test tests/consent-revocation-dispatcher-contract.test.mjs",
-    "test:revocation:authority": "node --test tests/consent-revocation-current-authority.test.mjs"
+    "test:revocation:authority": "node --test tests/consent-revocation-current-authority.test.mjs",
+    "test:revocation:lease-recovery": "node --test tests/consent-revocation-lease-recovery.test.mjs"
   },
   "dependencies": {
     "firebase": "^12.13.0",
