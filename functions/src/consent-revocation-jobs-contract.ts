@@ -107,6 +107,11 @@ export function verifyJobsRevocationResponse(event: JobsRevocationEventV2, value
       if (!Number.isSafeInteger(summary[key]) || (summary[key] as number) < 0) return false;
     }
     if ((summary.jobsInvalidated as number) > (summary.jobsScanned as number)) return false;
+    // Jobs only scans and deletes Life Movie derivatives for this purpose.
+    // Do not accept fabricated cleanup counts for unrelated consent purposes.
+    if (event.purpose !== 'life-movie.render' &&
+        ['jobsScanned', 'jobsInvalidated', 'plansInvalidated', 'storageObjectsDeleted']
+          .some((key) => summary[key] !== 0)) return false;
     return true;
   } catch { return false; }
 }
