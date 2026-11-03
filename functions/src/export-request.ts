@@ -6,7 +6,7 @@ import { z } from "zod";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 import { EXPORT_PACKAGE_TTL_MS } from "./export-lifecycle-contract";
-import { processingLeaseIsActive, scrubExportValue } from "./export-redaction-lease";
+import { processingLeaseIsActive, scrubExportValue, sensitiveFieldMarkers } from "./export-redaction-lease";
 export { shouldRedactExportField, scrubExportValue, processingLeaseIsActive } from "./export-redaction-lease";
 
 const exportCollections = [

@@ -62,6 +62,8 @@ describe("export redaction and processing lease", () => {
     const helperSource = readFileSync(new URL("../../functions/src/export-redaction-lease.ts", import.meta.url), "utf8");
     expect(exportSource).toMatch(/export \{ shouldRedactExportField, scrubExportValue, processingLeaseIsActive \} from/);
     expect(helperSource).not.toMatch(/firebase-functions|firebase-admin|onCall\(/);
+    expect(helperSource).toMatch(/export const sensitiveFieldMarkers = \[/);
+    expect(exportSource).toMatch(/processingLeaseIsActive, scrubExportValue, sensitiveFieldMarkers/);
 
     const deletionSource = readFileSync(new URL("../../functions/src/index.ts", import.meta.url), "utf8");
 

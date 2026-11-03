@@ -2,7 +2,7 @@
  * Shared between the production export worker and browser-side unit tests.
  * Do not expand into an authorization service; the worker owns server authority.
  */
-const sensitiveFieldMarkers = [
+export const sensitiveFieldMarkers = [
   "password",
   "token",
   "secret",
