@@ -24,4 +24,18 @@ describe('private Life Movie scope must be literal own-data evidence', () => {
     Object.defineProperty(forged, 'renderPlanDigest', { enumerable: true, get() { throw new Error('private synthetic getter'); } });
     expect(matchesLifeMovieRenderScope(forged, requested)).toBe(false);
   });
+  it('rejects requested scope accessors without invoking synthesized source claims', () => {
+    let reads = 0;
+    const forged = { ...requested };
+    Object.defineProperty(forged, 'renderPlanDigest', {
+      enumerable: true, get() { reads++; return requested.renderPlanDigest; },
+    });
+    expect(matchesLifeMovieRenderScope({ ...requested }, forged)).toBe(false);
+    expect(reads).toBe(0);
+  });
+  it('rejects inherited or hidden requested-scope authorization fields', () => {
+    expect(matchesLifeMovieRenderScope({ ...requested }, Object.create(requested))).toBe(false);
+    const hidden = Object.defineProperty({ ...requested }, 'extra', { value: 'synthetic' });
+    expect(matchesLifeMovieRenderScope({ ...requested }, hidden)).toBe(false);
+  });
 });

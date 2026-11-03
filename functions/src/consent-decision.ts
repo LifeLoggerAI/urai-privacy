@@ -15,20 +15,25 @@ export type LifeMovieRenderScope = Readonly<{
 }>;
 
 export function matchesLifeMovieRenderScope(recordScope: unknown, requestedScope: LifeMovieRenderScope): boolean {
-  if (!recordScope || typeof recordScope !== "object" || Array.isArray(recordScope)) return false;
+  if (!recordScope || typeof recordScope !== "object" || Array.isArray(recordScope)
+    || !requestedScope || typeof requestedScope !== "object" || Array.isArray(requestedScope)) return false;
   const scoped = recordScope as Record<string, unknown>;
-  // An accessor-backed value is not stored scope evidence, even when its
-  // getter produces the expected digest. Inspect own data descriptors without
-  // executing untrusted getters or accepting hidden/symbol authorization.
+  // Both the stored scope and the request must be literal own data evidence.
+  // Accessor-backed request claims must not be executed or treated as authority.
   try {
-    if (Reflect.ownKeys(scoped).length !== 3) return false;
+    if (Reflect.ownKeys(scoped).length !== 3 || Reflect.ownKeys(requestedScope).length !== 3) return false;
     const props = Object.getOwnPropertyDescriptors(scoped);
+    const requested = Object.getOwnPropertyDescriptors(requestedScope);
     const required = ["projectId", "renderPlanDigest", "sourceSetDigest"] as const;
     if (!required.every(key => Object.prototype.hasOwnProperty.call(props, key)
-      && Object.prototype.hasOwnProperty.call(props[key], "value"))) return false;
-    return props.projectId.value === requestedScope.projectId
-      && props.renderPlanDigest.value === requestedScope.renderPlanDigest
-      && props.sourceSetDigest.value === requestedScope.sourceSetDigest;
+      && Object.prototype.hasOwnProperty.call(props[key], "value")
+      && Object.prototype.hasOwnProperty.call(requested, key)
+      && Object.prototype.hasOwnProperty.call(requested[key], "value")
+      && typeof props[key].value === "string"
+      && typeof requested[key].value === "string")) return false;
+    return props.projectId.value === requested.projectId.value
+      && props.renderPlanDigest.value === requested.renderPlanDigest.value
+      && props.sourceSetDigest.value === requested.sourceSetDigest.value;
   } catch {
     return false;
   }
