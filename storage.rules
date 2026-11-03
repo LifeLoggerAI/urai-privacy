@@ -14,9 +14,21 @@ service firebase.storage {
     function exportJob(jobId) {
       return firestore.get(/databases/(default)/documents/exportJobs/$(jobId));
     }
+    // Export reads and admin export writes must respect the same strict deletion
+    // fence as Firestore profiles and server-side Life Movie processing.
+    // An in-flight deletion-planning lease is NOT an inactive account.
     function deletionFenceIsInactive(uid) {
-      return !firestore.exists(/databases/(default)/documents/privacyDeletionTombstones/$(uid))
-        || firestore.get(/databases/(default)/documents/privacyDeletionTombstones/$(uid)).data.get('active', true) == false;
+      let tombstone = /databases/(default)/documents/privacyDeletionTombstones/$(uid);
+      return !firestore.exists(tombstone) || (
+        firestore.get(tombstone).data.get('active', null) == false
+        && !firestore.get(tombstone).data.keys().hasAny([
+          'deletionPlanningLeaseToken',
+          'deletionPlanningLeaseUntil',
+          'deletionPlanningLeaseRequestId',
+          'deletionPlanningLeaseOperation',
+          'deletionPlanningLeaseBy'
+        ])
+      );
     }
     function activeExportPackage(uid, jobId) {
       return deletionFenceIsInactive(uid)

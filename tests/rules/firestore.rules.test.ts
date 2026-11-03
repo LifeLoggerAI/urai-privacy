@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment
 } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, deleteField, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 const PROJECT_ID = process.env.FIREBASE_TEST_PROJECT_ID ?? process.env.GCLOUD_PROJECT ?? "urai-privacy-integration-test";
 const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080";
@@ -114,6 +114,17 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { admin: true }));
     await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { legalHold: false }));
     await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { markedForDeletion: false }));
+    // Keep the profile authority fields aligned with Spatial without weakening
+    // Privacy's deletion tombstone or planning-lease protections.
+    for (const [index, field] of ["entitlementTier", "founderOverride", "deleted", "accountStatus"].entries()) {
+      const uid = `blocked-profile-field-${index}`;
+      await assertFails(setDoc(doc(authed(uid), `users/${uid}`), { uid, [field]: "forged" }));
+      await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { [field]: "forged" }));
+    }
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), "users/user-a"), { accountStatus: "active" });
+    });
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { accountStatus: deleteField() }));
     await assertSucceeds(updateDoc(doc(authed("user-a"), "users/user-a"), { displayName: "Updated safely" }));
     await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { legalHold: true }));
   });
@@ -128,6 +139,41 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertFails(setDoc(doc(authed("user-fenced-new"), "users/user-fenced-new"), { uid: "user-fenced-new", displayName: "Must stay deleted" }));
     await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { displayName: "Must stay fenced" }));
     await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { displayName: "Authorized recovery" }));
+  });
+
+  it("fails closed on malformed deletion tombstones and unreconciled planning leases", async () => {
+    const createUid = "user-malformed-new";
+    const existingUid = "user-a";
+    const createRef = doc(authed(createUid), `users/${createUid}`);
+    const updateRef = doc(authed(existingUid), `users/${existingUid}`);
+
+    const tombstones: Array<Record<string, unknown>> = [
+      {}, { active: null }, { active: "false" }, { active: 0 }, { active: true },
+      { active: false, deletionPlanningLeaseToken: "pending-lease" },
+      { active: false, deletionPlanningLeaseUntil: "2026-11-03T05:00:00.000Z" },
+      { active: false, deletionPlanningLeaseRequestId: "deletion-a" },
+      { active: false, deletionPlanningLeaseOperation: "dryRun" },
+      { active: false, deletionPlanningLeaseBy: "worker-a" }
+    ];
+
+    for (const tombstone of tombstones) {
+      await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await setDoc(doc(db, `privacyDeletionTombstones/${createUid}`), tombstone);
+        await setDoc(doc(db, `privacyDeletionTombstones/${existingUid}`), tombstone);
+      });
+      await assertFails(setDoc(createRef, { uid: createUid, displayName: "No unsafe recreate" }));
+      await assertFails(updateDoc(updateRef, { displayName: "No unsafe update" }));
+    }
+
+    // An explicit inactive boolean with no planning lease is a clear tombstone.
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `privacyDeletionTombstones/${createUid}`), { active: false });
+      await setDoc(doc(db, `privacyDeletionTombstones/${existingUid}`), { active: false });
+    });
+    await assertSucceeds(setDoc(createRef, { uid: createUid, displayName: "Allowed new profile" }));
+    await assertSucceeds(updateDoc(updateRef, { displayName: "Allowed profile update" }));
   });
 
   it("requires server-mediated writes for privacy workflows and evidence", async () => {

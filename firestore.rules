@@ -10,9 +10,21 @@ service cloud.firestore {
       );
     }
     function isAdmin() { return hasAdminClaim(); }
+    // An absent tombstone is safe; a present one must explicitly be inactive.
+    // Malformed values and an unreconciled deletion-planning lease fail closed,
+    // matching the server-side life-movie-deletion-fence authority.
     function deletionFenceIsInactive(uid) {
-      return !exists(/databases/$(database)/documents/privacyDeletionTombstones/$(uid))
-        || get(/databases/$(database)/documents/privacyDeletionTombstones/$(uid)).data.active != true;
+      let tombstone = /databases/$(database)/documents/privacyDeletionTombstones/$(uid);
+      return !exists(tombstone) || (
+        get(tombstone).data.get('active', null) == false
+        && !get(tombstone).data.keys().hasAny([
+          'deletionPlanningLeaseToken',
+          'deletionPlanningLeaseUntil',
+          'deletionPlanningLeaseRequestId',
+          'deletionPlanningLeaseOperation',
+          'deletionPlanningLeaseBy'
+        ])
+      );
     }
     function ownerIsNotChangingPrivilegedFields() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
@@ -21,7 +33,11 @@ service cloud.firestore {
         'isAdmin',
         'legalHold',
         'markedForDeletion',
-        'deletionMarkedAt'
+        'deletionMarkedAt',
+        'entitlementTier',
+        'founderOverride',
+        'deleted',
+        'accountStatus'
       ]);
     }
     function ownerIsNotCreatingPrivilegedFields() {
@@ -31,7 +47,11 @@ service cloud.firestore {
         'isAdmin',
         'legalHold',
         'markedForDeletion',
-        'deletionMarkedAt'
+        'deletionMarkedAt',
+        'entitlementTier',
+        'founderOverride',
+        'deleted',
+        'accountStatus'
       ]);
     }
 

@@ -26,6 +26,47 @@ const firestoreChecks = [
   "match /acknowledgements/{consumerId}",
   "allow create, update, delete: if false"
 ];
+// Static preflight is supplemental to the required real Firestore emulator.
+// Reject permissive tombstone comparisons that mistake malformed data for
+// a verified, inactive deletion fence (including active: "false" or zero).
+const ownerFence = firestore.match(/function deletionFenceIsInactive\(uid\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
+if (!/\.data\.get\(['"]active['"],\s*null\)\s*==\s*false/.test(ownerFence)) {
+  failures.push("owner deletion fence must require an explicit inactive boolean, not active != true");
+}
+for (const leaseField of [
+  "deletionPlanningLeaseToken",
+  "deletionPlanningLeaseUntil",
+  "deletionPlanningLeaseRequestId",
+  "deletionPlanningLeaseOperation",
+  "deletionPlanningLeaseBy"
+]) {
+  if (!ownerFence.includes(leaseField)) failures.push(`owner deletion fence missing planning lease guard: ${leaseField}`);
+}
+if (!ownerFence.includes("!exists(tombstone)") ||
+    !ownerFence.includes("data.keys().hasAny([")) {
+  failures.push("owner deletion fence must reject unreconciled planning leases");
+}
+
+// Storage must fence private export reads and admin writes throughout a
+// deletion-planning lease, not only after the final active tombstone is set.
+const storageFence = storage.match(/function deletionFenceIsInactive\(uid\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
+if (!/\.data\.get\(['"]active['"],\s*null\)\s*==\s*false/.test(storageFence)) {
+  failures.push("storage deletion fence must require an explicit inactive boolean");
+}
+for (const leaseField of [
+  "deletionPlanningLeaseToken",
+  "deletionPlanningLeaseUntil",
+  "deletionPlanningLeaseRequestId",
+  "deletionPlanningLeaseOperation",
+  "deletionPlanningLeaseBy"
+]) {
+  if (!storageFence.includes(leaseField)) failures.push(`storage deletion fence missing planning lease guard: ${leaseField}`);
+}
+if (!storageFence.includes("!firestore.exists(tombstone)") ||
+    !storageFence.includes("data.keys().hasAny([")) {
+  failures.push("storage deletion fence must reject unreconciled planning leases");
+}
+
 const storageChecks = [
   "match /exports/{uid}/{jobId}/{fileName}",
   "activeExportPackage(uid, jobId)",
@@ -59,6 +100,18 @@ if (firestore.includes("get(/databases/$(database)/documents/users/$(request.aut
 }
 if (firestore.includes("match /consentDecisions/{id}")) {
   failures.push("firestore must not revive the superseded consentDecisions collection");
+}
+
+// Shared server-owned profile authority across Privacy and Spatial.
+// Source check supplements, never substitutes for, a real Firestore emulator.
+const sharedProtectedFields = ["role","admin","isAdmin","legalHold","markedForDeletion","deletionMarkedAt","entitlementTier","founderOverride","deleted","accountStatus"];
+const ownerCreate = firestore.match(/function ownerIsNotCreatingPrivilegedFields\(\) \{([\s\S]*?)\n    \}/)?.[1] ?? '';
+const ownerUpdate = firestore.match(/function ownerIsNotChangingPrivilegedFields\(\) \{([\s\S]*?)\n    \}/)?.[1] ?? '';
+if (!ownerCreate.includes('request.resource.data.keys().hasAny(')) failures.push('owner create must guard all created profile keys');
+if (!ownerUpdate.includes('request.resource.data.diff(resource.data).affectedKeys().hasAny(')) failures.push('owner update must guard added, changed and removed profile keys');
+for (const field of sharedProtectedFields) {
+  if (!ownerCreate.includes("'" + field + "'")) failures.push('owner create permits server-owned profile field: ' + field);
+  if (!ownerUpdate.includes("'" + field + "'")) failures.push('owner update permits server-owned profile field: ' + field);
 }
 
 if (failures.length > 0) {

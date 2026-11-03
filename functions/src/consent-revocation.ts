@@ -75,6 +75,12 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
       sourceReceiptHash: receiptHash,
       status: "pending",
       attempts: 0,
+      // New events must be discoverable by a future reviewed Jobs dispatcher.
+      // This is an outstanding obligation, NOT proof of provider delivery.
+      jobsDeliveryConsumerId: "urai-jobs",
+      jobsDeliveryState: "pending",
+      jobsDeliveryAttempts: 0,
+      jobsNextAttemptAt: FieldValue.serverTimestamp(),
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
       integrityHash: digest({ eventId, recordId, uid, purpose })

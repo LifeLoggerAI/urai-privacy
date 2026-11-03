@@ -42,6 +42,27 @@ npm run typecheck
 printf '\n[verify-release] unit tests\n'
 npm run test:unit
 
+printf '\n[verify-release] scoped deployment guard regression\n'
+npm run test:deploy:guard
+
+printf '\n[verify-release] privacy-to-Jobs revocation contract\n'
+npm run test:revocation:jobs:contract
+
+printf '\n[verify-release] durable Jobs outbox dispatcher contract\n'
+npm run test:revocation:dispatcher
+
+printf '\n[verify-release] Jobs lease recovery and concurrent dispatcher ownership\n'
+npm run test:revocation:lease-recovery
+
+printf '\n[verify-release] current consent ordering during Jobs delivery\n'
+npm run test:revocation:authority
+
+printf '\n[verify-release] revocation publisher to Jobs outbox contract\n'
+npm run test:revocation:publisher
+
+printf '\n[verify-release] privacy revocation backlog health\n'
+npm run test:revocation:health
+
 printf '\n[verify-release] firebase rules static validation\n'
 npm run test:rules:static
 

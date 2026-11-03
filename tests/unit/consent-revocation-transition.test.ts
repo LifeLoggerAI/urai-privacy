@@ -25,6 +25,29 @@ describe("consent revocation transition selection", () => {
     expect(selectConsentRevocationSource(null, revoked)).toEqual(revoked);
   });
 
+  it("keeps the prior valid grant when a replacement is malformed", () => {
+    const malformedReplacements = [
+      {},
+      { ...granted, status: "denied", receiptHash: "invalid" },
+      { ...granted, status: "denied", uid: "another-owner", receiptHash: "b".repeat(64) },
+      { ...granted, status: "granted", uid: "another-owner", receiptHash: "b".repeat(64) },
+      { ...granted, status: "granted", receiptHash: "not-hex" },
+    ];
+    for (const successor of malformedReplacements) {
+      expect(selectConsentRevocationSource(granted, successor)).toEqual(granted);
+    }
+  });
+
+  it("keeps successful renewal suppressing revocation for the same authority", () => {
+    const renewed = { ...granted, status: "granted", receiptHash: "c".repeat(64) };
+    expect(selectConsentRevocationSource(granted, renewed)).toBeNull();
+  });
+
+  it("does not suppress revocation when a newer grant changes the purpose", () => {
+    const crossPurpose = { ...granted, purpose: "location.context", receiptHash: "d".repeat(64) };
+    expect(selectConsentRevocationSource(granted, crossPurpose)).toEqual(granted);
+  });
+
   it("suppresses replay of an unchanged non-grant and unrelated deletions", () => {
     const revoked = { ...granted, status: "revoked", receiptHash: "d".repeat(64) };
     expect(selectConsentRevocationSource(revoked, { ...revoked })).toBeNull();
