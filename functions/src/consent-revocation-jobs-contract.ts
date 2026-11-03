@@ -17,6 +17,9 @@ export type JobsRevocationEventV2 = Readonly<{
 const HEX64 = /^[0-9a-f]{64}$/;
 const IDENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const RECORD_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,399}$/;
+// Bound to Jobs' reviewed Firebase project (urai-jobs), region us-central1.
+// New gen2/Cloud Run hosts require separate immutable deployment provenance.
+const PINNED_JOBS_HOST = 'us-central1-urai-jobs.cloudfunctions.net';
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
@@ -139,8 +142,7 @@ export async function sendJobsRevocationEvent(
   catch { throw new Error('PRIVACY_JOBS_ENDPOINT_INVALID'); }
   if (url.protocol !== 'https:' || url.username || url.password || url.port ||
       url.search || url.hash || url.pathname !== '/ingestConsentRevocation' ||
-      url.hostname !== expectedHost ||
-      !(url.hostname.endsWith('.cloudfunctions.net') || url.hostname.endsWith('.run.app'))) {
+      url.hostname !== expectedHost || url.hostname !== PINNED_JOBS_HOST) {
     throw new Error('PRIVACY_JOBS_ENDPOINT_NOT_PINNED');
   }
   if (typeof bearerToken !== 'string' || bearerToken.length < 32 || bearerToken.length > 4096 ||
