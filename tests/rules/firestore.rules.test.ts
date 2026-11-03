@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment
 } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, deleteField, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 const PROJECT_ID = process.env.FIREBASE_TEST_PROJECT_ID ?? process.env.GCLOUD_PROJECT ?? "urai-privacy-integration-test";
 const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080";
@@ -114,6 +114,17 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { admin: true }));
     await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { legalHold: false }));
     await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { markedForDeletion: false }));
+    // Keep the profile authority fields aligned with Spatial without weakening
+    // Privacy's deletion tombstone or planning-lease protections.
+    for (const [index, field] of ["entitlementTier", "founderOverride", "deleted", "accountStatus"].entries()) {
+      const uid = `blocked-profile-field-${index}`;
+      await assertFails(setDoc(doc(authed(uid), `users/${uid}`), { uid, [field]: "forged" }));
+      await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { [field]: "forged" }));
+    }
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), "users/user-a"), { accountStatus: "active" });
+    });
+    await assertFails(updateDoc(doc(authed("user-a"), "users/user-a"), { accountStatus: deleteField() }));
     await assertSucceeds(updateDoc(doc(authed("user-a"), "users/user-a"), { displayName: "Updated safely" }));
     await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { legalHold: true }));
   });

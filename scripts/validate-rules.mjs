@@ -102,6 +102,18 @@ if (firestore.includes("match /consentDecisions/{id}")) {
   failures.push("firestore must not revive the superseded consentDecisions collection");
 }
 
+// Shared server-owned profile authority across Privacy and Spatial.
+// Source check supplements, never substitutes for, a real Firestore emulator.
+const sharedProtectedFields = ["role","admin","isAdmin","legalHold","markedForDeletion","deletionMarkedAt","entitlementTier","founderOverride","deleted","accountStatus"];
+const ownerCreate = firestore.match(/function ownerIsNotCreatingPrivilegedFields\(\) \{([\s\S]*?)\n    \}/)?.[1] ?? '';
+const ownerUpdate = firestore.match(/function ownerIsNotChangingPrivilegedFields\(\) \{([\s\S]*?)\n    \}/)?.[1] ?? '';
+if (!ownerCreate.includes('request.resource.data.keys().hasAny(')) failures.push('owner create must guard all created profile keys');
+if (!ownerUpdate.includes('request.resource.data.diff(resource.data).affectedKeys().hasAny(')) failures.push('owner update must guard added, changed and removed profile keys');
+for (const field of sharedProtectedFields) {
+  if (!ownerCreate.includes("'" + field + "'")) failures.push('owner create permits server-owned profile field: ' + field);
+  if (!ownerUpdate.includes("'" + field + "'")) failures.push('owner update permits server-owned profile field: ' + field);
+}
+
 if (failures.length > 0) {
   console.error("[validate-rules] failed");
   for (const failure of failures) console.error(`- ${failure}`);

@@ -33,7 +33,11 @@ service cloud.firestore {
         'isAdmin',
         'legalHold',
         'markedForDeletion',
-        'deletionMarkedAt'
+        'deletionMarkedAt',
+        'entitlementTier',
+        'founderOverride',
+        'deleted',
+        'accountStatus'
       ]);
     }
     function ownerIsNotCreatingPrivilegedFields() {
@@ -43,7 +47,11 @@ service cloud.firestore {
         'isAdmin',
         'legalHold',
         'markedForDeletion',
-        'deletionMarkedAt'
+        'deletionMarkedAt',
+        'entitlementTier',
+        'founderOverride',
+        'deleted',
+        'accountStatus'
       ]);
     }
 
