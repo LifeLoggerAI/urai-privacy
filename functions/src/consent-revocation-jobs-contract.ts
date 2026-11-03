@@ -162,8 +162,41 @@ export async function sendJobsRevocationEvent(
   if (!response.ok || response.status !== 200) throw new Error('PRIVACY_JOBS_DELIVERY_UNCONFIRMED');
   const type = response.headers.get('content-type') || '';
   if (!/^application\/json(?:;|$)/i.test(type)) throw new Error('PRIVACY_JOBS_ACK_CONTENT_TYPE');
-  const body = await response.text();
-  if (body.length > 16384) throw new Error('PRIVACY_JOBS_ACK_OVERSIZE');
+  // Do not buffer unbounded provider responses before enforcing size limits.
+  // The earlier post-response.text() check could exhaust process memory.
+  const MAX_ACK_BYTES = 16384;
+  const declaredLength = response.headers.get('content-length');
+  if (declaredLength !== null) {
+    if (!/^[0-9]+$/.test(declaredLength) ||
+        !Number.isSafeInteger(Number(declaredLength)) || Number(declaredLength) > MAX_ACK_BYTES) {
+      throw new Error('PRIVACY_JOBS_ACK_OVERSIZE');
+    }
+  }
+  let body: string;
+  if (response.body) {
+    const reader = response.body.getReader();
+    const chunks: Buffer[] = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > MAX_ACK_BYTES) {
+          await reader.cancel();
+          throw new Error('PRIVACY_JOBS_ACK_OVERSIZE');
+        }
+        chunks.push(Buffer.from(value));
+      }
+      body = Buffer.concat(chunks, total).toString('utf8');
+    } finally {
+      reader.releaseLock();
+    }
+  } else {
+    // Used by test fakes without a ReadableStream; live fetch always streams.
+    body = await response.text();
+    if (Buffer.byteLength(body, 'utf8') > MAX_ACK_BYTES) throw new Error('PRIVACY_JOBS_ACK_OVERSIZE');
+  }
   let decoded: unknown;
   try { decoded = JSON.parse(body); }
   catch { throw new Error('PRIVACY_JOBS_ACK_INVALID_JSON'); }
