@@ -17,7 +17,7 @@
     "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --minWorkers=1 --passWithNoTests",
     "test:e2e": "node scripts/smoke-routes.mjs",
     "test:rules": "vitest run tests/rules",
-    "test:rules:emulated": "vitest run tests/rules --pool=forks --maxWorkers=1 --minWorkers=1",
+    "test:rules:emulated": "URAI_RELEASE_VERIFY=1 vitest run tests/rules --pool=forks --maxWorkers=1 --minWorkers=1",
     "test:rules:static": "node scripts/validate-rules.mjs",
     "test:smoke": "node scripts/smoke-routes.mjs",
     "test:smoke:live": "node scripts/smoke-live.mjs",
