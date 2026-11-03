@@ -207,6 +207,26 @@ export async function dispatchPendingJobsRevocations(
       if (!latest.exists || state.jobsDeliveryState !== 'leased' ||
           state.jobsLeaseToken !== token ||
           state.jobsDeliveryAttempts !== result.attempt) return 'lost-lease' as const;
+      // The lease alone is not proof that the original publisher event remains
+      // unchanged. Revalidate immutable source fields inside finalization,
+      // BEFORE reading a possibly altered consentRecordId or accepting an ACK.
+      let samePublisherEvent = state.jobsDeliveryConsumerId === DESTINATION;
+      try {
+        samePublisherEvent = samePublisherEvent &&
+          JSON.stringify(buildJobsRevocationEventV2(item.id, state)) === JSON.stringify(result.event);
+      } catch {
+        samePublisherEvent = false;
+      }
+      if (!samePublisherEvent) {
+        transaction.update(item.ref, {
+          jobsDeliveryState: 'needs-review',
+          jobsDeliveryLastCode: 'outbox_identity_changed_during_delivery',
+          jobsLeaseToken: FieldValue.delete(),
+          jobsNextAttemptAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return 'needs-review' as const;
+      }
       const canonical = await transaction.get(db.collection('consentRecords').doc(state.consentRecordId));
       if (consentAuthorityStamp(canonical, result.event) !== result.authorityStamp) {
         transaction.update(item.ref, {
