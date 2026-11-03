@@ -26,6 +26,27 @@ const firestoreChecks = [
   "match /acknowledgements/{consumerId}",
   "allow create, update, delete: if false"
 ];
+// Static preflight is supplemental to the required real Firestore emulator.
+// Reject permissive tombstone comparisons that mistake malformed data for
+// a verified, inactive deletion fence (including active: "false" or zero).
+const ownerFence = firestore.match(/function deletionFenceIsInactive\(uid\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
+if (!/\.data\.get\(['"]active['"],\s*null\)\s*==\s*false/.test(ownerFence)) {
+  failures.push("owner deletion fence must require an explicit inactive boolean, not active != true");
+}
+for (const leaseField of [
+  "deletionPlanningLeaseToken",
+  "deletionPlanningLeaseUntil",
+  "deletionPlanningLeaseRequestId",
+  "deletionPlanningLeaseOperation",
+  "deletionPlanningLeaseBy"
+]) {
+  if (!ownerFence.includes(leaseField)) failures.push(`owner deletion fence missing planning lease guard: ${leaseField}`);
+}
+if (!ownerFence.includes("!exists(tombstone)") ||
+    !ownerFence.includes("data.keys().hasAny([")) {
+  failures.push("owner deletion fence must reject unreconciled planning leases");
+}
+
 const storageChecks = [
   "match /exports/{uid}/{jobId}/{fileName}",
   "activeExportPackage(uid, jobId)",
