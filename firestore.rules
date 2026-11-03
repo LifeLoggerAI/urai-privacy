@@ -11,8 +11,28 @@ service cloud.firestore {
     }
     function isAdmin() { return hasAdminClaim(); }
     function deletionFenceIsInactive(uid) {
-      return !exists(/databases/$(database)/documents/privacyDeletionTombstones/$(uid))
-        || get(/databases/$(database)/documents/privacyDeletionTombstones/$(uid)).data.active != true;
+      // A present marker is inactive only when the server explicitly clears it.
+      // Malformed markers and unreconciled planning leases must fail closed.
+      let tombstone = /databases/$(database)/documents/privacyDeletionTombstones/$(uid);
+      return !exists(tombstone) || (
+        get(tombstone).data.get('active', null) == false
+        && !get(tombstone).data.keys().hasAny([
+          'deletionPlanningLeaseToken',
+          'deletionPlanningLeaseUntil',
+          'deletionPlanningLeaseRequestId',
+          'deletionPlanningLeaseOperation',
+          'deletionPlanningLeaseBy'
+        ])
+      );
+    }
+    function ownerProfileIdentityOnCreate(uid) {
+      return (!('userId' in request.resource.data) || request.resource.data.userId == uid)
+        && (!('ownerId' in request.resource.data) || request.resource.data.ownerId == uid);
+    }
+    function ownerProfileIdentityOnUpdate(uid) {
+      return (!('userId' in resource.data) || resource.data.userId == uid)
+        && (!('ownerId' in resource.data) || resource.data.ownerId == uid)
+        && ownerProfileIdentityOnCreate(uid);
     }
     function ownerIsNotChangingPrivilegedFields() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
@@ -48,12 +68,14 @@ service cloud.firestore {
       allow create: if isOwner(uid)
         && deletionFenceIsInactive(uid)
         && request.resource.data.uid == uid
+        && ownerProfileIdentityOnCreate(uid)
         && ownerIsNotCreatingPrivilegedFields();
       allow update: if isAdmin() || (
         isOwner(uid)
         && deletionFenceIsInactive(uid)
         && request.resource.data.uid == uid
         && resource.data.uid == uid
+        && ownerProfileIdentityOnUpdate(uid)
         && ownerIsNotChangingPrivilegedFields()
       );
       allow delete: if false;
