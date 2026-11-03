@@ -67,12 +67,12 @@ const endpoint='https://urai-jobs.us-central1.cloudfunctions.net/ingestConsentRe
 const host='urai-jobs.us-central1.cloudfunctions.net';
 const transport=(overrides={})=>({
  endpoint,expectedHost:host,bearerToken:'x'.repeat(64),
- request:async(_url, options)=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify(ack())}),
+ request:async(_url, options)=>({ok:true,status:200,headers:{get:(name)=>name==='content-type'?'application/json':null},text:async()=>JSON.stringify(ack())}),
  ...overrides,
 });
 test('transport requires pinned HTTPS endpoint and verifies returned Jobs ack',async()=>{
  let sent;
- const result=await send(event,transport({request:async(url,options)=>{sent={url,options};return {ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify(ack())}}}));
+ const result=await send(event,transport({request:async(url,options)=>{sent={url,options};return {ok:true,status:200,headers:{get:(name)=>name==='content-type'?'application/json':null},text:async()=>JSON.stringify(ack())}}}));
  assert.equal(sent.url,endpoint);assert.equal(sent.options.method,'POST');assert.equal(sent.options.redirect,'error');
  assert.equal(JSON.parse(sent.options.body).eventId,event.eventId);
  assert.equal(result.consumerId,'urai-jobs');assert.match(result.acknowledgementHash,/^[a-f0-9]{64}$/);
@@ -90,11 +90,11 @@ for(const [name,changes] of [
  let calls=0;await assert.rejects(send(event,transport({...changes,request:async()=>{calls++;throw new Error('unexpected request')}})));assert.equal(calls,0);
 });
 for(const [name,response] of [
- ['HTTP failure',()=>({ok:false,status:500,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify(ack())})],
- ['text response',()=>({ok:true,status:200,headers:{get:()=> 'text/plain'},text:async()=>JSON.stringify(ack())})],
- ['malformed JSON',()=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>'{bad'})],
- ['tampered acknowledgement',()=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify({...ack(),acknowledgement:{...ack().acknowledgement,ownerUid:'other'}})})],
- ['oversized body',()=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=> ' '.repeat(18000)})],
+ ['HTTP failure',()=>({ok:false,status:500,headers:{get:(name)=>name==='content-type'?'application/json':null},text:async()=>JSON.stringify(ack())})],
+ ['text response',()=>({ok:true,status:200,headers:{get:(name)=>name==='content-type'?'text/plain':null},text:async()=>JSON.stringify(ack())})],
+ ['malformed JSON',()=>({ok:true,status:200,headers:{get:(name)=>name==='content-type'?'application/json':null},text:async()=>'{bad'})],
+ ['tampered acknowledgement',()=>({ok:true,status:200,headers:{get:(name)=>name==='content-type'?'application/json':null},text:async()=>JSON.stringify({...ack(),acknowledgement:{...ack().acknowledgement,ownerUid:'other'}})})],
+ ['oversized body',()=>({ok:true,status:200,headers:{get:(name)=>name==='content-type'?'application/json':null},text:async()=> ' '.repeat(18000)})],
 ]) test(`transport rejects ${name}`,async()=>await assert.rejects(send(event,transport({request:async()=>response()}))));
 
 test('Jobs retry acknowledgement hash is stable across different valid cleanup summaries', async()=>{
@@ -106,10 +106,38 @@ test('Jobs retry acknowledgement hash is stable across different valid cleanup s
   status:'blocked',integrityHash:ackHash(render),derivativeInvalidation:{purpose:render.purpose,
    jobsScanned:2,jobsInvalidated:1,plansInvalidated:1,storageObjectsDeleted:deleted}}});
  const invoke=(deleted)=>send(render,transport({request:async()=>({ok:true,status:200,
-  headers:{get:()=> 'application/json'},text:async()=>JSON.stringify(resp(deleted))})}));
+  headers:{get:(name)=>name==='content-type'?'application/json':null},text:async()=>JSON.stringify(resp(deleted))})}));
  const first=await invoke(2);const retry=await invoke(0);
  assert.equal(first.eventId,retry.eventId);
  assert.equal(first.acknowledgementHash,retry.acknowledgementHash,
   'canonical revocation acknowledgement must not incorporate mutable cleanup counts');
  assert.equal(first.acknowledgementHash,ackHash(render));
+});
+
+
+test('never buffers advertised oversized Jobs ack',async()=>{
+ let bodyReads=0;
+ const fakeResponse={ok:true,status:200,headers:{get:(key)=>key==='content-type'?'application/json':key==='content-length'?'65536':null},
+  text:async()=>{bodyReads++;return JSON.stringify(ack())}};
+ await assert.rejects(send(event,transport({request:async()=>fakeResponse})),/PRIVACY_JOBS_ACK_OVERSIZE/);
+ assert.equal(bodyReads,0,'must reject declared oversized body before reading');
+});
+
+test('bounds chunked Jobs ack streaming without draining the entire response',async()=>{
+ let pulls=0;let legacyTextCalls=0;
+ const body=new ReadableStream({pull(controller){pulls++;if(pulls<100){controller.enqueue(Buffer.alloc(1024,65));}else{controller.close();}}});
+ const fakeResponse={ok:true,status:200,headers:{get:(key)=>key==='content-type'?'application/json':null},body,
+  text:async()=>{legacyTextCalls++;return 'A'.repeat(1024*100)}};
+ await assert.rejects(send(event,transport({request:async()=>fakeResponse})),/PRIVACY_JOBS_ACK_OVERSIZE/);
+ assert.equal(legacyTextCalls,0,'a real stream must be consumed with a bounded reader');
+ assert.ok(pulls<25,`stream over-consumed: ${pulls} KB`);
+});
+
+test('reads and verifies a normal chunked Jobs acknowledgement',async()=>{
+ let legacyTextCalls=0;
+ const body=new ReadableStream({start(controller){controller.enqueue(Buffer.from(JSON.stringify(ack())));controller.close();}});
+ const fakeResponse={ok:true,status:200,headers:{get:(key)=>key==='content-type'?'application/json':null},body,
+  text:async()=>{legacyTextCalls++;throw new Error('unexpected unbounded text read')}};
+ const result=await send(event,transport({request:async()=>fakeResponse}));
+ assert.equal(legacyTextCalls,0);assert.equal(result.consumerId,'urai-jobs');
 });
