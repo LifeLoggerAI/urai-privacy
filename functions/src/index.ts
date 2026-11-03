@@ -858,19 +858,32 @@ export const recordAdminAction = onCall(async (request) => {
 
 export const getPrivacyHealthReport = onCall(async (request) => {
   await requireAdmin(request);
-  const [exportsSnap, deletionsSnap, policiesSnap, auditsSnap] = await Promise.all([
+  const [exportsSnap, deletionsSnap, policiesSnap, auditsSnap, revocationsSnap] = await Promise.all([
     db.collection("privacyRequests").where("type", "==", "export").where("status", "in", ["pending", "approved", "processing"]).get(),
     db.collection("deletionRequests").where("status", "in", ["pending", "approved", "processing"]).get(),
     db.collection("retentionPolicies").get(),
-    db.collection("auditLogs").limit(100).get()
+    db.collection("auditLogs").limit(100).get(),
+    // A bounded sample is operational evidence, not global delivery certification.
+    db.collection("consentRevocationOutbox").limit(101).get()
   ]);
-  const operationalState = exportsSnap.size > 50 || deletionsSnap.size > 25 ? "needs_review" : "nominal";
+  // Missing fields include legacy outbox records created before scheduling existed.
+  // Never report nominal while the sampled revocation queue is unresolved.
+  const jobsRevocationUnresolvedSampled = revocationsSnap.docs.filter((entry) =>
+    entry.data()?.jobsDeliveryState !== "applied").length;
+  const revocationSampleIncomplete = revocationsSnap.size >= 101;
+  const operationalState =
+    exportsSnap.size > 50 || deletionsSnap.size > 25 ||
+    jobsRevocationUnresolvedSampled > 0 || revocationSampleIncomplete
+      ? "needs_review" : "nominal";
   return {
     generatedAt: new Date().toISOString(),
     openExportRequests: exportsSnap.size,
     openDeletionRequests: deletionsSnap.size,
     activePolicies: policiesSnap.size,
     auditEventsSampled: auditsSnap.size,
+    jobsRevocationRecordsSampled: revocationsSnap.size,
+    jobsRevocationUnresolvedSampled,
+    revocationSampleIncomplete,
     operationalState,
     verdict: "evidence_incomplete",
     certification: "not_certified"
