@@ -164,6 +164,9 @@ describe("Firestore owner/admin privacy rules", () => {
     const owner = authed("user-a");
     const ownerProfile = doc(owner, "users/user-a");
     const markerPath = "privacyDeletionTombstones/user-a";
+    const newUid = "privacy-deletion-fenced-create";
+    const createMarkerPath = "privacyDeletionTombstones/" + newUid;
+    const newOwner = doc(authed(newUid), "users", newUid);
     const invalid = [
       {}, { active: null }, { active: "false" }, { active: 0 }, { active: true },
       ...["deletionPlanningLeaseToken", "deletionPlanningLeaseUntil", "deletionPlanningLeaseRequestId",
@@ -174,14 +177,18 @@ describe("Firestore owner/admin privacy rules", () => {
     for (const [index, value] of invalid.entries()) {
       await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
         await setDoc(doc(context.firestore(), markerPath), { uid: "user-a", ...value });
+        await setDoc(doc(context.firestore(), createMarkerPath), { uid: newUid, ...value });
       });
+      await assertFails(setDoc(newOwner, { uid: newUid, displayName: "Blocked creation " + index }));
       await assertFails(updateDoc(ownerProfile, { displayName: "Blocked " + index }));
       await assertFails(getDoc(doc(owner, markerPath)));
       await assertFails(setDoc(doc(owner, markerPath), { active: false }));
     }
     await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), markerPath), { uid: "user-a", active: false });
+      await setDoc(doc(context.firestore(), createMarkerPath), { uid: newUid, active: false });
     });
+    await assertSucceeds(setDoc(newOwner, { uid: newUid, displayName: "Permitted creation" }));
     await assertSucceeds(updateDoc(ownerProfile, { displayName: "Permitted with cleared marker" }));
     await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
       await deleteDoc(doc(context.firestore(), markerPath));
