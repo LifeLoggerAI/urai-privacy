@@ -11,7 +11,7 @@ const source = fs.readFileSync(new URL('../functions/src/consent-revocation-jobs
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true });
 assert.equal(compiled.diagnostics?.length, 0, 'TS transpile diagnostics');
 const exports = {};
-vm.runInNewContext(compiled.outputText, {exports, require, Buffer, Date, Number, Error, RegExp, Object, Array, String});
+vm.runInNewContext(compiled.outputText, {exports, require, Buffer, Date, Number, Error, RegExp, Object, Array, String, URL, AbortSignal, fetch});
 const { buildJobsRevocationEventV2: build, jobsRevocationAckHash: ackHash, verifyJobsRevocationResponse: verify } = exports;
 const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const make = (changes={}) => {
@@ -61,3 +61,38 @@ for(const [name, mutate] of [
  ['replay timestamp',x=>{x.acknowledgement.revokedAt='2025-01-01T00:00:00.000Z'}],
  ['missing source receipt',x=>{delete x.acknowledgement.sourceReceiptHash}],
 ]) test(`rejects ${name} acknowledgement`,()=>{const x=ack();mutate(x);assert.equal(verify(event,x),false)});
+
+const { sendJobsRevocationEvent: send } = exports;
+const endpoint='https://urai-jobs.us-central1.cloudfunctions.net/ingestConsentRevocation';
+const host='urai-jobs.us-central1.cloudfunctions.net';
+const transport=(overrides={})=>({
+ endpoint,expectedHost:host,bearerToken:'x'.repeat(64),
+ request:async(_url, options)=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify(ack())}),
+ ...overrides,
+});
+test('transport requires pinned HTTPS endpoint and verifies returned Jobs ack',async()=>{
+ let sent;
+ const result=await send(event,transport({request:async(url,options)=>{sent={url,options};return {ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify(ack())}}}));
+ assert.equal(sent.url,endpoint);assert.equal(sent.options.method,'POST');assert.equal(sent.options.redirect,'error');
+ assert.equal(JSON.parse(sent.options.body).eventId,event.eventId);
+ assert.equal(result.consumerId,'urai-jobs');assert.match(result.acknowledgementHash,/^[a-f0-9]{64}$/);
+});
+for(const [name,changes] of [
+ ['plain HTTP endpoint',{endpoint:'http://urai-jobs.us-central1.cloudfunctions.net/ingestConsentRevocation'}],
+ ['wrong host',{expectedHost:'evil.run.app'}],
+ ['loopback',{endpoint:'https://127.0.0.1/ingestConsentRevocation',expectedHost:'127.0.0.1'}],
+ ['user info',{endpoint:'https://user:pw@urai-jobs.us-central1.cloudfunctions.net/ingestConsentRevocation'}],
+ ['query parameters',{endpoint:endpoint+'?redirect=https://evil.run.app'}],
+ ['other path',{endpoint:'https://urai-jobs.us-central1.cloudfunctions.net/unrelated'}],
+ ['missing bearer',{bearerToken:''}],
+ ['header injection',{bearerToken:'a'.repeat(32)+'\nX: bad'}],
+]) test(`transport rejects ${name} without network call`,async()=>{
+ let calls=0;await assert.rejects(send(event,transport({...changes,request:async()=>{calls++;throw new Error('unexpected request')}})));assert.equal(calls,0);
+});
+for(const [name,response] of [
+ ['HTTP failure',()=>({ok:false,status:500,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify(ack())})],
+ ['text response',()=>({ok:true,status:200,headers:{get:()=> 'text/plain'},text:async()=>JSON.stringify(ack())})],
+ ['malformed JSON',()=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>'{bad'})],
+ ['tampered acknowledgement',()=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify({...ack(),acknowledgement:{...ack().acknowledgement,ownerUid:'other'}})})],
+ ['oversized body',()=>({ok:true,status:200,headers:{get:()=> 'application/json'},text:async()=> ' '.repeat(18000)})],
+]) test(`transport rejects ${name}`,async()=>await assert.rejects(send(event,transport({request:async()=>response()}))));
