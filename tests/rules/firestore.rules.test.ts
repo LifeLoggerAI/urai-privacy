@@ -141,6 +141,26 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { displayName: "Authorized recovery" }));
   });
 
+  it("denies forged embedded profile owner identities on creation and modification", async () => {
+    const self = authed("user-a");
+    const ref = doc(self, "users/user-a");
+    for (const field of ["userId", "ownerId"]) {
+      const newUid = `profile-forgery-${field}`;
+      await assertFails(setDoc(doc(authed(newUid), `users/${newUid}`), {
+        uid: newUid, [field]: "user-b", displayName: "Forged identity"
+      }));
+      await assertFails(updateDoc(ref, { [field]: "user-b" }));
+    }
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), "users/user-a"), { ownerId: "user-b" });
+    });
+    await assertFails(updateDoc(ref, { displayName: "Cannot edit contaminated profile" }));
+    await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), {
+      ownerId: "user-a", displayName: "Trusted repair"
+    }));
+    await assertSucceeds(updateDoc(ref, { displayName: "Valid owner update", userId: "user-a" }));
+  });
+
   it("fails closed on malformed deletion tombstones and unreconciled planning leases", async () => {
     const createUid = "user-malformed-new";
     const existingUid = "user-a";
