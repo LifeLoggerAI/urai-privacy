@@ -154,6 +154,46 @@ describe("Storage export and evidence rules", () => {
     ));
   });
 
+  it("blocks export reads and writes on malformed deletion tombstones or in-flight planning", async ({ skip }) => {
+    if (!storageRulesAvailable) return skip();
+    const uid = "user-genesis-strict-export";
+    const jobId = "genesis-export";
+    const objectPath = `exports/${uid}/${jobId}/manifest.json`;
+    await seedStorage(objectPath);
+    await seedCompletedExport(uid, jobId);
+
+    const tombstones: Array<Record<string, unknown>> = [
+      {}, { active: null }, { active: "false" }, { active: 0 }, { active: true },
+      { active: false, deletionPlanningLeaseToken: "pending-lease" },
+      { active: false, deletionPlanningLeaseUntil: "2026-11-03T05:00:00.000Z" },
+      { active: false, deletionPlanningLeaseRequestId: "request-a" },
+      { active: false, deletionPlanningLeaseOperation: "dryRun" },
+      { active: false, deletionPlanningLeaseBy: "executor-a" }
+    ];
+
+    for (const tombstone of tombstones) {
+      await requireStorageEnv().withSecurityRulesDisabled(async context => {
+        await setDoc(doc(context.firestore(), "privacyDeletionTombstones", uid), tombstone);
+      });
+      for (const client of [
+        storageFor(uid),
+        storageFor("claim-admin", { admin: true }),
+        storageFor("role-claim-admin", { role: "admin" })
+      ]) {
+        await assertFails(getBytes(ref(client, objectPath)));
+      }
+      await assertFails(uploadString(ref(storageFor("claim-admin", { admin: true }), objectPath), "invalid-write"));
+    }
+
+    // Only an explicitly inactive tombstone without planning fields permits
+    // a previously valid, still-unexpired export to be read.
+    await requireStorageEnv().withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), "privacyDeletionTombstones", uid), { active: false });
+    });
+    await assertSucceeds(getBytes(ref(storageFor(uid), objectPath)));
+    await assertSucceeds(getBytes(ref(storageFor("claim-admin", { admin: true }), objectPath)));
+  });
+
   it("denies other users and anonymous users from reading export paths", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await seedStorage("exports/user-a/export-1/manifest.json");
