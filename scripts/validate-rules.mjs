@@ -47,6 +47,26 @@ if (!ownerFence.includes("!exists(tombstone)") ||
   failures.push("owner deletion fence must reject unreconciled planning leases");
 }
 
+// Storage must fence private export reads and admin writes throughout a
+// deletion-planning lease, not only after the final active tombstone is set.
+const storageFence = storage.match(/function deletionFenceIsInactive\(uid\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
+if (!/\.data\.get\(['"]active['"],\s*null\)\s*==\s*false/.test(storageFence)) {
+  failures.push("storage deletion fence must require an explicit inactive boolean");
+}
+for (const leaseField of [
+  "deletionPlanningLeaseToken",
+  "deletionPlanningLeaseUntil",
+  "deletionPlanningLeaseRequestId",
+  "deletionPlanningLeaseOperation",
+  "deletionPlanningLeaseBy"
+]) {
+  if (!storageFence.includes(leaseField)) failures.push(`storage deletion fence missing planning lease guard: ${leaseField}`);
+}
+if (!storageFence.includes("!firestore.exists(tombstone)") ||
+    !storageFence.includes("data.keys().hasAny([")) {
+  failures.push("storage deletion fence must reject unreconciled planning leases");
+}
+
 const storageChecks = [
   "match /exports/{uid}/{jobId}/{fileName}",
   "activeExportPackage(uid, jobId)",
