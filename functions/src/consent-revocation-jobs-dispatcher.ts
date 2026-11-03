@@ -70,10 +70,17 @@ function attemptsOf(value: unknown): number | null {
  * carry a stale owner token. Quarantine contradictions instead of stealing
  * a possibly active worker's request or overwriting its completion receipt.
  */
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function validLeaseMetadata(state: State, token: unknown): boolean {
-  if (state === 'leased') return typeof token === 'string' &&
-    token.length > 0 && token.length <= 128;
+  if (state === 'leased') return typeof token === 'string' && UUID_V4.test(token);
   return token === undefined;
+}
+
+/** Source-created records begin pending with zero attempts. Once leased, the
+ * attempt counter is incremented transactionally and can never revert to zero.
+ * Inconsistent state history must not be treated as a fresh permission to send. */
+function validStateAttemptHistory(state: State, attempts: number): boolean {
+  return state === 'pending' ? attempts === 0 : attempts >= 1;
 }
 
 function backoffMs(attempt: number): number {
@@ -162,6 +169,16 @@ export async function dispatchPendingJobsRevocations(
         transaction.update(item.ref, {
           jobsDeliveryState: 'needs-review',
           jobsDeliveryLastCode: 'invalid_attempt_budget',
+          jobsLeaseToken: FieldValue.delete(),
+          jobsNextAttemptAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return { status: 'review' as const };
+      }
+      if (!validStateAttemptHistory(state, attempts)) {
+        transaction.update(item.ref, {
+          jobsDeliveryState: 'needs-review',
+          jobsDeliveryLastCode: 'invalid_state_attempt_history',
           jobsLeaseToken: FieldValue.delete(),
           jobsNextAttemptAt: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
