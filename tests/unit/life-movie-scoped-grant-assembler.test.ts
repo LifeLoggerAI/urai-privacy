@@ -37,3 +37,42 @@ describe("source-only Life Movie grant proposal assembly", () => {
     ["missing review", { notice: { ...notice, reviewEventId: "" } }]
   ])("rejects %s", (_name, change) => deny({ ...base, ...change }));
 });
+
+describe("Life Movie scoped-grant issuer evidence is literal and immutable (R435)", () => {
+  it("rejects selection getters that switch movies after rights were checked", () => {
+    const candidate = { ...base, selection: { ...selection } };
+    let reads = 0;
+    Object.defineProperty(candidate.selection, "renderScope", {
+      enumerable: true,
+      configurable: true,
+      get: () => (++reads <= 3 ? scope : { ...scope, projectId: "other-movie" }),
+    });
+    deny(candidate);
+  });
+  it("rejects getter-backed owner approval even when it returns granted", () => {
+    const candidate = { ...base, approval: { ...approval } };
+    Object.defineProperty(candidate.approval, "status", {
+      enumerable: true, get: () => "granted",
+    });
+    deny(candidate);
+  });
+  it("rejects getter-backed user-visible notice integrity hashes", () => {
+    const candidate = { ...base, notice: { ...notice } };
+    Object.defineProperty(candidate.notice, "noticeHash", {
+      enumerable: true, get: () => notice.noticeHash,
+    });
+    deny(candidate);
+  });
+  it("rejects inherited identity fields when no own actorUid was verified", () => {
+    const inherited = Object.assign(Object.create({ actorUid: approval.actorUid }), approval);
+    delete inherited.actorUid;
+    deny({ ...base, approval: inherited });
+  });
+  it("rejects dynamic root freshness clocks", () => {
+    const candidate = { ...base };
+    Object.defineProperty(candidate, "nowMs", {
+      enumerable: true, get: () => t,
+    });
+    deny(candidate);
+  });
+});
