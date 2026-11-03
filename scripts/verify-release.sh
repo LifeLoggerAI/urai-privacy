@@ -48,6 +48,9 @@ npm run test:deploy:guard
 printf '\n[verify-release] privacy-to-Jobs revocation contract\n'
 npm run test:revocation:jobs:contract
 
+printf '\n[verify-release] revocation publisher to Jobs outbox contract\n'
+npm run test:revocation:publisher
+
 printf '\n[verify-release] firebase rules static validation\n'
 npm run test:rules:static
 
