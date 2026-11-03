@@ -6,6 +6,8 @@ import { z } from "zod";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 import { EXPORT_PACKAGE_TTL_MS } from "./export-lifecycle-contract";
+import { processingLeaseIsActive, scrubExportValue } from "./export-redaction-lease";
+export { shouldRedactExportField, scrubExportValue, processingLeaseIsActive } from "./export-redaction-lease";
 
 const exportCollections = [
   "users",
@@ -21,18 +23,6 @@ const exportCollections = [
   "legalHoldRecords"
 ] as const;
 const revocationAcknowledgementExportKey = "consentRevocationAcknowledgements";
-const sensitiveFieldMarkers = [
-  "password",
-  "token",
-  "secret",
-  "apikey",
-  "privatekey",
-  "credential",
-  "authorization",
-  "cookie",
-  "sessionkey",
-  "webhooksignature"
-] as const;
 const QUERY_PAGE_LIMIT = 450;
 const NESTED_QUERY_CONCURRENCY = 8;
 const EXPORT_PROCESSING_LEASE_MS = 15 * 60 * 1000;
@@ -68,30 +58,6 @@ function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown): T {
 
 function sha256(value: unknown) {
   return createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
-}
-
-export function shouldRedactExportField(key: string) {
-  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return sensitiveFieldMarkers.some((marker) => normalized.includes(marker));
-}
-
-export function scrubExportValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(scrubExportValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([key]) => !shouldRedactExportField(key))
-        .map(([key, nested]) => [key, scrubExportValue(nested)])
-    );
-  }
-  return value;
-}
-
-export function processingLeaseIsActive(value: unknown, nowMs = Date.now()) {
-  if (!value || typeof value !== "object" || !("toMillis" in value) || typeof value.toMillis !== "function") {
-    return false;
-  }
-  return value.toMillis() > nowMs;
 }
 
 async function writeAudit(args: {
