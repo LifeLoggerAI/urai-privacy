@@ -140,6 +140,55 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { displayName: "Authorized recovery" }));
   });
 
+  it("denies forged embedded profile owner identities on creation and modification", async () => {
+    const self = authed("user-a");
+    const ref = doc(self, "users/user-a");
+    for (const field of ["userId", "ownerId"]) {
+      const newUid = `profile-forgery-${field}`;
+      await assertFails(setDoc(doc(authed(newUid), `users/${newUid}`), {
+        uid: newUid, [field]: "user-b", displayName: "Forged identity"
+      }));
+      await assertFails(updateDoc(ref, { [field]: "user-b" }));
+    }
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), "users/user-a"), { ownerId: "user-b" });
+    });
+    await assertFails(updateDoc(ref, { displayName: "Cannot edit contaminated profile" }));
+    await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), {
+      ownerId: "user-a", displayName: "Trusted repair"
+    }));
+    await assertSucceeds(updateDoc(ref, { displayName: "Valid owner update", userId: "user-a" }));
+  });
+
+  it("denies malformed or leased deletion markers and permits explicitly cleared markers", async () => {
+    const owner = authed("user-a");
+    const ownerProfile = doc(owner, "users/user-a");
+    const markerPath = "privacyDeletionTombstones/user-a";
+    const invalid = [
+      {}, { active: null }, { active: "false" }, { active: 0 }, { active: true },
+      ...["deletionPlanningLeaseToken", "deletionPlanningLeaseUntil", "deletionPlanningLeaseRequestId",
+        "deletionPlanningLeaseOperation", "deletionPlanningLeaseBy"].map(field => ({
+        active: false, [field]: "pending"
+      }))
+    ];
+    for (const [index, value] of invalid.entries()) {
+      await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), markerPath), { uid: "user-a", ...value });
+      });
+      await assertFails(updateDoc(ownerProfile, { displayName: "Blocked " + index }));
+      await assertFails(getDoc(doc(owner, markerPath)));
+      await assertFails(setDoc(doc(owner, markerPath), { active: false }));
+    }
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), markerPath), { uid: "user-a", active: false });
+    });
+    await assertSucceeds(updateDoc(ownerProfile, { displayName: "Permitted with cleared marker" }));
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore(), markerPath));
+    });
+    await assertSucceeds(updateDoc(ownerProfile, { displayName: "Permitted with no marker" }));
+  });
+
   it("requires server-mediated writes for privacy workflows and evidence", async () => {
     const userDb = authed("user-a");
     const adminDb = authed("claim-admin", { admin: true });
