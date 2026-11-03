@@ -8,6 +8,12 @@ const require=createRequire(import.meta.url);
 const ts=require('typescript');
 const source=readFileSync(new URL('../functions/src/consent-revocation-jobs-dispatcher.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
+// Exercise the exact publisher-integrity validator, not a permissive synthetic stub.
+const contractText=readFileSync(new URL('../functions/src/consent-revocation-jobs-contract.ts',import.meta.url),'utf8');
+const contractCode=ts.transpileModule(contractText,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
+const contractExports={};
+vm.runInNewContext(contractCode.outputText,{exports:contractExports,require,Buffer,Date,Number,Error,RegExp,Object,Array,String,URL,AbortSignal,fetch});
+const actualBuild=contractExports.buildJobsRevocationEventV2;
 assert.equal(compiled.diagnostics?.length,0);
 const NOW=Date.parse('2026-11-03T06:00:00.000Z');
 const DELETE=Symbol('delete');
@@ -19,7 +25,7 @@ const eventId=sha({schemaVersion:'consent.revoked.v1',recordId:identity.consentR
 const defaultConsent={uid:identity.uid,purpose:identity.purpose,status:'revoked',receiptHash:identity.sourceReceiptHash};
 const mkRef=(id)=>({id});
 const validTransport={endpoint:'https://us-central1-urai-jobs.cloudfunctions.net/ingestConsentRevocation', expectedHost:'us-central1-urai-jobs.cloudfunctions.net',bearerToken:'x'.repeat(64)};
-function fixture({current=defaultConsent,revision=NOW-1000,during=null,sameMillisecond=false}={}){
+function fixture({current=defaultConsent,revision=NOW-1000,during=null,sameMillisecond=false,duringOutbox=null}={}){
  let consent=current===null?null:{...current};let consentRevision=revision;let consentRevisionNanos=0;let sent=0;let mutations=0;
  const row={...identity,eventId,integrityHash:sha({eventId,recordId:identity.consentRecordId,uid:identity.uid,purpose:identity.purpose}),schemaVersion:'consent.revoked.v1',status:'pending',jobsDeliveryConsumerId:'urai-jobs',jobsDeliveryState:'pending',jobsDeliveryAttempts:0,createdAt:Timestamp.fromMillis(NOW),jobsNextAttemptAt:Timestamp.fromMillis(NOW)};
  const ref=mkRef(eventId);
@@ -30,8 +36,8 @@ function fixture({current=defaultConsent,revision=NOW-1000,during=null,sameMilli
   async runTransaction(fn){const pending=[];const transaction={get:async r=>snapshot(r),update(r,patch){pending.push({r,patch})}};const result=await fn(transaction);for(const {r,patch} of pending){assert.equal(r.id,eventId);mutations++;for(const [key,val] of Object.entries(patch)){if(val===DELETE)delete row[key];else row[key]=val;}}return result;},
  };
  const wrappedRequire=(name)=>{if(name==='node:crypto')return {randomUUID};if(name==='firebase-admin/firestore')return {FieldValue,Timestamp,getFirestore:()=>db};if(name==='./consent-revocation-jobs-contract')return {
-   buildJobsRevocationEventV2:(id,data)=>{if(id!==eventId||data.eventId!==id||data.status!=='pending'||data.integrityHash!==row.integrityHash)throw Error('BAD_IDENTITY');return {eventId:id,ownerUid:identity.uid,purpose:identity.purpose,sourceReceiptHash:identity.sourceReceiptHash};},
-   sendJobsRevocationEvent:async(event)=>{sent++;if(during){consent={...during};if(sameMillisecond)consentRevisionNanos+=1;else consentRevision+=1;}return {eventId:event.eventId,consumerId:'urai-jobs',acknowledgementHash:'b'.repeat(64)}}
+   buildJobsRevocationEventV2:actualBuild,
+   sendJobsRevocationEvent:async(event)=>{sent++;if(duringOutbox)Object.assign(row,duringOutbox);if(during){consent={...during};if(sameMillisecond)consentRevisionNanos+=1;else consentRevision+=1;}return {eventId:event.eventId,consumerId:'urai-jobs',acknowledgementHash:'b'.repeat(64)}}
   };throw Error('unexpected dependency '+name);};
  const exported={};vm.runInNewContext(compiled.outputText,{exports:exported,require:wrappedRequire,URL,Number,Date,Object,Array,String,Error,Promise,RegExp});
  return {run:()=>exported.dispatchPendingJobsRevocations(validTransport,{db,now:()=>NOW}),row,get sent(){return sent},get mutations(){return mutations},setConsent(next){consent=next===null?null:{...next};consentRevision+=1;}};
@@ -45,3 +51,18 @@ test('ABA-style consent revision changes during transit must not count as comple
 
 test('newer revoked receipt cannot be superseded by an older queued revocation', async()=>{const h=fixture({current:{...defaultConsent,receiptHash:'e'.repeat(64)}});const result=await h.run();assert.equal(result.needsReview,1);assert.equal(h.sent,0);assert.equal(h.row.jobsDeliveryState,'needs-review')});
 test('same-millisecond Firestore updateTime nanosecond change must quarantine result',async()=>{const h=fixture({during:{...defaultConsent},sameMillisecond:true});const result=await h.run();assert.equal(result.applied,0);assert.equal(result.needsReview,1)});
+
+for(const [name,change] of [
+ ['owner switched', {uid:'unauthorized-owner'}],
+ ['consumer destination switched', {jobsDeliveryConsumerId:'other-consumer'}],
+ ['source receipt changed', {sourceReceiptHash:'f'.repeat(64)}],
+ ['publisher integrity changed', {integrityHash:'f'.repeat(64)}],
+ ['schema version changed', {schemaVersion:'consent.revoked.v9'}],
+ ['source record id changed', {consentRecordId:'another-owner_memory_storage'}],
+]) test('in-flight outbox mutation cannot be completed as applied: '+name,async()=>{
+ const h=fixture({duringOutbox:change}); const result=await h.run();
+ assert.equal(h.sent,1,'claim and send must occur before injected mutation');
+ assert.equal(result.applied,0,'immutable source change invalidates successful acknowledgement');
+ assert.equal(result.needsReview,1,'unresolved ownership must be retained for review');
+ assert.equal(h.row.jobsDeliveryState,'needs-review');
+});
