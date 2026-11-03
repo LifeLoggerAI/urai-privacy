@@ -26,6 +26,7 @@ const FieldValue = { delete: () => DELETE, serverTimestamp: () => Timestamp.from
 const sha = input => createHash('sha256').update(JSON.stringify(input)).digest('hex');
 const identity = { consentRecordId: 'owner-1_memory_storage', uid: 'owner-1', purpose: 'memory.storage', consentTier: 'C1', policyVersion: '1.0.0', sourceReceiptHash: 'a'.repeat(64) };
 const eventId = sha({schemaVersion:'consent.revoked.v1',recordId:identity.consentRecordId,uid:identity.uid,purpose:identity.purpose,consentTier:identity.consentTier,policyVersion:identity.policyVersion,receiptHash:identity.sourceReceiptHash});
+const VALID_LEASE = '123e4567-e89b-42d3-a456-426614174000';
 const transport = {endpoint:'https://us-central1-urai-jobs.cloudfunctions.net/ingestConsentRevocation',expectedHost:'us-central1-urai-jobs.cloudfunctions.net',bearerToken:'x'.repeat(64)};
 const defer = () => { let resolve, reject; const promise = new Promise((r,j) => { resolve=r; reject=j; }); return {promise, resolve, reject}; };
 function fixture({deliveryState='pending', attempt=0, token, due=NOW, sender}={}) {
@@ -64,7 +65,7 @@ function fixture({deliveryState='pending', attempt=0, token, due=NOW, sender}={}
   }};
   const exports={};
   const wrappedRequire=name=>{
-    if(name==='node:crypto')return {randomUUID:()=>`lease-${++tokenSeq}`};
+    if(name==='node:crypto')return {randomUUID:()=>`00000000-0000-4000-8000-${(++tokenSeq).toString(16).padStart(12,'0')}`};
     if(name==='firebase-admin/firestore')return {FieldValue,Timestamp,getFirestore:()=>db};
     if(name==='./consent-revocation-jobs-contract')return {
       buildJobsRevocationEventV2:contract.buildJobsRevocationEventV2,
@@ -76,12 +77,12 @@ function fixture({deliveryState='pending', attempt=0, token, due=NOW, sender}={}
   return {row, run:()=>exports.dispatchPendingJobsRevocations(transport,{db,now:()=>clock}),advance:ms=>{clock+=ms;},setSender:x=>{handler=x;},get sends(){return calls;}};
 }
 test('unexpired valid lease is not stolen',async()=>{
-  const h=fixture({deliveryState:'leased',attempt:1,token:'lease-previous',due:NOW+60000});
+  const h=fixture({deliveryState:'leased',attempt:1,token:VALID_LEASE,due:NOW+60000});
   const r=await h.run();assert.equal(r.scanned,0);assert.equal(h.sends,0);
-  assert.equal(h.row.jobsLeaseToken,'lease-previous');
+  assert.equal(h.row.jobsLeaseToken,VALID_LEASE);
 });
 test('expired valid lease is recovered with a fresh token and second attempt',async()=>{
-  const h=fixture({deliveryState:'leased',attempt:1,token:'lease-previous',due:NOW-1});
+  const h=fixture({deliveryState:'leased',attempt:1,token:VALID_LEASE,due:NOW-1});
   const r=await h.run();assert.equal(r.applied,1);assert.equal(h.row.jobsDeliveryAttempts,2);
   assert.equal(h.sends,1);assert.equal('jobsLeaseToken' in h.row,false);
 });
@@ -134,4 +135,25 @@ test('last permitted delivery attempt fails closed and does not attempt again',a
   const r=await h.run();assert.equal(r.needsReview,1);assert.equal(h.sends,1);
   assert.equal(h.row.jobsDeliveryAttempts,12);assert.equal(h.row.jobsDeliveryState,'needs-review');
   const again=await h.run();assert.equal(again.scanned,0);assert.equal(h.sends,1);
+});
+
+test('expired leased state with a non-UUID owner token must quarantine',async()=>{
+  const h=fixture({deliveryState:'leased',attempt:1,token:'lease-previous',due:NOW-1});
+  const r=await h.run();assert.equal(h.sends,0);assert.equal(r.needsReview,1);
+  assert.equal(h.row.jobsDeliveryLastCode,'invalid_lease_metadata');
+});
+test('leased state with zero attempts has impossible ownership history',async()=>{
+  const h=fixture({deliveryState:'leased',attempt:0,token:VALID_LEASE,due:NOW-1});
+  const r=await h.run();assert.equal(h.sends,0);assert.equal(r.needsReview,1);
+  assert.equal(h.row.jobsDeliveryLastCode,'invalid_state_attempt_history');
+});
+test('pending state cannot have previously attempted delivery',async()=>{
+  const h=fixture({deliveryState:'pending',attempt:3});
+  const r=await h.run();assert.equal(h.sends,0);assert.equal(r.needsReview,1);
+  assert.equal(h.row.jobsDeliveryLastCode,'invalid_state_attempt_history');
+});
+test('retry state must represent at least one previous delivery',async()=>{
+  const h=fixture({deliveryState:'retry',attempt:0});
+  const r=await h.run();assert.equal(h.sends,0);assert.equal(r.needsReview,1);
+  assert.equal(h.row.jobsDeliveryLastCode,'invalid_state_attempt_history');
 });
