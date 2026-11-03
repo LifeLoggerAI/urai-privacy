@@ -70,6 +70,27 @@ function backoffMs(attempt: number): number {
   return Math.min(MAX_RETRY_MS, MIN_RETRY_MS * 2 ** Math.min(attempt - 1, 8));
 }
 
+/** Bind the remote delivery to the canonical consent document examined in the
+ * same Firestore transaction. A regrant, delete/recreate, or newer revocation
+ * during network transit requires reconciliation instead of false completion.
+ * Firestore updateTime prevents an ABA change from looking like the original.
+ */
+function consentAuthorityStamp(snapshot: {
+  exists: boolean;
+  data(): Record<string, unknown> | undefined;
+  updateTime?: Timestamp;
+}, event: { ownerUid: string; purpose: string }): string | null {
+  if (!snapshot.exists) return 'missing'; // Deleted consent still requires downstream cleanup.
+  const current = snapshot.data() ?? {};
+  const revision = snapshot.updateTime;
+  if (!(revision instanceof Timestamp) || !Number.isSafeInteger(revision.toMillis()) ||
+      revision.toMillis() <= 0 || current.uid !== event.ownerUid ||
+      current.purpose !== event.purpose ||
+      !['revoked', 'denied', 'expired'].includes(String(current.status))) return null;
+  return JSON.stringify({revision: revision.toMillis(), uid: current.uid,
+    purpose: current.purpose, status: current.status, receiptHash: current.receiptHash});
+}
+
 /**
  * Performs one bounded scan of due events using an exact composite index.
  * The Firestore document is the durable source of truth; remote sends are
@@ -138,6 +159,19 @@ export async function dispatchPendingJobsRevocations(
         });
         return { status: 'review' as const };
       }
+      const consentRef = db.collection('consentRecords').doc(data.consentRecordId);
+      const canonical = await transaction.get(consentRef);
+      const authorityStamp = consentAuthorityStamp(canonical, event);
+      if (authorityStamp === null) {
+        transaction.update(item.ref, {
+          jobsDeliveryState: 'needs-review',
+          jobsDeliveryLastCode: 'current_consent_unreconciled',
+          jobsLeaseToken: FieldValue.delete(),
+          jobsNextAttemptAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return { status: 'review' as const };
+      }
       transaction.update(item.ref, {
         jobsDeliveryState: 'leased',
         jobsLeaseToken: token,
@@ -145,7 +179,7 @@ export async function dispatchPendingJobsRevocations(
         jobsNextAttemptAt: Timestamp.fromMillis(at + LEASE_MS),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return { status: 'claimed' as const, event, attempt: attempts + 1 };
+      return { status: 'claimed' as const, event, attempt: attempts + 1, authorityStamp };
     });
 
     if (result.status === 'skip') { skipped++; continue; }
@@ -171,6 +205,17 @@ export async function dispatchPendingJobsRevocations(
       if (!latest.exists || state.jobsDeliveryState !== 'leased' ||
           state.jobsLeaseToken !== token ||
           state.jobsDeliveryAttempts !== result.attempt) return 'lost-lease' as const;
+      const canonical = await transaction.get(db.collection('consentRecords').doc(state.consentRecordId));
+      if (consentAuthorityStamp(canonical, result.event) !== result.authorityStamp) {
+        transaction.update(item.ref, {
+          jobsDeliveryState: 'needs-review',
+          jobsDeliveryLastCode: 'consent_changed_during_delivery',
+          jobsLeaseToken: FieldValue.delete(),
+          jobsNextAttemptAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return 'needs-review' as const;
+      }
       if (confirmedHash !== null) {
         transaction.update(item.ref, {
           jobsDeliveryState: 'applied',
