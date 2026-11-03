@@ -15,17 +15,28 @@ export type LifeMovieRenderScope = Readonly<{
 }>;
 
 export function matchesLifeMovieRenderScope(recordScope: unknown, requestedScope: LifeMovieRenderScope): boolean {
-  if (!recordScope || typeof recordScope !== "object" || Array.isArray(recordScope)) return false;
+  if (!recordScope || typeof recordScope !== "object" || Array.isArray(recordScope)
+    || !requestedScope || typeof requestedScope !== "object" || Array.isArray(requestedScope)) return false;
   const scoped = recordScope as Record<string, unknown>;
-  // Reject additional critical fields, including non-enumerable and symbol keys.
-  // A Life Movie scope is precisely the three contract-defined own properties.
-  if (Reflect.ownKeys(scoped).length !== 3) return false;
-  return Object.prototype.hasOwnProperty.call(scoped, "projectId")
-    && Object.prototype.hasOwnProperty.call(scoped, "renderPlanDigest")
-    && Object.prototype.hasOwnProperty.call(scoped, "sourceSetDigest")
-    && scoped.projectId === requestedScope.projectId
-    && scoped.renderPlanDigest === requestedScope.renderPlanDigest
-    && scoped.sourceSetDigest === requestedScope.sourceSetDigest;
+  // Both the stored scope and the request must be literal own data evidence.
+  // Accessor-backed request claims must not be executed or treated as authority.
+  try {
+    if (Reflect.ownKeys(scoped).length !== 3 || Reflect.ownKeys(requestedScope).length !== 3) return false;
+    const props = Object.getOwnPropertyDescriptors(scoped);
+    const requested = Object.getOwnPropertyDescriptors(requestedScope);
+    const required = ["projectId", "renderPlanDigest", "sourceSetDigest"] as const;
+    if (!required.every(key => Object.prototype.hasOwnProperty.call(props, key)
+      && Object.prototype.hasOwnProperty.call(props[key], "value")
+      && Object.prototype.hasOwnProperty.call(requested, key)
+      && Object.prototype.hasOwnProperty.call(requested[key], "value")
+      && typeof props[key].value === "string"
+      && typeof requested[key].value === "string")) return false;
+    return props.projectId.value === requested.projectId.value
+      && props.renderPlanDigest.value === requested.renderPlanDigest.value
+      && props.sourceSetDigest.value === requested.sourceSetDigest.value;
+  } catch {
+    return false;
+  }
 }
 
 export const consentPurposeRegistry = {
