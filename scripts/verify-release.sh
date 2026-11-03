@@ -42,6 +42,9 @@ npm run typecheck
 printf '\n[verify-release] unit tests\n'
 npm run test:unit
 
+printf '\n[verify-release] scoped deployment guard regression\n'
+npm run test:deploy:guard
+
 printf '\n[verify-release] firebase rules static validation\n'
 npm run test:rules:static
 
