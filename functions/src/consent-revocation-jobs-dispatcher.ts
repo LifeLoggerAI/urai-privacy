@@ -79,15 +79,17 @@ function consentAuthorityStamp(snapshot: {
   exists: boolean;
   data(): Record<string, unknown> | undefined;
   updateTime?: Timestamp;
-}, event: { ownerUid: string; purpose: string }): string | null {
+}, event: { ownerUid: string; purpose: string; sourceReceiptHash: string }): string | null {
   if (!snapshot.exists) return 'missing'; // Deleted consent still requires downstream cleanup.
   const current = snapshot.data() ?? {};
   const revision = snapshot.updateTime;
-  if (!(revision instanceof Timestamp) || !Number.isSafeInteger(revision.toMillis()) ||
-      revision.toMillis() <= 0 || current.uid !== event.ownerUid ||
-      current.purpose !== event.purpose ||
+  if (!(revision instanceof Timestamp) || !Number.isSafeInteger(revision.seconds) ||
+      revision.seconds <= 0 || !Number.isSafeInteger(revision.nanoseconds) ||
+      revision.nanoseconds < 0 || revision.nanoseconds > 999999999 ||
+      current.uid !== event.ownerUid || current.purpose !== event.purpose ||
+      current.receiptHash !== event.sourceReceiptHash ||
       !['revoked', 'denied', 'expired'].includes(String(current.status))) return null;
-  return JSON.stringify({revision: revision.toMillis(), uid: current.uid,
+  return JSON.stringify({revision: [revision.seconds, revision.nanoseconds], uid: current.uid,
     purpose: current.purpose, status: current.status, receiptHash: current.receiptHash});
 }
 
