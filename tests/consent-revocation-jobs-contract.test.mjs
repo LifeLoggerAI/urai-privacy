@@ -25,7 +25,7 @@ const valid = make();
 const event = build(valid.id,valid.record);
 const ack = () => ({ ok:true, acknowledgement:{ consumerId:'urai-jobs', eventType:'consent.revoked.v2',eventId:event.eventId,ownerUid:event.ownerUid,
  purpose:event.purpose,policyVersion:event.policyVersion,sourceReceiptHash:event.sourceReceiptHash,correlationId:event.correlationId,revokedAt:event.revokedAt,
- status:'blocked',integrityHash:ackHash(event),derivativeInvalidation:{purpose:event.purpose,jobsScanned:3,jobsInvalidated:2,plansInvalidated:1,storageObjectsDeleted:1} } });
+ status:'blocked',integrityHash:ackHash(event),derivativeInvalidation:{purpose:event.purpose,jobsScanned:0,jobsInvalidated:0,plansInvalidated:0,storageObjectsDeleted:0} } });
 
 test('maps exact publisher v1 record to Jobs v2 with stable deterministic timestamp',()=>{
  assert.equal(event.type,'consent.revoked.v2'); assert.equal(event.correlationId,`revocation:${valid.id}`);
@@ -56,6 +56,7 @@ for(const [name, mutate] of [
  ['missing cleanup summary',x=>{delete x.acknowledgement.derivativeInvalidation}],
  ['fake successful cleanup',x=>{x.acknowledgement.derivativeInvalidation.storageObjectsDeleted=-1}],
  ['impossible counts',x=>{x.acknowledgement.derivativeInvalidation.jobsInvalidated=7}],
+ ['non-render purpose claims worker cleanup',x=>{x.acknowledgement.derivativeInvalidation.jobsScanned=1}],
  ['altered digest',x=>{x.acknowledgement.integrityHash='b'.repeat(64)}],
  ['replay timestamp',x=>{x.acknowledgement.revokedAt='2025-01-01T00:00:00.000Z'}],
  ['missing source receipt',x=>{delete x.acknowledgement.sourceReceiptHash}],
