@@ -66,6 +66,16 @@ function attemptsOf(value: unknown): number | null {
     (value as number) <= MAX_ATTEMPTS ? value as number : null;
 }
 
+/** A lease must have an owner, and a non-leased obligation must not still
+ * carry a stale owner token. Quarantine contradictions instead of stealing
+ * a possibly active worker's request or overwriting its completion receipt.
+ */
+function validLeaseMetadata(state: State, token: unknown): boolean {
+  if (state === 'leased') return typeof token === 'string' &&
+    token.length > 0 && token.length <= 128;
+  return token === undefined;
+}
+
 function backoffMs(attempt: number): number {
   return Math.min(MAX_RETRY_MS, MIN_RETRY_MS * 2 ** Math.min(attempt - 1, 8));
 }
@@ -135,6 +145,17 @@ export async function dispatchPendingJobsRevocations(
       const state = data.jobsDeliveryState as State;
       if (data.jobsDeliveryConsumerId !== DESTINATION || !STATES.includes(state) ||
           !due(data.jobsNextAttemptAt, at)) return { status: 'skip' as const };
+
+      if (!validLeaseMetadata(state, data.jobsLeaseToken)) {
+        transaction.update(item.ref, {
+          jobsDeliveryState: 'needs-review',
+          jobsDeliveryLastCode: 'invalid_lease_metadata',
+          jobsLeaseToken: FieldValue.delete(),
+          jobsNextAttemptAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return { status: 'review' as const };
+      }
 
       const attempts = attemptsOf(data.jobsDeliveryAttempts);
       if (attempts === null || attempts >= MAX_ATTEMPTS) {
