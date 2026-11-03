@@ -48,6 +48,12 @@ npm run test:deploy:guard
 printf '\n[verify-release] privacy-to-Jobs revocation contract\n'
 npm run test:revocation:jobs:contract
 
+printf '\n[verify-release] durable Jobs outbox dispatcher contract\n'
+npm run test:revocation:dispatcher
+
+printf '\n[verify-release] current consent ordering during Jobs delivery\n'
+npm run test:revocation:authority
+
 printf '\n[verify-release] revocation publisher to Jobs outbox contract\n'
 npm run test:revocation:publisher
 
