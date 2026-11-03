@@ -63,8 +63,8 @@ for(const [name, mutate] of [
 ]) test(`rejects ${name} acknowledgement`,()=>{const x=ack();mutate(x);assert.equal(verify(event,x),false)});
 
 const { sendJobsRevocationEvent: send } = exports;
-const endpoint='https://urai-jobs.us-central1.cloudfunctions.net/ingestConsentRevocation';
-const host='urai-jobs.us-central1.cloudfunctions.net';
+const endpoint='https://us-central1-urai-jobs.cloudfunctions.net/ingestConsentRevocation';
+const host='us-central1-urai-jobs.cloudfunctions.net';
 const transport=(overrides={})=>({
  endpoint,expectedHost:host,bearerToken:'x'.repeat(64),
  request:async(_url, options)=>({ok:true,status:200,headers:{get:(name)=>name==='content-type'?'application/json':null},text:async()=>JSON.stringify(ack())}),
@@ -78,12 +78,12 @@ test('transport requires pinned HTTPS endpoint and verifies returned Jobs ack',a
  assert.equal(result.consumerId,'urai-jobs');assert.match(result.acknowledgementHash,/^[a-f0-9]{64}$/);
 });
 for(const [name,changes] of [
- ['plain HTTP endpoint',{endpoint:'http://urai-jobs.us-central1.cloudfunctions.net/ingestConsentRevocation'}],
+ ['plain HTTP endpoint',{endpoint:'http://us-central1-urai-jobs.cloudfunctions.net/ingestConsentRevocation'}],
  ['wrong host',{expectedHost:'evil.run.app'}],
  ['loopback',{endpoint:'https://127.0.0.1/ingestConsentRevocation',expectedHost:'127.0.0.1'}],
- ['user info',{endpoint:'https://user:pw@urai-jobs.us-central1.cloudfunctions.net/ingestConsentRevocation'}],
+ ['user info',{endpoint:'https://user:pw@us-central1-urai-jobs.cloudfunctions.net/ingestConsentRevocation'}],
  ['query parameters',{endpoint:endpoint+'?redirect=https://evil.run.app'}],
- ['other path',{endpoint:'https://urai-jobs.us-central1.cloudfunctions.net/unrelated'}],
+ ['other path',{endpoint:'https://us-central1-urai-jobs.cloudfunctions.net/unrelated'}],
  ['missing bearer',{bearerToken:''}],
  ['header injection',{bearerToken:'a'.repeat(32)+'\nX: bad'}],
 ]) test(`transport rejects ${name} without network call`,async()=>{
@@ -140,4 +140,25 @@ test('reads and verifies a normal chunked Jobs acknowledgement',async()=>{
   text:async()=>{legacyTextCalls++;throw new Error('unexpected unbounded text read')}};
  const result=await send(event,transport({request:async()=>fakeResponse}));
  assert.equal(legacyTextCalls,0);assert.equal(result.consumerId,'urai-jobs');
+});
+
+
+test('rejects a matching foreign Cloud Functions host before sending bearer credentials', async () => {
+ let calls = 0;
+ const foreign = 'unrelated.us-central1.cloudfunctions.net';
+ await assert.rejects(send(event, transport({
+  endpoint: `https://${foreign}/ingestConsentRevocation`, expectedHost: foreign,
+  request: async () => { calls++; return { ok: true, status: 200, headers: { get: k => k === 'content-type' ? 'application/json' : null }, text: async () => JSON.stringify(ack()) }; },
+ })), /PRIVACY_JOBS_ENDPOINT_NOT_PINNED/);
+ assert.equal(calls, 0);
+});
+
+test('rejects a matching foreign Cloud Run host before sending bearer credentials', async () => {
+ let calls = 0;
+ const foreign = 'unrelated-123-uc.a.run.app';
+ await assert.rejects(send(event, transport({
+  endpoint: `https://${foreign}/ingestConsentRevocation`, expectedHost: foreign,
+  request: async () => { calls++; return { ok: true, status: 200, headers: { get: k => k === 'content-type' ? 'application/json' : null }, text: async () => JSON.stringify(ack()) }; },
+ })), /PRIVACY_JOBS_ENDPOINT_NOT_PINNED/);
+ assert.equal(calls, 0);
 });
