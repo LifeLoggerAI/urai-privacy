@@ -130,6 +130,41 @@ describe("Firestore owner/admin privacy rules", () => {
     await assertSucceeds(updateDoc(doc(authed("claim-admin", { admin: true }), "users/user-a"), { displayName: "Authorized recovery" }));
   });
 
+  it("fails closed on malformed deletion tombstones and unreconciled planning leases", async () => {
+    const createUid = "user-malformed-new";
+    const existingUid = "user-a";
+    const createRef = doc(authed(createUid), `users/${createUid}`);
+    const updateRef = doc(authed(existingUid), `users/${existingUid}`);
+
+    const tombstones: Array<Record<string, unknown>> = [
+      {}, { active: null }, { active: "false" }, { active: 0 }, { active: true },
+      { active: false, deletionPlanningLeaseToken: "pending-lease" },
+      { active: false, deletionPlanningLeaseUntil: "2026-11-03T05:00:00.000Z" },
+      { active: false, deletionPlanningLeaseRequestId: "deletion-a" },
+      { active: false, deletionPlanningLeaseOperation: "dryRun" },
+      { active: false, deletionPlanningLeaseBy: "worker-a" }
+    ];
+
+    for (const tombstone of tombstones) {
+      await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await setDoc(doc(db, `privacyDeletionTombstones/${createUid}`), tombstone);
+        await setDoc(doc(db, `privacyDeletionTombstones/${existingUid}`), tombstone);
+      });
+      await assertFails(setDoc(createRef, { uid: createUid, displayName: "No unsafe recreate" }));
+      await assertFails(updateDoc(updateRef, { displayName: "No unsafe update" }));
+    }
+
+    // An explicit inactive boolean with no planning lease is a clear tombstone.
+    await requireFirestoreEnv().withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `privacyDeletionTombstones/${createUid}`), { active: false });
+      await setDoc(doc(db, `privacyDeletionTombstones/${existingUid}`), { active: false });
+    });
+    await assertSucceeds(setDoc(createRef, { uid: createUid, displayName: "Allowed new profile" }));
+    await assertSucceeds(updateDoc(updateRef, { displayName: "Allowed profile update" }));
+  });
+
   it("requires server-mediated writes for privacy workflows and evidence", async () => {
     const userDb = authed("user-a");
     const adminDb = authed("claim-admin", { admin: true });
