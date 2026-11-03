@@ -129,3 +129,50 @@ test('bad token or endpoint never creates a lease', async () => {
   assert.equal(writes.length,0);
   assert.equal(transmissions,0);
 });
+
+test('lease starts at claim time rather than stale batch-scan time', async () => {
+  const {writes} = fixture(); response = undefined;
+  let calls = 0;
+  const clock = () => NOW + 90000 * calls++;
+  const result = await module.exports.dispatchPendingJobsRevocations(
+    transport(), {db:database,now:clock});
+  assert.equal(result.applied,1);
+  assert.ok(calls >= 2, 'claim transaction must resample time after query');
+  assert.equal(writes[0].jobsNextAttemptAt.toMillis(), NOW + 90000 + 60000);
+});
+
+test('failed delivery retry deadline starts after network completion, not batch scan', async () => {
+  const {row,writes} = fixture(); response = Error('transport failure');
+  let calls = 0;
+  const clock = () => NOW + 90000 * calls++;
+  const result = await module.exports.dispatchPendingJobsRevocations(
+    transport(), {db:database,now:clock});
+  assert.equal(result.retry,1);
+  assert.equal(row.jobsDeliveryState,'retry');
+  assert.ok(calls >= 3, 'finalization transaction must resample time after response');
+  assert.equal(writes[0].jobsNextAttemptAt.toMillis(), NOW+90000+60000);
+  assert.equal(row.jobsNextAttemptAt.toMillis(), NOW+180000+30000);
+});
+
+test('clock regression before claim fails closed without touching a due outbox row', async () => {
+  const {row,writes} = fixture(); response = undefined;
+  let calls = 0;
+  const clock = () => calls++ === 0 ? NOW : NOW - 1000;
+  await assert.rejects(module.exports.dispatchPendingJobsRevocations(
+    transport(), {db:database,now:clock}), /PRIVACY_JOBS_DISPATCHER_INVALID_CLOCK/);
+  assert.equal(row.jobsDeliveryState,'pending');
+  assert.equal(writes.length,0);
+  assert.equal(transmissions,0);
+});
+
+test('clock regression after remote response does not record a false applied receipt', async () => {
+  const {row,writes} = fixture(); response = undefined;
+  let calls = 0;
+  const clock = () => calls++ === 2 ? NOW - 1000 : NOW;
+  await assert.rejects(module.exports.dispatchPendingJobsRevocations(
+    transport(), {db:database,now:clock}), /PRIVACY_JOBS_DISPATCHER_INVALID_CLOCK/);
+  assert.equal(row.jobsDeliveryState,'leased');
+  assert.equal(writes.length,1);
+  assert.equal(transmissions,1);
+  assert.equal('jobsDeliveryAckHash' in row,false);
+});

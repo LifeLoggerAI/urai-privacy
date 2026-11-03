@@ -133,8 +133,15 @@ export async function dispatchPendingJobsRevocations(
       if (!live.exists) return { status: 'skip' as const };
       const data = live.data() ?? {};
       const state = data.jobsDeliveryState as State;
+      // Never grant a lease from the age of an earlier batch query. A slow
+      // query or preceding item can otherwise create an already-expired lease.
+      const claimAt = now();
+      if (!Number.isSafeInteger(claimAt) || claimAt < at ||
+          claimAt > Number.MAX_SAFE_INTEGER - LEASE_MS) {
+        throw new Error('PRIVACY_JOBS_DISPATCHER_INVALID_CLOCK');
+      }
       if (data.jobsDeliveryConsumerId !== DESTINATION || !STATES.includes(state) ||
-          !due(data.jobsNextAttemptAt, at)) return { status: 'skip' as const };
+          !due(data.jobsNextAttemptAt, claimAt)) return { status: 'skip' as const };
 
       const attempts = attemptsOf(data.jobsDeliveryAttempts);
       if (attempts === null || attempts >= MAX_ATTEMPTS) {
@@ -178,10 +185,10 @@ export async function dispatchPendingJobsRevocations(
         jobsDeliveryState: 'leased',
         jobsLeaseToken: token,
         jobsDeliveryAttempts: attempts + 1,
-        jobsNextAttemptAt: Timestamp.fromMillis(at + LEASE_MS),
+        jobsNextAttemptAt: Timestamp.fromMillis(claimAt + LEASE_MS),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return { status: 'claimed' as const, event, attempt: attempts + 1, authorityStamp };
+      return { status: 'claimed' as const, event, attempt: attempts + 1, authorityStamp, claimedAtMs: claimAt };
     });
 
     if (result.status === 'skip') { skipped++; continue; }
@@ -204,6 +211,13 @@ export async function dispatchPendingJobsRevocations(
     const final = await db.runTransaction(async (transaction) => {
       const latest = await transaction.get(item.ref);
       const state = latest.data() ?? {};
+      // Retry deadlines start when the remote attempt finishes, not when
+      // this batch began. Long queues must not trigger immediate retry storms.
+      const finalAt = now();
+      if (!Number.isSafeInteger(finalAt) || finalAt < result.claimedAtMs ||
+          finalAt > Number.MAX_SAFE_INTEGER - MAX_RETRY_MS) {
+        throw new Error('PRIVACY_JOBS_DISPATCHER_INVALID_CLOCK');
+      }
       if (!latest.exists || state.jobsDeliveryState !== 'leased' ||
           state.jobsLeaseToken !== token ||
           state.jobsDeliveryAttempts !== result.attempt) return 'lost-lease' as const;
@@ -236,7 +250,7 @@ export async function dispatchPendingJobsRevocations(
         jobsDeliveryLastCode: 'delivery_unconfirmed',
         jobsLeaseToken: FieldValue.delete(),
         jobsNextAttemptAt: terminal ? FieldValue.delete()
-          : Timestamp.fromMillis(at + backoffMs(result.attempt)),
+          : Timestamp.fromMillis(finalAt + backoffMs(result.attempt)),
         updatedAt: FieldValue.serverTimestamp(),
       });
       return terminal ? 'needs-review' as const : 'retry' as const;
