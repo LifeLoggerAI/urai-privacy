@@ -22,12 +22,14 @@ const transport = (overrides = {}) => ({ endpoint, expectedHost: 'us-central1-ur
 let response, database, transmissions;
 const fixture = (overrides = {}) => {
   const row = { eventId: ID, schemaVersion: 'consent.revoked.v1', status: 'pending',
+    consentRecordId:'owner-1_memory_storage', uid:'owner-1',purpose:'memory.storage',
     jobsDeliveryConsumerId: 'urai-jobs', jobsDeliveryState: 'pending', jobsDeliveryAttempts: 0,
     jobsNextAttemptAt: Timestamp.fromMillis(NOW), ...overrides };
   transmissions = 0;
   const writes = [];
   database = {
     collection(name) {
+      if(name==='consentRecords')return {doc:(id)=>({id,kind:'canonical'})};
       assert.equal(name, 'consentRevocationOutbox');
       const parts = [];
       const q = {
@@ -42,7 +44,9 @@ const fixture = (overrides = {}) => {
     },
     async runTransaction(work) {
       const pending = [];
-      const tx = { get: async () => ({ exists: true, data: () => ({...row}) }),
+      const tx = { get: async (ref) => ref.kind==='canonical'
+        ? ({exists:true,data:()=>({uid:'owner-1',purpose:'memory.storage',status:'revoked',receiptHash:'a'.repeat(64)}),updateTime:Timestamp.fromMillis(123)})
+        : ({ exists: true, data: () => ({...row}) }),
         update: (_,patch) => pending.push(patch) };
       const result = await work(tx);
       for (const patch of pending) { for(const [key,value] of Object.entries(patch)) {
@@ -61,7 +65,7 @@ vm.runInNewContext(compiled.outputText, { module, exports: module.exports, URL, 
     if(name==='./consent-revocation-jobs-contract') return {
       buildJobsRevocationEventV2: (id,data) => {
         if(data.status!=='pending' || data.schemaVersion!=='consent.revoked.v1')throw Error('invalid source');
-        return {eventId:id};
+        return {eventId:id,ownerUid:'owner-1',purpose:'memory.storage'};
       },
       sendJobsRevocationEvent: async event => {
         transmissions++;
