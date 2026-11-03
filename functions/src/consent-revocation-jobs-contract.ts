@@ -171,6 +171,8 @@ export async function sendJobsRevocationEvent(
   return {
     eventId: event.eventId,
     consumerId: 'urai-jobs',
-    acknowledgementHash: hash(decoded),
+    // The Jobs integrityHash binds the immutable revocation identity.
+    // Cleanup counts can legitimately change on idempotent retries.
+    acknowledgementHash: jobsRevocationAckHash(event),
   };
 }
