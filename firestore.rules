@@ -26,6 +26,15 @@ service cloud.firestore {
         ])
       );
     }
+    function ownerProfileIdentityOnCreate(uid) {
+      return (!('userId' in request.resource.data) || request.resource.data.userId == uid)
+        && (!('ownerId' in request.resource.data) || request.resource.data.ownerId == uid);
+    }
+    function ownerProfileIdentityOnUpdate(uid) {
+      return (!('userId' in resource.data) || resource.data.userId == uid)
+        && (!('ownerId' in resource.data) || resource.data.ownerId == uid)
+        && ownerProfileIdentityOnCreate(uid);
+    }
     function ownerIsNotChangingPrivilegedFields() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'role',
@@ -60,12 +69,14 @@ service cloud.firestore {
       allow create: if isOwner(uid)
         && deletionFenceIsInactive(uid)
         && request.resource.data.uid == uid
+        && ownerProfileIdentityOnCreate(uid)
         && ownerIsNotCreatingPrivilegedFields();
       allow update: if isAdmin() || (
         isOwner(uid)
         && deletionFenceIsInactive(uid)
         && request.resource.data.uid == uid
         && resource.data.uid == uid
+        && ownerProfileIdentityOnUpdate(uid)
         && ownerIsNotChangingPrivilegedFields()
       );
       allow delete: if false;
