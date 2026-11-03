@@ -115,3 +115,62 @@ export function verifyJobsRevocationResponse(event: JobsRevocationEventV2, value
     return true;
   } catch { return false; }
 }
+
+export type JobsRevocationTransport = Readonly<{
+  endpoint: string;
+  expectedHost: string;
+  bearerToken: string;
+  request?: typeof fetch;
+}>;
+
+/** Secure transport primitive, deliberately NOT a scheduled/event-triggered
+ * dispatcher. The caller must separately enforce trusted configuration,
+ * durable retries, per-consumer state, and least-privilege deployment. */
+export async function sendJobsRevocationEvent(
+  event: JobsRevocationEventV2,
+  transport: JobsRevocationTransport,
+): Promise<Readonly<{ eventId: string; consumerId: 'urai-jobs'; acknowledgementHash: string }>> {
+  const { endpoint, expectedHost, bearerToken } = transport;
+  if (typeof endpoint !== 'string' || typeof expectedHost !== 'string') {
+    throw new Error('PRIVACY_JOBS_ENDPOINT_NOT_CONFIGURED');
+  }
+  let url: URL;
+  try { url = new URL(endpoint); }
+  catch { throw new Error('PRIVACY_JOBS_ENDPOINT_INVALID'); }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port ||
+      url.search || url.hash || url.pathname !== '/ingestConsentRevocation' ||
+      url.hostname !== expectedHost ||
+      !(url.hostname.endsWith('.cloudfunctions.net') || url.hostname.endsWith('.run.app'))) {
+    throw new Error('PRIVACY_JOBS_ENDPOINT_NOT_PINNED');
+  }
+  if (typeof bearerToken !== 'string' || bearerToken.length < 32 || bearerToken.length > 4096 ||
+      /[\r\n]/.test(bearerToken)) {
+    throw new Error('PRIVACY_JOBS_TOKEN_UNAVAILABLE');
+  }
+  if (!HEX64.test(event.eventId) || !HEX64.test(event.sourceReceiptHash) ||
+      event.correlationId !== `revocation:${event.eventId}` ||
+      !IDENT.test(event.ownerUid) || !IDENT.test(event.purpose)) {
+    throw new Error('PRIVACY_JOBS_EVENT_NOT_VALIDATED');
+  }
+  const sender = transport.request ?? fetch;
+  const response = await sender(url.href, {
+    method: 'POST', redirect: 'error', cache: 'no-store',
+    signal: AbortSignal.timeout(8000),
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${bearerToken}` },
+    body: JSON.stringify(event),
+  });
+  if (!response.ok || response.status !== 200) throw new Error('PRIVACY_JOBS_DELIVERY_UNCONFIRMED');
+  const type = response.headers.get('content-type') || '';
+  if (!/^application\/json(?:;|$)/i.test(type)) throw new Error('PRIVACY_JOBS_ACK_CONTENT_TYPE');
+  const body = await response.text();
+  if (body.length > 16384) throw new Error('PRIVACY_JOBS_ACK_OVERSIZE');
+  let decoded: unknown;
+  try { decoded = JSON.parse(body); }
+  catch { throw new Error('PRIVACY_JOBS_ACK_INVALID_JSON'); }
+  if (!verifyJobsRevocationResponse(event, decoded)) throw new Error('PRIVACY_JOBS_ACK_NOT_VERIFIED');
+  return {
+    eventId: event.eventId,
+    consumerId: 'urai-jobs',
+    acknowledgementHash: hash(decoded),
+  };
+}
