@@ -12,7 +12,7 @@ assert.equal(compiled.diagnostics?.length ?? 0, 0);
 const DELETED = Symbol('deleted'), NOW = 1793685600000, ID = 'a'.repeat(64);
 const FieldValue = { delete: () => DELETED, serverTimestamp: () => 'server-time' };
 class Timestamp {
-  constructor(ms) { this.ms = ms; }
+  constructor(ms) { this.ms = ms; this.seconds=Math.floor(ms/1000); this.nanoseconds=(ms%1000)*1000000; }
   toMillis() { return this.ms; }
   static fromMillis(ms) { return new Timestamp(ms); }
 }
@@ -45,7 +45,7 @@ const fixture = (overrides = {}) => {
     async runTransaction(work) {
       const pending = [];
       const tx = { get: async (ref) => ref.kind==='canonical'
-        ? ({exists:true,data:()=>({uid:'owner-1',purpose:'memory.storage',status:'revoked',receiptHash:'a'.repeat(64)}),updateTime:Timestamp.fromMillis(123)})
+        ? ({exists:true,data:()=>({uid:'owner-1',purpose:'memory.storage',status:'revoked',receiptHash:'a'.repeat(64)}),updateTime:Timestamp.fromMillis(NOW-1000)})
         : ({ exists: true, data: () => ({...row}) }),
         update: (_,patch) => pending.push(patch) };
       const result = await work(tx);
@@ -65,7 +65,7 @@ vm.runInNewContext(compiled.outputText, { module, exports: module.exports, URL, 
     if(name==='./consent-revocation-jobs-contract') return {
       buildJobsRevocationEventV2: (id,data) => {
         if(data.status!=='pending' || data.schemaVersion!=='consent.revoked.v1')throw Error('invalid source');
-        return {eventId:id,ownerUid:'owner-1',purpose:'memory.storage'};
+        return {eventId:id,ownerUid:'owner-1',purpose:'memory.storage',sourceReceiptHash:'a'.repeat(64)};
       },
       sendJobsRevocationEvent: async event => {
         transmissions++;
