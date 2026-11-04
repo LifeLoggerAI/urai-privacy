@@ -38,6 +38,9 @@ export function assertPrivacyJobs261Checkout({ directory, declaredSha }, git = r
   assert.equal(read('rev-parse', '--abbrev-ref', 'HEAD'), 'HEAD', 'JOBS_CHECKOUT_NOT_DETACHED');
   assert.equal(read('rev-parse', 'HEAD'), EXACT_JOBS_SHA, 'JOBS_ACTUAL_HEAD_MISMATCH');
   assert.equal(read('rev-parse', 'HEAD^{tree}'), EXACT_JOBS_TREE, 'JOBS_ACTUAL_TREE_MISMATCH');
+  // Catch staged or unstaged tracked changes outside the six pinned contract files.
+  // Generated/ignored build outputs still require their own artifact proof.
+  assert.equal(read('status', '--porcelain=v1', '--untracked-files=no'), '', 'JOBS_TRACKED_WORKTREE_DIRTY');
   for (const [path, expected] of Object.entries(PINNED_BLOBS)) {
     assert.equal(read('hash-object', '--', path), expected, 'JOBS_SOURCE_BLOB_MISMATCH: ' + path);
   }
