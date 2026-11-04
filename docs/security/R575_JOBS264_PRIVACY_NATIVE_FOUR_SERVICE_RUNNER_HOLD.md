@@ -1,0 +1,9 @@
+# R575 — Jobs264 -> Privacy original four-emulator integration runner (HOLD)
+
+Source review anchor: Privacy `151d672f25f0efbf69a9578278f3070894aab288`, tree `aba80aa581fa50d0cdc2a45f8d3719839dcab30f`, containing new separate Jobs264 review guard and original 4-service emulator fixture. Runner commit is deliberately *subsequent*; the allowed Privacy source SHA is not self-referential and the source anchor is immutable. Original Jobs261 runner and fixture remain accessible and unchanged.
+
+Jobs `e2a700bd186c4dcff47c6da763e647992145d8b0`, tree `9ca86b4a60ef2969203819a52ff9f827ac710d59`. Verified on US-GA-2 and US-MO-2 with two independently matching 70-file generated JavaScript tree digests (`c7280667ade99c531a275b22cdd21fa39c058c18599e3137de35025825e36278`) and manifest (`423d58cb656b7545c1951a8338e5f6bce3bb53eccabec3879374970bdbc02049`). Original node --test negative consent tests 21/21 PASS on each host, both Pods explicitly stopped. No production or private patient data.
+
+Runner phases: no-cloud-credential preflight, exact detached Git SHA/tree, frozen original installs, Jobs shared/Functions and maintained security verify, Privacy Functions/build/typecheck/unit and Next.js build, independently pinned complete Jobs emitted JS manifest (the existing immutable serializer format), fresh isolated TS compiled parity, real Auth+Firestore+Storage+Functions emulator 23+ original checks, unique receipts, negative production flags and hashed private evidence log index.
+
+The full four-emulator run has NOT yet passed unless a subsequent exact-run receipt explicitly says so. On any failure no customer data, C6, runtime output writers or cloud IAM is authorized. This runner cannot substitute for GitHub required protected CI, independently signed build, broker-exclusive IAM, all old-writer denial, in-flight stream drain, physical GCS generation verification, real replay/deletion, staging rollout/rollback or Founder GO. Genesis HOLD.
