@@ -22,6 +22,11 @@ test('R560: four exact generated imports match separately captured manifest', ()
 test('R560: missing expected out-of-band manifest digest fails closed', () => {
   assert.throws(() => check({ digest: undefined }), /ARTIFACT_EXPECTED_DIGEST_REQUIRED/);
 });
+test('R561: transitive generated dependency added after capture fails', () => {
+  const p = join(root, 'functions/lib/functions/jobs/transitive-helper.js');
+  writeFileSync(p, 'module.exports = 999;\n');
+  assert.throws(() => check(), /JOBS_COMPILED_ARTIFACT_DRIFT/);
+});
 test('R560: changed manifest body fails its digest', () => {
   assert.throws(() => check({ manifest: captured.manifest + ' ' }), /ARTIFACT_MANIFEST_DIGEST_MISMATCH/);
 });
