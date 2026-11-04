@@ -50,7 +50,8 @@
     "test:revocation:health": "node --test tests/privacy-revocation-health.test.mjs",
     "test:revocation:dispatcher": "node --test tests/consent-revocation-dispatcher-contract.test.mjs",
     "test:revocation:authority": "node --test tests/consent-revocation-current-authority.test.mjs",
-    "test:revocation:lease-recovery": "node --test tests/consent-revocation-lease-recovery.test.mjs"
+    "test:revocation:lease-recovery": "node --test tests/consent-revocation-lease-recovery.test.mjs",
+    "test:life-movie:jobs264-rights:bridge:emulated": "npm run check:java && URAI_EMULATOR_PROJECT=urai-privacy-integration-test URAI_PRIVACY_JOBS_VERIFIER_UID=synthetic-jobs-verifier-uid FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_FUNCTIONS_EMULATOR_HOST=127.0.0.1:5001 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 firebase emulators:exec --config firebase.emulators.json --project urai-privacy-integration-test --only auth,firestore,storage,functions \"node tests/integration/life-movie-jobs264-rights-bridge.emulator.mjs\""
   },
   "dependencies": {
     "firebase": "^12.13.0",
