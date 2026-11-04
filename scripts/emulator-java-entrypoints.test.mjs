@@ -44,8 +44,8 @@ function withMockJava(version) {
   try {
     if (version !== null) {
       const path = join(dir, 'java');
-      writeFileSync(path, '#!/bin/sh\nprintf %s\\n ' +
-        "'openjdk version \\" + '"' + version + '\\"' + "'" + ' >&2\n');
+      writeFileSync(path, '#!/bin/sh\n' +
+        'echo ' + String.fromCharCode(39) + 'openjdk version "' + version + '"' + String.fromCharCode(39) + ' >&2\n');
       chmodSync(path, 0o755);
     }
     return spawnSync(process.execPath, [JAVA_CHECK], {
