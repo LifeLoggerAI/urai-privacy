@@ -13,7 +13,11 @@ const verified = (mutate = () => {}) => {
     assert.deepEqual(args.slice(0, 2), ['-C', root]);
     calls.push(args.slice(2));
     const [action, ref, path] = args.slice(2);
-    let output = action === 'rev-parse' ? (ref === 'HEAD' ? EXACT_JOBS_SHA : EXACT_JOBS_TREE)
+    let output = action === 'rev-parse'
+      ? (ref === 'HEAD' ? EXACT_JOBS_SHA
+        : ref === 'HEAD^{tree}' ? EXACT_JOBS_TREE
+        : ref === '--show-toplevel' ? root
+        : ref === '--abbrev-ref' && path === 'HEAD' ? 'HEAD' : undefined)
       : (action === 'hash-object' && ref === '--' ? PINNED_BLOBS[path] : undefined);
     output = mutate({ action, ref, path, output });
     return (output ?? '') + '\n';
@@ -25,7 +29,7 @@ const args = { directory: root, declaredSha: EXACT_JOBS_SHA };
 test('R548: exact Jobs commit, tree and six contract/worker blobs match', () => {
   const v = verified(({output}) => output);
   assert.equal(assertPrivacyJobs261Checkout(args, v.git), true);
-  assert.equal(v.calls.length, 8);
+  assert.equal(v.calls.length, 10);
   assert.equal(v.calls.filter(x => x[0] === 'hash-object').length, 6);
 });
 test('R548: caller cannot supply an older Jobs donor SHA', () => {
@@ -44,6 +48,16 @@ test('R548: non-disposable and relative paths fail closed', () => {
   for (const directory of ['relative-dir', '/', '/tmp']) {
     assert.throws(() => assertPrivacyJobs261Checkout({directory, declaredSha: EXACT_JOBS_SHA}, verified().git));
   }
+});
+test('R551: Git top level must equal the canonical disposable checkout root', () => {
+  const v = verified(({ action, ref, output }) =>
+    action === 'rev-parse' && ref === '--show-toplevel' ? '/tmp/redirected-worktree' : output);
+  assert.throws(() => assertPrivacyJobs261Checkout(args, v.git), /JOBS_GIT_TOPLEVEL_MISMATCH/);
+});
+test('R551: attached/movable branch must be rejected even at the pinned commit', () => {
+  const v = verified(({ action, ref, output }) =>
+    action === 'rev-parse' && ref === '--abbrev-ref' ? 'review/movable-branch' : output);
+  assert.throws(() => assertPrivacyJobs261Checkout(args, v.git), /JOBS_CHECKOUT_NOT_DETACHED/);
 });
 test('R548: missing Git or inaccessible source is denied', () => {
   assert.throws(() => assertPrivacyJobs261Checkout(args, () => { throw Error('mock git failure'); }), /mock git failure/);
