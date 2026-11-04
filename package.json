@@ -12,7 +12,7 @@
     "lint": "node scripts/lint-existing.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "node --test scripts/emulator-java-entrypoints.test.mjs && npm run test:jobs-checkout:attestation && vitest run tests/unit",
+    "test:unit": "node --test scripts/emulator-java-entrypoints.test.mjs && npm run test:jobs-checkout:attestation && npm run test:jobs-compiled:attestation && vitest run tests/unit",
     "test:jobs-checkout:attestation": "node --test scripts/assert-privacy-jobs261-checkout.test.mjs",
     "test:integration": "vitest run tests/integration --passWithNoTests",
     "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --minWorkers=1 --passWithNoTests",
@@ -49,7 +49,8 @@
     "test:revocation:health": "node --test tests/privacy-revocation-health.test.mjs",
     "test:revocation:dispatcher": "node --test tests/consent-revocation-dispatcher-contract.test.mjs",
     "test:revocation:authority": "node --test tests/consent-revocation-current-authority.test.mjs",
-    "test:revocation:lease-recovery": "node --test tests/consent-revocation-lease-recovery.test.mjs"
+    "test:revocation:lease-recovery": "node --test tests/consent-revocation-lease-recovery.test.mjs",
+    "test:jobs-compiled:attestation": "node --test scripts/assert-privacy-jobs261-compiled-output.test.mjs"
   },
   "dependencies": {
     "firebase": "^12.13.0",
