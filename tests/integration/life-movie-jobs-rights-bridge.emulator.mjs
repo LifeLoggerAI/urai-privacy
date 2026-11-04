@@ -20,13 +20,20 @@ import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { createEmulatorOnlyReviewMovieGrantBackend } from "../../functions/lib/life-movie-scoped-issuer-firestore-emulator.js";
 import { writeReviewOnlyScopedGrantCandidate } from "../../functions/lib/life-movie-scoped-issuer-review.js";
 import { evaluateLifeMovieRenderAuthorization } from "../../functions/lib/life-movie-render-authorization.js";
-import { assertPrivacyJobs261Checkout } from "../../scripts/review-only/assert-privacy-jobs261-checkout.mjs";
+import { assertPrivacyJobs261BuildBridge } from "../../scripts/review-only/assert-privacy-jobs261-build-bridge.mjs";
 
 const PROJECT = "urai-privacy-integration-test";
 const EXACT_JOBS_SOURCE = "b7a498e543160e64748a0679469a1fc1550acb3b";
 assert.equal(process.env.URAI_JOBS_SOURCE_SHA, EXACT_JOBS_SOURCE);
 assert.ok(process.env.URAI_JOBS_DIR?.startsWith("/tmp/"), "Jobs must be disposable clone");
-assertPrivacyJobs261Checkout({ directory: process.env.URAI_JOBS_DIR, declaredSha: process.env.URAI_JOBS_SOURCE_SHA });
+assertPrivacyJobs261BuildBridge({
+  directory: process.env.URAI_JOBS_DIR,
+  declaredSha: process.env.URAI_JOBS_SOURCE_SHA,
+  // The expected digest must originate in a separately preserved, trusted
+  // frozen-build receipt, NOT from this emulator test's own imports.
+  generatedManifest: process.env.URAI_JOBS_COMPILED_MANIFEST,
+  expectedGeneratedDigest: process.env.URAI_JOBS_COMPILED_EXPECTED_SHA256,
+});
 const jobsRequire = createRequire(resolve(process.env.URAI_JOBS_DIR, "functions/package.json"));
 const jobsAdmin = jobsRequire("firebase-admin/app");
 const jobsApp = jobsAdmin.initializeApp({ projectId: PROJECT }); // original Jobs getApp() reads default
