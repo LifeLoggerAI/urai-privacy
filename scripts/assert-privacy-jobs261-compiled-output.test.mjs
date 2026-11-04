@@ -61,6 +61,14 @@ test('R558: symlinked compiled module is denied', () => {
   symlinkSync(join(main,'privacy/lifeMovieFirebaseOwnerState.js'),location);
   assert.throws(() => run(), /JOBS_COMPILED_SYMLINK_NOT_ALLOWED/);
 });
+test('R558: entire ignored compiled-output root cannot be redirected by symlink', () => {
+  reset();
+  const relocated = join(dir, 'relocated-output');
+  mkdirSync(relocated, { recursive: true });
+  rmSync(main, { recursive: true, force: true });
+  symlinkSync(relocated, main);
+  assert.throws(() => run(), /JOBS_COMPILED_OUTPUT_ROOT_SYMLINK_NOT_ALLOWED/);
+});
 test('R558: non-disposable checkout path fails closed', () => {
   assert.throws(() => assertPrivacyJobs261CompiledOutput({directory:'/'}), /JOBS_COMPILED_DISPOSABLE_CHECKOUT_REQUIRED/);
 });
