@@ -41,6 +41,33 @@ function hasOwn(value: Record<string, unknown>, key: string) {
 }
 
 /**
+ * Create one literal, exact-shape snapshot of authority-bearing Firestore data.
+ * No getters, inherited values, symbols, surplus fields or proxy traps can be
+ * treated as approval. A snapshot also prevents validation/hash read drift.
+ * This validates receipt *integrity*, not the issuer or media rights.
+ */
+function pinExactOwnData(value: unknown, allowed: readonly string[]): Readonly<Record<string, unknown>> | null {
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return null;
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Reflect.ownKeys(descriptors);
+    if (keys.length !== allowed.length ||
+        keys.some(key => typeof key !== "string" || !allowed.includes(key))) return null;
+    const pinned: Record<string, unknown> = Object.create(null);
+    for (const key of allowed) {
+      const property = descriptors[key];
+      if (!property || !Object.prototype.hasOwnProperty.call(property, "value")) return null;
+      pinned[key] = property.value;
+    }
+    return Object.freeze(pinned);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Construct the canonical payload with exactly the approved field order.
  * Future scoped issuance must use this same helper before writing a grant.
  */
@@ -82,26 +109,30 @@ export function verifiesLifeMovieScopedReceipt(
     renderScope: LifeMovieScopedReceipt["renderScope"];
   }
 ): boolean {
-  if (!record || typeof record !== "object" || Array.isArray(record)) return false;
-  const source = record as Record<string, unknown>;
-  if (!fields.every((key) => hasOwn(source, key))) return false;
-  if (source.uid !== expected.subjectUid || source.tenantId !== expected.tenantId
+  // A hash over selected fields must never silently approve unreviewed fields
+  // present on the actual record. Pin both records and exact movie scopes once.
+  const root = pinExactOwnData(record, [...fields, "receiptHash"]);
+  const request = pinExactOwnData(expected,
+    ["subjectUid", "tenantId", "decisionReceiptId", "renderScope"]);
+  if (!root || !request) return false;
+  const scopeFields = ["projectId", "renderPlanDigest", "sourceSetDigest"] as const;
+  const selection = pinExactOwnData(root.renderScope, scopeFields);
+  const requested = pinExactOwnData(request.renderScope, scopeFields);
+  if (!selection || !requested) return false;
+  const source = Object.freeze(Object.assign(Object.create(null) as Record<string, unknown>, root, { renderScope: selection }));
+
+  if (source.uid !== request.subjectUid || source.tenantId !== request.tenantId
     || source.purpose !== "life-movie.render" || source.consentTier !== "C6"
     || source.status !== "granted" || source.policyVersion !== "1.1.0") return false;
-  if (!hasOwn(source, "receiptHash") || typeof source.receiptHash !== "string" || !SHA256_HEX.test(source.receiptHash)
-    || source.receiptHash !== expected.decisionReceiptId) return false;
+  if (typeof source.receiptHash !== "string" || !SHA256_HEX.test(source.receiptHash)
+    || source.receiptHash !== request.decisionReceiptId) return false;
 
-  const scope = source.renderScope;
-  if (!scope || typeof scope !== "object" || Array.isArray(scope)) return false;
-  const selection = scope as Record<string, unknown>;
-  if (Reflect.ownKeys(selection).length !== 3
-    || !["projectId", "renderPlanDigest", "sourceSetDigest"].every((key) => hasOwn(selection, key))
-    || typeof selection.projectId !== "string" || !SAFE_PROJECT.test(selection.projectId)
+  if (typeof selection.projectId !== "string" || !SAFE_PROJECT.test(selection.projectId)
     || typeof selection.renderPlanDigest !== "string" || !SHA256_HEX.test(selection.renderPlanDigest)
     || typeof selection.sourceSetDigest !== "string" || !SHA256_HEX.test(selection.sourceSetDigest)
-    || selection.projectId !== expected.renderScope.projectId
-    || selection.renderPlanDigest !== expected.renderScope.renderPlanDigest
-    || selection.sourceSetDigest !== expected.renderScope.sourceSetDigest) return false;
+    || selection.projectId !== requested.projectId
+    || selection.renderPlanDigest !== requested.renderPlanDigest
+    || selection.sourceSetDigest !== requested.sourceSetDigest) return false;
 
   for (const key of ["uid", "tenantId", "expiresAt", "surface", "jurisdiction",
     "noticeVersion", "noticeHash", "evidenceHash", "updatedAt"]) {
@@ -110,6 +141,5 @@ export function verifiesLifeMovieScopedReceipt(
   if (!SHA256_HEX.test(source.noticeHash as string)
     || !SHA256_HEX.test(source.evidenceHash as string)) return false;
 
-  const receipt = source as unknown as LifeMovieScopedReceipt;
-  return hashLifeMovieScopedReceipt(receipt) === expected.decisionReceiptId;
+  return hashLifeMovieScopedReceipt(source as LifeMovieScopedReceipt) === request.decisionReceiptId;
 }
