@@ -59,7 +59,7 @@ function fixture(overrides: FixtureOptions = {}) {
       : overrides.profile,
     readDeletionTombstone: async () => overrides.tombstone === undefined
       ? { exists: false, data: () => undefined }
-      : overrides.tombstone as ReviewOnlyMovieGrantTransaction extends never ? never : any,
+      : overrides.tombstone as any,
     readExistingGrant: async () => overrides.existing === undefined ? null : overrides.existing,
     readReviewedNotice: async () => overrides.notice === undefined ? notice : overrides.notice,
     readOwnerApproval: async () => overrides.approval === undefined ? approval : overrides.approval,
