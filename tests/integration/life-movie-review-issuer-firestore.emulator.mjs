@@ -23,8 +23,11 @@ const EXPECTED = {
   FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080",
 };
 for (const [key, value] of Object.entries(EXPECTED)) assert.equal(process.env[key], value);
-for (const name of ["GOOGLE_APPLICATION_CREDENTIALS", "FIREBASE_TOKEN", "GCLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"]) {
+for (const name of ["GOOGLE_APPLICATION_CREDENTIALS", "FIREBASE_TOKEN"]) {
   assert.equal(process.env[name] ?? "", "", name + " must not be set");
+}
+for (const name of ["GCLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"]) {
+  if (process.env[name]) assert.equal(process.env[name], PROJECT, name + " must refer to the disposable project");
 }
 const config = {
   apiKey: "local-synthetic-emulator-only",
