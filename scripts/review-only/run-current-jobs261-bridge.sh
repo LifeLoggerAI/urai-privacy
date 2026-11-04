@@ -65,8 +65,23 @@ finalize() {
   rc=$?
   trap - EXIT
   if [[ -d "$EVIDENCE_ROOT" ]]; then
+    # A green run must retain the generated-module manifest, too. Bind it
+    # into SHA256SUMS so the stage receipt cannot omit artifact lineage.
+    if [[ "$rc" -eq 0 && ! -s "$EVIDENCE_ROOT/COMPILED_JOBS_SHA256SUMS.txt" ]]; then
+      echo 'R565: missing generated-Jobs manifest on successful run' >&2
+      rc=2
+    fi
     printf 'R554_EXACT_PRIVACY_SHA=%s\nR554_EXACT_JOBS_SHA=%s\nR554_EXIT=%s\n' "$PRIVACY_SHA" "$JOBS_SHA" "$rc" > "$EVIDENCE_ROOT/RESULT.txt"
-    (cd "$EVIDENCE_ROOT" && sha256sum ./*.log RESULT.txt > SHA256SUMS.txt) || true
+    if ! (cd "$EVIDENCE_ROOT" &&
+      files=(./*.log RESULT.txt)
+      if [[ -f COMPILED_JOBS_SHA256SUMS.txt ]]; then
+        files+=(COMPILED_JOBS_SHA256SUMS.txt)
+      fi
+      sha256sum "${files[@]}" > SHA256SUMS.txt); then
+      echo 'R565: unable to hash the complete private evidence bundle' >&2
+      rc=2
+      printf 'R554_EXACT_PRIVACY_SHA=%s\nR554_EXACT_JOBS_SHA=%s\nR554_EXIT=%s\n' "$PRIVACY_SHA" "$JOBS_SHA" "$rc" > "$EVIDENCE_ROOT/RESULT.txt"
+    fi
     echo "R554_REVIEW_ONLY_EXIT=$rc EVIDENCE_DIR=$EVIDENCE_ROOT (PRIVATE; RETAIN APPROVED LOGS)"
   fi
   rm -rf -- "$RUN_ROOT"
@@ -177,9 +192,16 @@ run_step actual_four_emulator_bridge env \
 node - "$EVIDENCE_ROOT/actual_four_emulator_bridge.log" <<'NODE'
 const fs = require('node:fs');
 const data = fs.readFileSync(process.argv[2], 'utf8');
-const parity = data.split(/\r?\n/).find(x => x.startsWith('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS '));
-if (!parity || !/^R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS [1-9][0-9]* [0-9a-f]{64}$/.test(parity.trim())) {
-  throw Error('R565: original Jobs fresh-compiled parity receipt missing or malformed');
+// Do not accept an emulator result that omitted the fresh compiled-JS
+// proof. The checked-out Privacy fixture must report exactly one parity pass.
+const parityEntries = data.split(/\r?\n/)
+  .filter(x => x.includes('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS '));
+if (parityEntries.length !== 1) {
+  throw Error('R566: compiled Jobs parity receipt missing or ambiguous');
+}
+const parity = parityEntries[0].match(/R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS (\d+) ([0-9a-f]{64})(?:\s|$)/);
+if (!parity || !Number.isSafeInteger(Number(parity[1])) || Number(parity[1]) < 4) {
+  throw Error('R566: malformed compiled Jobs parity receipt');
 }
 const entry = data.split(/\r?\n/).find(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
 if (!entry) throw Error('R554: missing original emulator pass receipt');
