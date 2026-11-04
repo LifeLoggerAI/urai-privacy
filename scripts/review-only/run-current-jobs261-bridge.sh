@@ -177,10 +177,18 @@ run_step actual_four_emulator_bridge env \
 node - "$EVIDENCE_ROOT/actual_four_emulator_bridge.log" <<'NODE'
 const fs = require('node:fs');
 const data = fs.readFileSync(process.argv[2], 'utf8');
+const parity = data.split(/\r?\n/).find(x => x.startsWith('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS '));
+if (!parity || !/^R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS [1-9][0-9]* [0-9a-f]{64}$/.test(parity.trim())) {
+  throw Error('R565: original Jobs fresh-compiled parity receipt missing or malformed');
+}
 const entry = data.split(/\r?\n/).find(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
 if (!entry) throw Error('R554: missing original emulator pass receipt');
 const r = JSON.parse(entry.slice('R454_REVIEW_ONLY_FIRESTORE_PASS '.length));
 if (!Number.isInteger(r.checksPassed) || r.checksPassed < 23 ||
+    !Array.isArray(r.checks) || r.checks.length !== r.checksPassed ||
+    !r.checks.includes('Jobs-original-scope-derived-from-actual-Storage-generation') ||
+    !r.checks.includes('original-Jobs-erases-pinned-private-generation-after-review-revocation') ||
+    r.syntheticReviewProjectionOnly !== true || r.jobsWorkerRuntimeIntegrated !== false ||
     r.authEmulator !== true || r.firestoreEmulator !== true ||
     r.functionsEmulator !== true || r.jobSourceAuditReadFromRealAuthFirestoreStorage !== true ||
     r.productionAuthorized !== false || r.renderEnabled !== false ||
