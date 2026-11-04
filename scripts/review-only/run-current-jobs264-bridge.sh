@@ -32,8 +32,8 @@ fi
 # A caller-provided 40-hex commit is not a release approval. Only the
 # exact Git-tree-verified R569 converged Privacy review candidate is in this runner's
 # reviewed allowlist. Future changes require a new reviewed runner commit.
-APPROVED_PRIVACY_SHA='380530b558aa093de9346fc5d0f4163cf6578bc0'
-APPROVED_PRIVACY_TREE='5e5541173d0ca34509eeef095b745e5febd97c54'
+APPROVED_PRIVACY_SHA='17883515f8160bc4eacbc667d4f7a6d8a67a7d17'
+APPROVED_PRIVACY_TREE='23b223c1bb133281b20b82e25ef9d52ef314c182'
 if [[ "$PRIVACY_SHA" != "$APPROVED_PRIVACY_SHA" ]]; then
   echo 'DENIED: Privacy revision not pinned by this review-only runner' >&2
   exit 2
@@ -203,6 +203,30 @@ if [[ "$(sha256sum "$EVIDENCE_ROOT/reviewed_jobs_generated_manifest.log" | cut -
   exit 2
 fi
 REVIEWED_JOBS_COMPILED_MANIFEST="$(cat "$EVIDENCE_ROOT/reviewed_jobs_generated_manifest.log")"
+
+# R583: require an INDEPENDENT 70-file Jobs264 manifest as well as the
+# original R575/Jobs261-compatible serializer before accepting ANY emulator GO.
+# These two independently pre-reviewed hashes are not caller-supplied.
+run_step independently_reproduced_jobs264_manifest node --input-type=module -e '
+import assert from "node:assert/strict";
+import {pathToFileURL} from "node:url";
+import {join} from "node:path";
+const [jobsDir,privacyDir]=process.argv.slice(1);
+const capture=await import(pathToFileURL(join(privacyDir,"scripts/review-only/attest-jobs264-generated.mjs")).href);
+const pinned=await import(pathToFileURL(join(privacyDir,"scripts/review-only/assert-privacy-jobs264-independent-build.mjs")).href);
+const observed=capture.captureJobs264GeneratedManifest(jobsDir);
+const parsed=JSON.parse(observed.manifest);
+assert.equal(observed.digest,pinned.R580_REVIEWED_JOBS264_MANIFEST_SHA256,"R583 independent two-host SHA256 mismatch");
+assert.equal(parsed.treeSha256,pinned.R580_REVIEWED_JOBS264_TREE_SHA256,"R583 independent compiled tree digest mismatch");
+assert.equal(parsed.treeCount,pinned.R580_REVIEWED_JOBS264_FILE_COUNT,"R583 Jobs264 compiled file count mismatch");
+assert.equal(parsed.treeBytes,pinned.R580_REVIEWED_JOBS264_TREE_BYTES,"R583 Jobs264 compiled byte count mismatch");
+assert.equal(pinned.assertR583ReviewedPrivacyJobs264IndependentBuild({
+ directory:jobsDir,declaredSha:"e2a700bd186c4dcff47c6da763e647992145d8b0",
+ generatedManifest:observed.manifest,expectedGeneratedDigest:pinned.R580_REVIEWED_JOBS264_MANIFEST_SHA256
+}),true);
+console.log("R583_INDEPENDENT_JOBS264_MANIFEST_PASS count="+parsed.treeCount+" sha256="+observed.digest+" productionAuthorized=false");
+' "$JOBS_DIR" "$PRIVACY_DIR"
+
 
 # All four emulators are disposable; both Jobs and Privacy are on detached
 # immutable commits. The fixture keeps C6 reviewOnlyEmulator=true and
