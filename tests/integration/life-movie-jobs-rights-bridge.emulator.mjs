@@ -21,12 +21,19 @@ import { createEmulatorOnlyReviewMovieGrantBackend } from "../../functions/lib/l
 import { writeReviewOnlyScopedGrantCandidate } from "../../functions/lib/life-movie-scoped-issuer-review.js";
 import { evaluateLifeMovieRenderAuthorization } from "../../functions/lib/life-movie-render-authorization.js";
 import { assertPrivacyJobs261Checkout } from "../../scripts/review-only/assert-privacy-jobs261-checkout.mjs";
+import { assertPrivacyJobs261CompiledOutput } from "../../scripts/review-only/assert-privacy-jobs261-compiled-output.mjs";
 
 const PROJECT = "urai-privacy-integration-test";
 const EXACT_JOBS_SOURCE = "b7a498e543160e64748a0679469a1fc1550acb3b";
 assert.equal(process.env.URAI_JOBS_SOURCE_SHA, EXACT_JOBS_SOURCE);
 assert.ok(process.env.URAI_JOBS_DIR?.startsWith("/tmp/"), "Jobs must be disposable clone");
 assertPrivacyJobs261Checkout({ directory: process.env.URAI_JOBS_DIR, declaredSha: process.env.URAI_JOBS_SOURCE_SHA });
+// Fail closed if ignored generated JavaScript differs from a fresh TypeScript
+// emit of the pinned source. This runs BEFORE loading any Jobs module.
+const compiledProof = assertPrivacyJobs261CompiledOutput({ directory: process.env.URAI_JOBS_DIR });
+assert.equal(compiledProof.reviewOnly, true);
+assert.equal(compiledProof.productionAuthorized, false);
+console.log("R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS", compiledProof.javascriptFileCount, compiledProof.emittedFileDigestSha256);
 const jobsRequire = createRequire(resolve(process.env.URAI_JOBS_DIR, "functions/package.json"));
 const jobsAdmin = jobsRequire("firebase-admin/app");
 const jobsApp = jobsAdmin.initializeApp({ projectId: PROJECT }); // original Jobs getApp() reads default
