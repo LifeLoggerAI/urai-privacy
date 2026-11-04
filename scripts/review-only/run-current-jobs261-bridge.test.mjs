@@ -175,12 +175,12 @@ const valid = Object.freeze({
   productionSignedJobsIdentityVerified:false,
   finalReleaseAccepted:false
 });
-function verifySyntheticReceipt({receipt=valid, parity=true, digest='a'.repeat(64)}={}) {
+function verifySyntheticReceipt({receipt=valid, parity=true, digest='a'.repeat(64), parityCount=1, moduleCount=20}={}) {
   const temp=mkdtempSync(join(tmpdir(),'urai-r565-bridge-receipt-'));
   const log=join(temp,'emulator.log');
   try {
     const rows=[];
-    if(parity)rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS 20 '+digest);
+    if(parity) for(let i=0;i<parityCount;i++) rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS '+moduleCount+' '+digest);
     rows.push('R454_REVIEW_ONLY_FIRESTORE_PASS '+JSON.stringify(receipt));
     writeFileSync(log,rows.join('\n')+'\n');
     return spawnSync(process.execPath,['-',log],{input:parserSource(),encoding:'utf8',timeout:10000});
@@ -194,12 +194,12 @@ test('R565: actual review runner parser accepts pinned parity plus real Storage 
 test('R565: absent fresh-compiled parity receipt is denied',()=>{
   const r=verifySyntheticReceipt({parity:false});
   assert.notEqual(r.status,0);
-  assert.match(r.stderr,/fresh-compiled parity receipt missing or malformed/);
+  assert.match(r.stderr,/R566: compiled Jobs parity receipt missing or ambiguous/);
 });
 test('R565: malformed parity digest is denied',()=>{
   const r=verifySyntheticReceipt({digest:'forged-hash'});
   assert.notEqual(r.status,0);
-  assert.match(r.stderr,/fresh-compiled parity receipt missing or malformed/);
+  assert.match(r.stderr,/R566: malformed compiled Jobs parity receipt/);
 });
 test('R565: Storage-generation proof cannot be omitted despite 23 synthetic checks',()=>{
   const altered=[...checks];altered[0]='synthetic-does-not-prove-storage-generation';
@@ -224,4 +224,20 @@ test('R565: production authorization can never be an emulator acceptance',()=>{
     const r=verifySyntheticReceipt({receipt:{...valid,[key]:true}});
     assert.notEqual(r.status,0,key);
   }
+});
+
+test('R566: duplicate parity receipts are denied rather than first-match accepted',()=>{
+  const r=verifySyntheticReceipt({parityCount:2});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/R566: compiled Jobs parity receipt missing or ambiguous/);
+});
+test('R566: parity reports fewer than four imported modules fail closed',()=>{
+  const r=verifySyntheticReceipt({moduleCount:1});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/R566: malformed compiled Jobs parity receipt/);
+});
+test('R566: generated Jobs artifact manifest is included in the evidence index',()=>{
+  assert.match(source,/files\+=\(COMPILED_JOBS_SHA256SUMS\.txt\)/);
+  assert.match(source,/sha256sum "\$\{files\[@\]\}" > SHA256SUMS\.txt/);
+  assert.match(source,/R565: missing generated-Jobs manifest on successful run/);
 });
