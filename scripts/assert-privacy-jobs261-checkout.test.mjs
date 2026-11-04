@@ -29,7 +29,7 @@ const args = { directory: root, declaredSha: EXACT_JOBS_SHA };
 test('R548: exact Jobs commit, tree and six contract/worker blobs match', () => {
   const v = verified(({output}) => output);
   assert.equal(assertPrivacyJobs261Checkout(args, v.git), true);
-  assert.equal(v.calls.length, 10);
+  assert.equal(v.calls.length, 11);
   assert.equal(v.calls.filter(x => x[0] === 'hash-object').length, 6);
 });
 test('R548: caller cannot supply an older Jobs donor SHA', () => {
@@ -58,6 +58,14 @@ test('R551: attached/movable branch must be rejected even at the pinned commit',
   const v = verified(({ action, ref, output }) =>
     action === 'rev-parse' && ref === '--abbrev-ref' ? 'review/movable-branch' : output);
   assert.throws(() => assertPrivacyJobs261Checkout(args, v.git), /JOBS_CHECKOUT_NOT_DETACHED/);
+});
+test('R552: reject unstaged modifications outside six pinned Jobs files', () => {
+  const v = verified(({ action, output }) => action === 'status' ? ' M functions/src/privacy/unpinned-check.ts' : output);
+  assert.throws(() => assertPrivacyJobs261Checkout(args, v.git), /JOBS_TRACKED_WORKTREE_DIRTY/);
+});
+test('R552: reject staged modifications outside six pinned Jobs files', () => {
+  const v = verified(({ action, output }) => action === 'status' ? 'M  scripts/unpinned-check.mjs' : output);
+  assert.throws(() => assertPrivacyJobs261Checkout(args, v.git), /JOBS_TRACKED_WORKTREE_DIRTY/);
 });
 test('R548: missing Git or inaccessible source is denied', () => {
   assert.throws(() => assertPrivacyJobs261Checkout(args, () => { throw Error('mock git failure'); }), /mock git failure/);
