@@ -159,12 +159,17 @@ run_step actual_four_emulator_bridge env \
 node - "$EVIDENCE_ROOT/actual_four_emulator_bridge.log" <<'NODE'
 const fs = require('node:fs');
 const data = fs.readFileSync(process.argv[2], 'utf8');
+const parity = data.split(/\r?\n/).find(x => x.startsWith('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS '));
+if (!parity || !/^R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS [1-9][0-9]* [0-9a-f]{64}$/.test(parity.trim())) {
+  throw Error('R560: missing or malformed original fresh-compiled Jobs parity receipt');
+}
 const entry = data.split(/\r?\n/).find(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
 if (!entry) throw Error('R554: missing original emulator pass receipt');
 const r = JSON.parse(entry.slice('R454_REVIEW_ONLY_FIRESTORE_PASS '.length));
 if (!Number.isInteger(r.checksPassed) || r.checksPassed < 23 ||
     r.authEmulator !== true || r.firestoreEmulator !== true ||
-    r.functionsEmulator !== true || r.jobSourceAuditReadFromRealAuthFirestoreStorage !== true ||
+    r.storageEmulator !== true || r.functionsEmulator !== true ||
+    r.jobSourceAuditReadFromRealAuthFirestoreStorage !== true ||
     r.productionAuthorized !== false || r.renderEnabled !== false ||
     r.approvedOwnerC6ConsentIssuer !== false || r.productionSignedJobsIdentityVerified !== false ||
     r.finalReleaseAccepted !== false) {
