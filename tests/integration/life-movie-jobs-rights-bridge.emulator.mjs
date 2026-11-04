@@ -4,7 +4,7 @@
  * Privacy review module, not an actual independently approved grant issuer.
  */
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { initializeApp, deleteApp } from "firebase/app";
@@ -22,7 +22,7 @@ import { writeReviewOnlyScopedGrantCandidate } from "../../functions/lib/life-mo
 import { evaluateLifeMovieRenderAuthorization } from "../../functions/lib/life-movie-render-authorization.js";
 
 const PROJECT = "urai-privacy-integration-test";
-const EXACT_JOBS_SOURCE = "07f18849fdab6200f357326158a60b853242ff49";
+const EXACT_JOBS_SOURCE = "04d714c85c5ec212d3f9c04cc9f91ba12edf7e02";
 assert.equal(process.env.URAI_JOBS_SOURCE_SHA, EXACT_JOBS_SOURCE);
 assert.ok(process.env.URAI_JOBS_DIR?.startsWith("/tmp/"), "Jobs must be disposable clone");
 const jobsRequire = createRequire(resolve(process.env.URAI_JOBS_DIR, "functions/package.json"));
@@ -35,6 +35,8 @@ const { createReviewOnlyFirebaseLifeMovieOwnerVerifier } =
   jobsRequire("./lib/functions/privacy/lifeMovieFirebaseOwnerState.js");
 const { createFirebaseLifeMovieSourceRightsVerifier } =
   jobsRequire("./lib/functions/privacy/lifeMovieFirebaseSourceRightsAdapter.js");
+const { invalidateLifeMovieDerivativesForConsent } =
+  jobsRequire("./lib/functions/privacy/lifeMovieDerivativeRevocation.js");
 const EXPECTED = {
   URAI_EMULATOR_PROJECT: PROJECT,
   FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
@@ -244,6 +246,65 @@ try {
   await realRightsRef.update({ status: "revoked" });
   await assert.rejects(() => verifySourceRights(verifyInput), /life_movie_source_rights_unverified/);
   checks.push("original-Jobs-refuses-rights-after-review-only-consent-creation");
+
+  // R506: real source-to-derivative deletion chain on the SAME disposable
+  // Auth/Firestore/Storage/Functions emulator environment. The derivative is
+  // manually seeded with SYNTHETIC bytes, NOT rendered under an active C6 grant.
+  // A revoked Privacy-side review record must never revive output access, and
+  // the original Jobs revocation code must delete only the pinned GCS generation.
+  const syntheticJobId = "review-revoked-derivative-" + first.uid;
+  const derivativePath = "tenants/tenant-1/life-movies/" +
+    scope.projectId + "/render/" + syntheticJobId + ".mp4";
+  const derivative = jobsStorage.bucket(bucket).file(derivativePath);
+  await derivative.save(Buffer.from("R506-SYNTHETIC-NOT-A-RENDER"), {
+    resumable: false, metadata: { contentType: "video/mp4" },
+  });
+  const [derivativeBefore] = await derivative.getMetadata();
+  assert.match(String(derivativeBefore.generation), /^[1-9][0-9]*$/);
+  const derivativeJob = jobsDb.collection("jobs").doc(syntheticJobId);
+  await derivativeJob.set({
+    jobId: syntheticJobId, ownerUid: first.uid, tenantId: "tenant-1",
+    sourceSystem: "urai-studio", jobType: "studio.render.video",
+    status: "SUCCESS", payload: { projectId: scope.projectId },
+    output: { outputs: [{
+      kind: "mp4", ref: "gs://" + bucket + "/" + derivativePath,
+      generation: String(derivativeBefore.generation), mimeType: "video/mp4",
+    }] },
+  });
+  checks.push("synthetic-derivative-generation-seeded-after-review-rights-revocation");
+
+  const revokeEvent = {
+    eventId: "r506-synthetic-rights-revoked-" + first.uid,
+    ownerUid: first.uid, purpose: "life-movie.render",
+    revokedAt: new Date().toISOString(),
+  };
+  await jobsDb.collection("jobConsentEventReceipts")
+    .doc(createHash("sha256").update(revokeEvent.eventId).digest("hex"))
+    .set({ ...revokeEvent, status: "blocked", consumerId: "urai-jobs" });
+  const previousBucketName = process.env.GCS_BUCKET_NAME;
+  process.env.GCS_BUCKET_NAME = bucket;
+  let cleanup;
+  try {
+    cleanup = await invalidateLifeMovieDerivativesForConsent(revokeEvent);
+  } finally {
+    if (previousBucketName === undefined) delete process.env.GCS_BUCKET_NAME;
+    else process.env.GCS_BUCKET_NAME = previousBucketName;
+  }
+  assert.equal(cleanup.jobsInvalidated, 1);
+  assert.equal(cleanup.storageObjectsDeleted, 1);
+  await assert.rejects(() => derivative.getMetadata(),
+    (error) => error?.code === 404);
+  checks.push("original-Jobs-erases-pinned-private-generation-after-review-revocation");
+
+  const revokedJob = (await derivativeJob.get()).data();
+  assert.equal(revokedJob?.derivativeAccessState, "REVOKED");
+  assert.equal(revokedJob?.output, undefined);
+  assert.ok(revokedJob?.outputDeletedAt);
+  const reviewAfterCleanup = await adminDb.collection("consentRecords")
+    .doc(result.recordId).get();
+  assert.equal(reviewAfterCleanup.data()?.reviewOnlyEmulator, true);
+  assert.equal(reviewAfterCleanup.data()?.productionAuthorized, false);
+  checks.push("original-Jobs-retains-revocation-fence-without-promoting-review-consent");
 
 
   await expectDeny("duplicate-grant-denied", () =>
