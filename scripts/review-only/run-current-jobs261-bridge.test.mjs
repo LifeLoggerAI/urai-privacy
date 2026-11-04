@@ -175,12 +175,13 @@ const valid = Object.freeze({
   productionSignedJobsIdentityVerified:false,
   finalReleaseAccepted:false
 });
-function verifySyntheticReceipt({receipt=valid, parity=true, digest='a'.repeat(64)}={}) {
+function verifySyntheticReceipt({receipt=valid, parity=true, duplicateParity=false, digest='a'.repeat(64)}={}) {
   const temp=mkdtempSync(join(tmpdir(),'urai-r565-bridge-receipt-'));
   const log=join(temp,'emulator.log');
   try {
     const rows=[];
     if(parity)rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS 20 '+digest);
+    if(duplicateParity)rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS 20 '+digest);
     rows.push('R454_REVIEW_ONLY_FIRESTORE_PASS '+JSON.stringify(receipt));
     writeFileSync(log,rows.join('\n')+'\n');
     return spawnSync(process.execPath,['-',log],{input:parserSource(),encoding:'utf8',timeout:10000});
@@ -194,12 +195,17 @@ test('R565: actual review runner parser accepts pinned parity plus real Storage 
 test('R565: absent fresh-compiled parity receipt is denied',()=>{
   const r=verifySyntheticReceipt({parity:false});
   assert.notEqual(r.status,0);
-  assert.match(r.stderr,/fresh-compiled parity receipt missing or malformed/);
+  assert.match(r.stderr,/compiled Jobs parity receipt missing or ambiguous/);
 });
 test('R565: malformed parity digest is denied',()=>{
   const r=verifySyntheticReceipt({digest:'forged-hash'});
   assert.notEqual(r.status,0);
-  assert.match(r.stderr,/fresh-compiled parity receipt missing or malformed/);
+  assert.match(r.stderr,/malformed compiled Jobs parity receipt/);
+});
+test('R567: duplicated parity receipt is rejected as ambiguous',()=>{
+  const r=verifySyntheticReceipt({duplicateParity:true});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/compiled Jobs parity receipt missing or ambiguous/);
 });
 test('R565: Storage-generation proof cannot be omitted despite 23 synthetic checks',()=>{
   const altered=[...checks];altered[0]='synthetic-does-not-prove-storage-generation';
