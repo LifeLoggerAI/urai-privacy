@@ -95,7 +95,7 @@ exit 0
       PATH: dir + ':' + process.env.PATH,
       R555_FAIL_GIT_STAGE: stage,
       URAI_DISPOSABLE_REVIEW:'YES_SYNTHETIC_ONLY',
-      URAI_EXPECTED_PRIVACY_SHA:'9620cf75c3e0914a86f47f694423c9a1e0a2da1a',
+      URAI_EXPECTED_PRIVACY_SHA:'2567d6e9c0a30068c799ffe80b443fe45b7b67b5',
     });
   } finally {
     rmSync(dir, {force:true, recursive:true});
@@ -127,12 +127,22 @@ test('R561: arbitrary valid-looking Privacy hash fails before checkout', () => {
   assert.match(r.stderr,/Privacy revision not approved by this reviewed runner/);
   assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=/);
 });
-test('R561: reviewed Privacy commit and tree are pinned before any Jobs fetch', () => {
-  assert.match(source,/APPROVED_PRIVACY_SHA='9620cf75c3e0914a86f47f694423c9a1e0a2da1a'/);
-  assert.match(source,/APPROVED_PRIVACY_TREE='ac86eee8d2971d0bf8b27ba2040cda018b1b6626'/);
+test('R564: reviewed R562 Privacy commit and tree are pinned before any Jobs fetch', () => {
+  assert.match(source,/APPROVED_PRIVACY_SHA='2567d6e9c0a30068c799ffe80b443fe45b7b67b5'/);
+  assert.match(source,/APPROVED_PRIVACY_TREE='9c878321ceae8072b85371859e73f66add1d89af'/);
   const privacyFetch = source.indexOf('run_step privacy_exact_fetch fetch_exact');
   const treeGuard = source.indexOf("privacy_actual_tree=");
   const jobsFetch = source.indexOf('run_step jobs_exact_fetch fetch_exact');
   assert.ok(privacyFetch > 0 && treeGuard > privacyFetch && jobsFetch > treeGuard);
   assert.match(source,/DENIED: approved Privacy source tree mismatch/);
+});
+
+test('R564: previously reviewed Privacy revision is not implicitly still allowlisted', () => {
+  const r=invoke(['--execute-disposable'], {
+    URAI_DISPOSABLE_REVIEW:'YES_SYNTHETIC_ONLY',
+    URAI_EXPECTED_PRIVACY_SHA:'9620cf75c3e0914a86f47f694423c9a1e0a2da1a',
+  });
+  assert.equal(r.status,2,r.stdout + r.stderr);
+  assert.match(r.stderr,/Privacy revision not approved by this reviewed runner/);
+  assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=/);
 });
