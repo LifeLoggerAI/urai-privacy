@@ -32,6 +32,10 @@ export function assertPrivacyJobs261Checkout({ directory, declaredSha }, git = r
     assert.equal(typeof output, 'string', 'JOBS_GIT_READ_FAILED');
     return output.trim();
   };
+  // A matching SHA is not sufficient if -C resolves a different worktree, or
+  // if a movable branch remains attached to the disposable review checkout.
+  assert.equal(read('rev-parse', '--show-toplevel'), root, 'JOBS_GIT_TOPLEVEL_MISMATCH');
+  assert.equal(read('rev-parse', '--abbrev-ref', 'HEAD'), 'HEAD', 'JOBS_CHECKOUT_NOT_DETACHED');
   assert.equal(read('rev-parse', 'HEAD'), EXACT_JOBS_SHA, 'JOBS_ACTUAL_HEAD_MISMATCH');
   assert.equal(read('rev-parse', 'HEAD^{tree}'), EXACT_JOBS_TREE, 'JOBS_ACTUAL_TREE_MISMATCH');
   for (const [path, expected] of Object.entries(PINNED_BLOBS)) {
