@@ -203,11 +203,14 @@ const parity = parityEntries[0].match(/R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS (
 if (!parity || !Number.isSafeInteger(Number(parity[1])) || Number(parity[1]) < 4) {
   throw Error('R566: malformed compiled Jobs parity receipt');
 }
-const entry = data.split(/\r?\n/).find(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
-if (!entry) throw Error('R554: missing original emulator pass receipt');
+const receipts = data.split(/\r?\n/).filter(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
+if (receipts.length !== 1) throw Error('R568: original emulator receipt missing or ambiguous');
+const entry = receipts[0];
 const r = JSON.parse(entry.slice('R454_REVIEW_ONLY_FIRESTORE_PASS '.length));
 if (!Number.isInteger(r.checksPassed) || r.checksPassed < 23 ||
     !Array.isArray(r.checks) || r.checks.length !== r.checksPassed ||
+    !r.checks.every(x => typeof x === 'string' && x.length > 0 && x.length <= 200) ||
+    new Set(r.checks).size !== r.checks.length ||
     !r.checks.includes('Jobs-original-scope-derived-from-actual-Storage-generation') ||
     !r.checks.includes('original-Jobs-erases-pinned-private-generation-after-review-revocation') ||
     r.syntheticReviewProjectionOnly !== true || r.jobsWorkerRuntimeIntegrated !== false ||

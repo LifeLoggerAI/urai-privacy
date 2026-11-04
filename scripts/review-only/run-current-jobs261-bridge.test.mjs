@@ -175,13 +175,14 @@ const valid = Object.freeze({
   productionSignedJobsIdentityVerified:false,
   finalReleaseAccepted:false
 });
-function verifySyntheticReceipt({receipt=valid, parity=true, digest='a'.repeat(64), parityCount=1, moduleCount=20}={}) {
+function verifySyntheticReceipt({receipt=valid, extraReceipts=[], parity=true, digest='a'.repeat(64), parityCount=1, moduleCount=20}={}) {
   const temp=mkdtempSync(join(tmpdir(),'urai-r565-bridge-receipt-'));
   const log=join(temp,'emulator.log');
   try {
     const rows=[];
     if(parity) for(let i=0;i<parityCount;i++) rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS '+moduleCount+' '+digest);
     rows.push('R454_REVIEW_ONLY_FIRESTORE_PASS '+JSON.stringify(receipt));
+    for (const extra of extraReceipts) rows.push('R454_REVIEW_ONLY_FIRESTORE_PASS '+JSON.stringify(extra));
     writeFileSync(log,rows.join('\n')+'\n');
     return spawnSync(process.execPath,['-',log],{input:parserSource(),encoding:'utf8',timeout:10000});
   }finally{rmSync(temp,{recursive:true,force:true});}
@@ -251,4 +252,25 @@ test('R567: superseded Privacy commit is denied before any checkout', () => {
   assert.equal(r.status,2,r.stdout+r.stderr);
   assert.match(r.stderr,/Privacy revision not approved by this reviewed runner/);
   assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=/);
+});
+
+test('R568: duplicate emulator receipts are rejected, including contradictory outcomes',()=>{
+  for (const extra of [valid, {...valid,productionAuthorized:true}]) {
+    const r=verifySyntheticReceipt({extraReceipts:[extra]});
+    assert.notEqual(r.status,0,r.stderr);
+    assert.match(r.stderr,/R568: original emulator receipt missing or ambiguous/);
+  }
+});
+test('R568: 23 claimed checks cannot reuse the same check name',()=>{
+  const repeated=[checks[0],checks[1],...Array.from({length:21},()=>checks[0])];
+  const r=verifySyntheticReceipt({receipt:{...valid,checks:repeated}});
+  assert.notEqual(r.status,0,r.stderr);
+  assert.match(r.stderr,/incomplete, unsafe, or misclassified/);
+});
+test('R568: check entries must be nonempty bounded strings',()=>{
+  for (const altered of [42, '', 'x'.repeat(201)]) {
+    const r=verifySyntheticReceipt({receipt:{...valid,checks:[...checks.slice(0,-1),altered]}});
+    assert.notEqual(r.status,0,r.stderr);
+    assert.match(r.stderr,/incomplete, unsafe, or misclassified/);
+  }
 });
