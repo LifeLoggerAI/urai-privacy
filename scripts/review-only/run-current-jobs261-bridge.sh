@@ -30,10 +30,10 @@ if [[ ! "$PRIVACY_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   exit 2
 fi
 # A caller-provided 40-hex commit is not a release approval. Only the
-# exact Git-tree-verified R562 Privacy review candidate is in this runner's
+# exact Git-tree-verified R569 converged Privacy review candidate is in this runner's
 # reviewed allowlist. Future changes require a new reviewed runner commit.
-APPROVED_PRIVACY_SHA='2567d6e9c0a30068c799ffe80b443fe45b7b67b5'
-APPROVED_PRIVACY_TREE='9c878321ceae8072b85371859e73f66add1d89af'
+APPROVED_PRIVACY_SHA='c90136dcc4933c28b51cc548f72d3d8ecdf4f6fd'
+APPROVED_PRIVACY_TREE='1e4ee0aad3837f4f8bbbdfc463fd1023d761b1bc'
 if [[ "$PRIVACY_SHA" != "$APPROVED_PRIVACY_SHA" ]]; then
   echo 'DENIED: Privacy revision not approved by this reviewed runner' >&2
   exit 2
@@ -203,11 +203,14 @@ const parity = parityEntries[0].match(/R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS (
 if (!parity || !Number.isSafeInteger(Number(parity[1])) || Number(parity[1]) < 4) {
   throw Error('R566: malformed compiled Jobs parity receipt');
 }
-const entry = data.split(/\r?\n/).find(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
-if (!entry) throw Error('R554: missing original emulator pass receipt');
+const receipts = data.split(/\r?\n/).filter(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
+if (receipts.length !== 1) throw Error('R568: original emulator receipt missing or ambiguous');
+const entry = receipts[0];
 const r = JSON.parse(entry.slice('R454_REVIEW_ONLY_FIRESTORE_PASS '.length));
 if (!Number.isInteger(r.checksPassed) || r.checksPassed < 23 ||
     !Array.isArray(r.checks) || r.checks.length !== r.checksPassed ||
+    !r.checks.every(x => typeof x === 'string' && x.length > 0 && x.length <= 200) ||
+    new Set(r.checks).size !== r.checks.length ||
     !r.checks.includes('Jobs-original-scope-derived-from-actual-Storage-generation') ||
     !r.checks.includes('original-Jobs-erases-pinned-private-generation-after-review-revocation') ||
     r.syntheticReviewProjectionOnly !== true || r.jobsWorkerRuntimeIntegrated !== false ||
