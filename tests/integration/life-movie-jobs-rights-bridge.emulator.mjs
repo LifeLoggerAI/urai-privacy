@@ -22,7 +22,7 @@ import { writeReviewOnlyScopedGrantCandidate } from "../../functions/lib/life-mo
 import { evaluateLifeMovieRenderAuthorization } from "../../functions/lib/life-movie-render-authorization.js";
 
 const PROJECT = "urai-privacy-integration-test";
-const EXACT_JOBS_SOURCE = "f2e4897fb2a517d1e2665224c4cb1ee1a4c017d4";
+const EXACT_JOBS_SOURCE = "ae40425d6d5978b5a9f9048e38c0521023ccbb33";
 assert.equal(process.env.URAI_JOBS_SOURCE_SHA, EXACT_JOBS_SOURCE);
 assert.ok(process.env.URAI_JOBS_DIR?.startsWith("/tmp/"), "Jobs must be disposable clone");
 const jobsRequire = createRequire(resolve(process.env.URAI_JOBS_DIR, "functions/package.json"));
