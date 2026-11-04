@@ -117,3 +117,70 @@ test('R555: failed exact-commit checkout cannot produce a green stage', () => {
   assert.match(r.stdout,/R554_STAGE=privacy_exact_fetch EXIT=17 /);
   assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=jobs_exact_fetch/);
 });
+
+
+// R560: execute the runner's ACTUAL embedded Node receipt parser, instead of
+// checking just for the presence of text. All cases use synthetic local logs.
+const getReceiptValidator = () => {
+  const anchor = 'node - "$EVIDENCE_ROOT/actual_four_emulator_bridge.log" <<' + "'NODE'\n";
+  const start = source.indexOf(anchor);
+  assert.ok(start !== -1, 'original receipt parser must remain in the runner');
+  const contentStart = start + anchor.length;
+  const end = source.indexOf('\nNODE\n', contentStart);
+  assert.ok(end > contentStart, 'original receipt parser terminator missing');
+  return source.slice(contentStart, end);
+};
+const validReceipt = Object.freeze({
+  checksPassed: 23, authEmulator: true, firestoreEmulator: true,
+  storageEmulator: true, functionsEmulator: true,
+  jobSourceAuditReadFromRealAuthFirestoreStorage: true,
+  productionAuthorized: false, renderEnabled: false,
+  approvedOwnerC6ConsentIssuer: false,
+  productionSignedJobsIdentityVerified: false, finalReleaseAccepted: false,
+});
+const runReceipt = ({receipt=validReceipt, parity=true, parityHash='a'.repeat(64)}={}) => {
+  const folder = mkdtempSync(join(tmpdir(), 'urai-r560-receipt-'));
+  const log = join(folder, 'synthetic-four-emulator.log');
+  try {
+    const rows = [];
+    if (parity) rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS 12 ' + parityHash);
+    rows.push('R454_REVIEW_ONLY_FIRESTORE_PASS ' + JSON.stringify(receipt));
+    writeFileSync(log, rows.join('\n') + '\n');
+    return spawnSync(process.execPath, ['-', log], {
+      input: getReceiptValidator(), encoding: 'utf8', timeout: 10000,
+    });
+  } finally {
+    rmSync(folder, {recursive:true, force:true});
+  }
+};
+test('R560: the actual receipt parser accepts both exact parity and four synthetic emulators', () => {
+  const r=runReceipt();
+  assert.equal(r.status,0,r.stderr);
+  assert.match(r.stdout,/R554_VERIFIED_REVIEW_RECEIPT_CHECKS=23 PRODUCTION_AUTHORIZED=false/);
+});
+test('R560: receipt without compiled Jobs parity is denied', () => {
+  const r=runReceipt({parity:false});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/missing or malformed original fresh-compiled Jobs parity receipt/);
+});
+test('R560: tampered compiled-parity hash is denied', () => {
+  const r=runReceipt({parityHash:'untrusted-hash'});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/missing or malformed original fresh-compiled Jobs parity receipt/);
+});
+test('R560: three emulators without Storage are never a four-emulator pass', () => {
+  const r=runReceipt({receipt:{...validReceipt,storageEmulator:false}});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/incomplete, unsafe, or misclassified/);
+});
+test('R560: insufficient completed bridge assertions are denied', () => {
+  const r=runReceipt({receipt:{...validReceipt,checksPassed:22}});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/incomplete, unsafe, or misclassified/);
+});
+test('R560: any production authorization flag disqualifies a review-only bridge receipt', () => {
+  for (const key of ['productionAuthorized','renderEnabled','finalReleaseAccepted']) {
+    const r=runReceipt({receipt:{...validReceipt,[key]:true}});
+    assert.notEqual(r.status,0,key);
+  }
+});
