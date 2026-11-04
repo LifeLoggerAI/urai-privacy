@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
 const here = dirname(fileURLToPath(import.meta.url));
 const script = resolve(here, 'run-current-jobs261-bridge.sh');
 const source = readFileSync(script, 'utf8');
@@ -70,4 +71,49 @@ test('R554: logs have hashes, retained privately, and temporary cloned sources a
   assert.match(source,/sha256sum/);
   assert.match(source,/EVIDENCE_ROOT="\$\(mktemp -d \/tmp\/urai-r554-evidence/);
   assert.match(source,/rm -rf -- "\$RUN_ROOT"/);
+});
+
+// R555: actual Bash invocation with synthetic Git failure.  A failed fetch or
+// checkout must never become an apparently green stage just because the final
+// `git status` command happens to return an empty output.
+function failGitAt(stage) {
+  const dir = mkdtempSync(join(tmpdir(), 'urai-r555-fakegit-'));
+  const fake = join(dir, 'git');
+  const shim = `#!/bin/sh
+case " $* " in
+  *" fetch "*) if [ "$R555_FAIL_GIT_STAGE" = fetch ]; then exit 22; fi ;;
+  *" checkout "*) if [ "$R555_FAIL_GIT_STAGE" = checkout ]; then exit 17; fi ;;
+  *" rev-parse HEAD "*) printf '%s\\n' "$URAI_EXPECTED_PRIVACY_SHA"; exit 0 ;;
+  *" rev-parse HEAD^{tree} "*) printf '%s\\n' 'f655a6200ff12106de49faa678d54db707d21549'; exit 0 ;;
+esac
+exit 0
+`;
+  writeFileSync(fake, shim, {mode:0o755});
+  let result;
+  try {
+    result = invoke(['--execute-disposable'], {
+      PATH: dir + ':' + process.env.PATH,
+      R555_FAIL_GIT_STAGE: stage,
+      URAI_DISPOSABLE_REVIEW:'YES_SYNTHETIC_ONLY',
+      URAI_EXPECTED_PRIVACY_SHA:'4230e8f968ddd12ce4be32a32cd45566908dc124',
+    });
+  } finally {
+    rmSync(dir, {force:true, recursive:true});
+  }
+  const found = result.stdout.match(/EVIDENCE_DIR=(\/tmp\/urai-r554-evidence-[^ ]+)/);
+  if (found) rmSync(found[1], {force:true, recursive:true});
+  return result;
+}
+
+test('R555: failed original Git fetch cannot produce a green checkout stage', () => {
+  const r = failGitAt('fetch');
+  assert.equal(r.status, 22);
+  assert.match(r.stdout,/R554_STAGE=privacy_exact_fetch EXIT=22 /);
+  assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=jobs_exact_fetch/);
+});
+test('R555: failed exact-commit checkout cannot produce a green stage', () => {
+  const r = failGitAt('checkout');
+  assert.equal(r.status, 17);
+  assert.match(r.stdout,/R554_STAGE=privacy_exact_fetch EXIT=17 /);
+  assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=jobs_exact_fetch/);
 });
