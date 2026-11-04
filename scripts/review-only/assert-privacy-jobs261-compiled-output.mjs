@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
@@ -51,7 +51,11 @@ export function assertPrivacyJobs261CompiledOutput({ directory }, { compile = em
   assert.ok(typeof directory === 'string' && isAbsolute(directory), 'JOBS_COMPILED_ABSOLUTE_CHECKOUT_REQUIRED');
   const checkout = realpathSync(directory);
   assert.ok(checkout.startsWith('/tmp' + sep), 'JOBS_COMPILED_DISPOSABLE_CHECKOUT_REQUIRED');
-  const originalOutput = join(checkout, 'functions', 'lib', 'functions');
+  const libRoot = join(checkout, 'functions', 'lib');
+  const originalOutput = join(libRoot, 'functions');
+  // Root symlinks are not encountered by the recursive Dirent walker below.
+  assert.ok(!lstatSync(libRoot).isSymbolicLink(), 'JOBS_COMPILED_LIB_SYMLINK_NOT_ALLOWED');
+  assert.ok(!lstatSync(originalOutput).isSymbolicLink(), 'JOBS_COMPILED_OUTPUT_ROOT_SYMLINK_NOT_ALLOWED');
   const scratch = mkdtempSync(join(tmpdir(), 'urai-r558-jobs-artifact-'));
   try {
     compile({ checkout, outputDir: scratch });
