@@ -453,7 +453,7 @@ try {
   console.log("R454_REVIEW_ONLY_FIRESTORE_PASS " + JSON.stringify({
     schemaVersion: "urai-review-only-firestore-emulator-1",
     projectId: PROJECT, checksPassed: checks.length, checks,
-    authEmulator: true, firestoreEmulator: true, functionsEmulator: true,
+    authEmulator: true, firestoreEmulator: true, storageEmulator: true, functionsEmulator: true,
     jobsIdentityEmulatorOnly: true, productionSignedJobsIdentityVerified: false,
     jobSourceAuditReadFromRealAuthFirestoreStorage: true,
     syntheticReviewProjectionOnly: true,
