@@ -17,6 +17,7 @@ import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { createEmulatorOnlyReviewMovieGrantBackend } from "../../functions/lib/life-movie-scoped-issuer-firestore-emulator.js";
 import { writeReviewOnlyScopedGrantCandidate } from "../../functions/lib/life-movie-scoped-issuer-review.js";
+import { evaluateLifeMovieRenderAuthorization } from "../../functions/lib/life-movie-render-authorization.js";
 
 const PROJECT = "urai-privacy-integration-test";
 const EXPECTED = {
@@ -232,30 +233,47 @@ try {
     decisionReceiptId: result.receiptHash,
     policyVersion: "1.1.0", renderScope: scope,
   };
-  const decision = (await verify(request)).data;
-  assert.equal(decision.allowed, false);
-  assert.equal(decision.reason, "REVIEW_ONLY_EVIDENCE");
-  assert.equal(decision.receiptHash, null);
-  const readAudit = await adminDb.collection("dataAccessEvents")
-    .where("uid", "==", first.uid).get();
-  assert.equal(readAudit.docs.some(x => x.data().consumerId === "urai-jobs" &&
-    x.data().decision === "deny" && x.data().reason === "REVIEW_ONLY_EVIDENCE"), true);
-  checks.push("actual-privacy-callable-denies-emulator-review-grant-for-custom-jobs-login");
+  // The emulator custom-token sign-in has the correct superficial claims but
+  // is NOT a verified production Jobs service identity. Real callable rejects
+  // before reading grant data. Never weaken it just for a green test.
+  const requireCallableDeny = async (label) => {
+    await assert.rejects(() => verify(request), error => {
+      assert.match(String(error?.code || error), /permission-denied|unauthenticated/);
+      return true;
+    });
+    checks.push(label);
+  };
+  await requireCallableDeny("actual-privacy-callable-rejects-untrusted-emulator-jobs-login");
+
+  // Independently prove the actual server policy classifies the persisted
+  // review-only candidate as a denial, even with correct digest + owner.
+  const policy = evaluateLifeMovieRenderAuthorization({
+    record: stored.data(), deletionActive: false,
+    subjectUid: first.uid, tenantId: "tenant-1",
+    decisionReceiptId: result.receiptHash,
+    policyVersion: "1.1.0", renderScope: scope,
+    now: new Date(now),
+  });
+  assert.equal(policy.allowed, false);
+  assert.equal(policy.reason, "REVIEW_ONLY_EVIDENCE");
+  checks.push("original-policy-denies-correctly-hashed-review-only-record");
 
   await adminDb.collection("privacyDeletionTombstones").doc(first.uid)
     .set({ active: true, uid: first.uid });
-  const deletionDecision = (await verify(request)).data;
-  assert.equal(deletionDecision.allowed, false);
-  assert.equal(deletionDecision.reason, "ACCOUNT_DELETED");
-  checks.push("actual-privacy-callable-denies-existing-grant-after-owner-deletion");
+  await requireCallableDeny("untrusted-jobs-identity-still-denied-after-owner-deletion");
+  const deletedPolicy = evaluateLifeMovieRenderAuthorization({
+    record: stored.data(), deletionActive: true,
+    subjectUid: first.uid, tenantId: "tenant-1",
+    decisionReceiptId: result.receiptHash,
+    policyVersion: "1.1.0", renderScope: scope,
+    now: new Date(now),
+  });
+  assert.equal(deletedPolicy.allowed, false);
+  assert.equal(deletedPolicy.reason, "ACCOUNT_DELETED");
+  checks.push("original-policy-prioritizes-active-owner-deletion");
 
   await adminAuth.updateUser("synthetic-jobs-verifier-uid", { disabled: true });
-  await assert.rejects(() => verify(request), error => {
-    const code = String(error?.code || error);
-    assert.match(code, /permission-denied|unauthenticated/);
-    return true;
-  });
-  checks.push("original-privacy-callable-rejects-disabled-custom-jobs-login");
+  await requireCallableDeny("original-privacy-callable-rejects-disabled-custom-jobs-login");
 
   console.log("R454_REVIEW_ONLY_FIRESTORE_PASS " + JSON.stringify({
     schemaVersion: "urai-review-only-firestore-emulator-1",
