@@ -146,3 +146,82 @@ test('R564: previously reviewed Privacy revision is not implicitly still allowli
   assert.match(r.stderr,/Privacy revision not approved by this reviewed runner/);
   assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=/);
 });
+
+
+// R565: execute the exact embedded parser in the reviewed R564 runner on
+// synthetic log fixtures. No network, cloud credentials or Firebase required.
+const parserSource = () => {
+  const marker = 'node - "$EVIDENCE_ROOT/actual_four_emulator_bridge.log" <<' + "'NODE'\n";
+  const start = source.indexOf(marker);
+  assert.ok(start >= 0, 'original embedded receipt validator must exist');
+  const from = start + marker.length;
+  const end = source.indexOf('\nNODE\n', from);
+  assert.ok(end > from, 'original receipt validator must end');
+  return source.slice(from, end);
+};
+const checks = [
+  'Jobs-original-scope-derived-from-actual-Storage-generation',
+  'original-Jobs-erases-pinned-private-generation-after-review-revocation',
+  ...Array.from({length:21},(_,i)=>'synthetic-review-check-'+i)
+];
+const valid = Object.freeze({
+  checks, checksPassed:checks.length,
+  authEmulator:true, firestoreEmulator:true, functionsEmulator:true,
+  jobSourceAuditReadFromRealAuthFirestoreStorage:true,
+  syntheticReviewProjectionOnly:true,
+  jobsWorkerRuntimeIntegrated:false,
+  productionAuthorized:false,renderEnabled:false,
+  approvedOwnerC6ConsentIssuer:false,
+  productionSignedJobsIdentityVerified:false,
+  finalReleaseAccepted:false
+});
+function verifySyntheticReceipt({receipt=valid, parity=true, digest='a'.repeat(64)}={}) {
+  const temp=mkdtempSync(join(tmpdir(),'urai-r565-bridge-receipt-'));
+  const log=join(temp,'emulator.log');
+  try {
+    const rows=[];
+    if(parity)rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS 20 '+digest);
+    rows.push('R454_REVIEW_ONLY_FIRESTORE_PASS '+JSON.stringify(receipt));
+    writeFileSync(log,rows.join('\n')+'\n');
+    return spawnSync(process.execPath,['-',log],{input:parserSource(),encoding:'utf8',timeout:10000});
+  }finally{rmSync(temp,{recursive:true,force:true});}
+}
+test('R565: actual review runner parser accepts pinned parity plus real Storage check names',()=>{
+  const r=verifySyntheticReceipt();
+  assert.equal(r.status,0,r.stderr);
+  assert.match(r.stdout,/R554_VERIFIED_REVIEW_RECEIPT_CHECKS=23 PRODUCTION_AUTHORIZED=false/);
+});
+test('R565: absent fresh-compiled parity receipt is denied',()=>{
+  const r=verifySyntheticReceipt({parity:false});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/fresh-compiled parity receipt missing or malformed/);
+});
+test('R565: malformed parity digest is denied',()=>{
+  const r=verifySyntheticReceipt({digest:'forged-hash'});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/fresh-compiled parity receipt missing or malformed/);
+});
+test('R565: Storage-generation proof cannot be omitted despite 23 synthetic checks',()=>{
+  const altered=[...checks];altered[0]='synthetic-does-not-prove-storage-generation';
+  const r=verifySyntheticReceipt({receipt:{...valid,checks:altered}});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/incomplete, unsafe, or misclassified/);
+});
+test('R565: Storage derivative generation deletion cannot be omitted',()=>{
+  const altered=[...checks];altered[1]='synthetic-no-physical-deletion';
+  const r=verifySyntheticReceipt({receipt:{...valid,checks:altered}});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/incomplete, unsafe, or misclassified/);
+});
+test('R565: fabricated total and review-only projection drift are denied',()=>{
+  for(const receipt of [{...valid,checksPassed:24},{...valid,syntheticReviewProjectionOnly:false},{...valid,jobsWorkerRuntimeIntegrated:true}]){
+    const r=verifySyntheticReceipt({receipt});
+    assert.notEqual(r.status,0,r.stderr);
+  }
+});
+test('R565: production authorization can never be an emulator acceptance',()=>{
+  for(const key of ['productionAuthorized','renderEnabled','finalReleaseAccepted']){
+    const r=verifySyntheticReceipt({receipt:{...valid,[key]:true}});
+    assert.notEqual(r.status,0,key);
+  }
+});
