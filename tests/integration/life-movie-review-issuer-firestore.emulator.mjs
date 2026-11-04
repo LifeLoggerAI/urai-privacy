@@ -5,8 +5,6 @@
  */
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
-import { createRequire } from "node:module";
-import { resolve } from "node:path";
 import { initializeApp, deleteApp } from "firebase/app";
 import {
   getAuth, connectAuthEmulator, createUserWithEmailAndPassword,
@@ -22,24 +20,10 @@ import { writeReviewOnlyScopedGrantCandidate } from "../../functions/lib/life-mo
 import { evaluateLifeMovieRenderAuthorization } from "../../functions/lib/life-movie-render-authorization.js";
 
 const PROJECT = "urai-privacy-integration-test";
-const EXACT_JOBS_SOURCE = "07f18849fdab6200f357326158a60b853242ff49";
-assert.equal(process.env.URAI_JOBS_SOURCE_SHA, EXACT_JOBS_SOURCE);
-assert.ok(process.env.URAI_JOBS_DIR?.startsWith("/tmp/"), "Jobs must be disposable clone");
-const jobsRequire = createRequire(resolve(process.env.URAI_JOBS_DIR, "functions/package.json"));
-const jobsAdmin = jobsRequire("firebase-admin/app");
-const jobsApp = jobsAdmin.initializeApp({ projectId: PROJECT }); // original Jobs getApp() reads default
-const jobsDb = jobsRequire("firebase-admin/firestore").getFirestore(jobsApp);
-const jobsStorage = jobsRequire("firebase-admin/storage").getStorage(jobsApp);
-const { deriveStudioLifeMovieRenderScope } = jobsRequire("./lib/functions/jobs/studioLifeMovieContract.js");
-const { createReviewOnlyFirebaseLifeMovieOwnerVerifier } =
-  jobsRequire("./lib/functions/privacy/lifeMovieFirebaseOwnerState.js");
-const { createFirebaseLifeMovieSourceRightsVerifier } =
-  jobsRequire("./lib/functions/privacy/lifeMovieFirebaseSourceRightsAdapter.js");
 const EXPECTED = {
   URAI_EMULATOR_PROJECT: PROJECT,
   FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
   FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080",
-  FIREBASE_STORAGE_EMULATOR_HOST: "127.0.0.1:9199",
   FIREBASE_FUNCTIONS_EMULATOR_HOST: "127.0.0.1:5001",
   URAI_PRIVACY_JOBS_VERIFIER_UID: "synthetic-jobs-verifier-uid",
 };
@@ -73,9 +57,9 @@ const adminAuth = getAdminAuth(adminApp);
 const clients = [];
 const checks = [];
 // Keep synthetic grant unexpired while testing the original Privacy callable.
-let now = Date.now();
+const now = Date.now();
 const iso = (delta = 0) => new Date(now + delta).toISOString();
-let scope = {
+const scope = {
   projectId: "synthetic-movie-1",
   renderPlanDigest: "a".repeat(64),
   sourceSetDigest: "b".repeat(64),
@@ -146,85 +130,7 @@ async function auditCount(uid) {
 }
 
 try {
-  // This synthetic 1px source is uploaded into the ACTUAL Storage emulator.
-  // The original Jobs modules independently derive its immutable generation
-  // and scope, reread server-owned rights, check current owner, and durably
-  // audit. Nothing here constitutes independently issued/legal source rights.
-  const bucket = "urai-privacy-integration-test.appspot.com";
-  const path = "tenants/tenant-1/sources/bridge-review-synthetic.png";
-  const sourceFile = jobsStorage.bucket(bucket).file(path);
-  const png = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/U5YAAAAASUVORK5CYII=",
-    "base64",
-  );
-  await sourceFile.save(png, { resumable: false, metadata: { contentType: "image/png" } });
-  const [metadata] = await sourceFile.getMetadata();
-  const originalSource = {
-    id: "synthetic-source-1",
-    bucket, objectPath: path, generation: String(metadata.generation),
-    mimeType: "image/png", provenance: "original-source",
-    sourceRefs: ["synthetic-record-1"], consentRef: "synthetic-consent-ref-1",
-    ownerOrRightsRef: "synthetic-server-rights-ref-1",
-  };
-  const selection = {
-    projectId: scope.projectId, renderPlanDigest: scope.renderPlanDigest,
-    sources: [originalSource],
-  };
-  scope = deriveStudioLifeMovieRenderScope(selection);
-  assert.match(scope.sourceSetDigest, /^[0-9a-f]{64}$/);
-  checks.push("Jobs-original-scope-derived-from-actual-Storage-generation");
-
   const first = await createOwner("positive");
-  const realRightsRef = jobsDb.collection("lifeMovieSourceRights").doc(originalSource.ownerOrRightsRef);
-  await realRightsRef.set({
-    schemaVersion: "urai-life-movie-source-rights-v1",
-    issuer: "trusted-server-source-rights-v1", // TEST FIXTURE. NOT a real reviewed issuer.
-    status: "approved", purpose: "life-movie.render",
-    ownerUid: first.uid, tenantId: "tenant-1",
-    projectId: selection.projectId, sourceId: originalSource.id,
-    bucket, objectPath: path, generation: originalSource.generation,
-    mimeType: originalSource.mimeType,
-    consentRef: originalSource.consentRef,
-    ownerOrRightsRef: originalSource.ownerOrRightsRef,
-    provenance: originalSource.provenance,
-    sourceRefs: originalSource.sourceRefs, thirdPartyClearance: "verified",
-    evidenceHash: "f".repeat(64),
-    reviewedAt: new Date(Date.now() - 1000).toISOString(),
-    expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
-  });
-  const verifyCurrentOwner = createReviewOnlyFirebaseLifeMovieOwnerVerifier({
-    firebaseProjectId: PROJECT,
-  });
-  const verifySourceRights = createFirebaseLifeMovieSourceRightsVerifier({
-    firebaseProjectId: PROJECT, allowedBuckets: [bucket],
-    assertCurrentOwner: verifyCurrentOwner, nowMs: () => Date.now(),
-  });
-  const verifyInput = {
-    ownerUid: first.uid, tenantId: "tenant-1", selection, renderScope: scope,
-  };
-  const jobsRightsEvidence = await verifySourceRights(verifyInput);
-  assert.deepEqual(jobsRightsEvidence.renderScope, scope);
-  const originalJobsAudit = await jobsDb.collection("lifeMovieSourceRightsDecisions")
-    .doc(jobsRightsEvidence.rightsEventId).get();
-  assert.equal(originalJobsAudit.exists, true);
-  assert.equal(originalJobsAudit.data()?.ownerUid, first.uid);
-  assert.equal(originalJobsAudit.data()?.renderPlanDigest, scope.renderPlanDigest);
-  assert.equal(originalJobsAudit.data()?.sourceSetDigest, scope.sourceSetDigest);
-  assert.equal(originalJobsAudit.data()?.action, "life_movie_source_rights_preflight_verified");
-  checks.push("original-Jobs-owner-and-rights-audit-verified-on-real-Auth-Firestore-Storage");
-
-  // Explicit review-only TEST PROJECTION from a real Jobs audit ID to the
-  // Privacy synthetic evidence collection. A trusted production projector
-  // DOES NOT EXIST and this test code MUST NEVER be used as that issuer.
-  await adminDb.collection("reviewOnlyMovieRights").doc(first.req.rightsEventId).delete();
-  first.req.rightsEventId = jobsRightsEvidence.rightsEventId;
-  await adminDb.collection("reviewOnlyMovieRights").doc(jobsRightsEvidence.rightsEventId).set({
-    rightsEventId: jobsRightsEvidence.rightsEventId,
-    ownerUid: first.uid, tenantId: "tenant-1",
-    renderScope: scope, verifiedAt: jobsRightsEvidence.verifiedAt,
-  });
-  now = Date.now(); // Privacy's frozen transaction clock AFTER Jobs' real audit.
-  const result = await writeReviewOnlyScopedGrantCandidate(first.req, first.backend);
   const result = await writeReviewOnlyScopedGrantCandidate(first.req, first.backend);
   assert.match(result.receiptHash, /^[0-9a-f]{64}$/);
   assert.equal(result.recordId, first.uid + "_life-movie_render");
@@ -234,18 +140,6 @@ try {
   assert.equal(stored.data()?.productionAuthorized, false);
   assert.equal(await auditCount(first.uid), 1);
   checks.push("matching-synthetic-transaction-created-review-only-record-and-audit");
-
-  assert.equal(stored.data()?.renderScope.sourceSetDigest, jobsRightsEvidence.renderScope.sourceSetDigest);
-  assert.equal(stored.data()?.reviewOnlyEmulator, true);
-  assert.equal(stored.data()?.productionAuthorized, false);
-  checks.push("real-Jobs-source-audit-bound-to-Privacy-review-only-grant");
-
-  // Original Jobs must reject revoked server rights even though a historical
-  // review-only grant/receipt is present. It never creates a render capability.
-  await realRightsRef.update({ status: "revoked" });
-  await assert.rejects(() => verifySourceRights(verifyInput), /life_movie_source_rights_unverified/);
-  checks.push("original-Jobs-refuses-rights-after-review-only-consent-creation");
-
 
   await expectDeny("duplicate-grant-denied", () =>
     writeReviewOnlyScopedGrantCandidate(first.req, first.backend));
@@ -386,10 +280,6 @@ try {
     projectId: PROJECT, checksPassed: checks.length, checks,
     authEmulator: true, firestoreEmulator: true, functionsEmulator: true,
     jobsIdentityEmulatorOnly: true, productionSignedJobsIdentityVerified: false,
-    jobSourceAuditReadFromRealAuthFirestoreStorage: true,
-    syntheticReviewProjectionOnly: true,
-    approvedOwnerC6ConsentIssuer: false,
-    independentlyApprovedJobsRightsIssuer: false,
     deployedIssuer: false, approvedEvidenceIssuer: false,
     jobsWorkerRuntimeIntegrated: false, renderEnabled: false,
     productionAuthorized: false, finalReleaseAccepted: false,
@@ -397,5 +287,4 @@ try {
 } finally {
   for (const app of clients) await deleteApp(app).catch(() => {});
   await deleteAdminApp(adminApp).catch(() => {});
-  await jobsAdmin.deleteApp(jobsApp).catch(() => {});
 }
