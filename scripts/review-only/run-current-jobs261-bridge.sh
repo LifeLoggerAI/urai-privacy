@@ -85,14 +85,24 @@ run_step() {
 
 fetch_exact() {
   local repo="$1" dir="$2" sha="$3"
-  git init -q "$dir"
-  git -C "$dir" remote add origin "$repo"
-  timeout -k 10 180 git -C "$dir" -c credential.helper= fetch --quiet --no-tags --depth=1 origin "$sha"
-  git -C "$dir" checkout --quiet --detach FETCH_HEAD
-  test "$(git -C "$dir" rev-parse HEAD)" = "$sha"
-  test "$(git -C "$dir" symbolic-ref -q HEAD || true)" = ''
-  test -z "$(git -C "$dir" status --porcelain=v1 --untracked-files=all)"
+  local actual branch clean root
+  # IMPORTANT: the caller evaluates ( fetch_exact ... ) in an OR-list to
+  # capture its status. In Bash this disables implicit errexit inside the
+  # function. Every Git operation must therefore return on failure explicitly.
+  git init -q "$dir" || return $?
+  git -C "$dir" remote add origin "$repo" || return $?
+  timeout -k 10 180 git -C "$dir" -c credential.helper= fetch --quiet --no-tags --depth=1 origin "$sha" || return $?
+  git -C "$dir" checkout --quiet --detach FETCH_HEAD || return $?
+  actual="$(git -C "$dir" rev-parse --verify HEAD)" || return $?
+  [[ "$actual" == "$sha" ]] || { echo 'DENIED: actual checkout commit mismatch' >&2; return 2; }
+  branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD)" || return $?
+  [[ "$branch" == 'HEAD' ]] || { echo 'DENIED: checkout is not detached' >&2; return 2; }
+  root="$(git -C "$dir" rev-parse --show-toplevel)" || return $?
+  [[ "$root" == "$dir" ]] || { echo 'DENIED: unexpected Git repository root' >&2; return 2; }
+  clean="$(git -C "$dir" status --porcelain=v1 --untracked-files=all)" || return $?
+  [[ -z "$clean" ]] || { echo 'DENIED: checkout is not clean' >&2; return 2; }
 }
+
 run_step privacy_exact_fetch fetch_exact "$PRIVACY_REPO" "$PRIVACY_DIR" "$PRIVACY_SHA"
 run_step jobs_exact_fetch fetch_exact "$JOBS_REPO" "$JOBS_DIR" "$JOBS_SHA"
 if [[ "$(git -C "$JOBS_DIR" rev-parse 'HEAD^{tree}')" != "$JOBS_TREE" ]]; then
