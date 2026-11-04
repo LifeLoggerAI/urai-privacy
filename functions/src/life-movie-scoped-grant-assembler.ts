@@ -70,6 +70,44 @@ const MAX_GRANT_TTL_MS = 24 * 60 * 60_000;
 const DENIED = "life_movie_scoped_grant_evidence_unverified";
 
 const own = (value: object, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key);
+
+/** Pin each authority-bearing field exactly once. Firestore data is plain data;
+ * accessor-backed, inherited or dynamically replaced claims are never evidence.
+ * This is a SOURCE-ONLY guard and does not authenticate an actual issuer.
+ */
+function pinOwnEvidence(value: unknown, fields: readonly string[]): Record<string, unknown> {
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(DENIED);
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) throw new Error(DENIED);
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== fields.length ||
+        keys.some(key => typeof key !== "string" || !fields.includes(key))) throw new Error(DENIED);
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const pinned: Record<string, unknown> = Object.create(null);
+    for (const name of fields) {
+      const prop = descriptors[name];
+      if (!prop || !own(prop, "value")) throw new Error(DENIED);
+      pinned[name] = prop.value;
+    }
+    return Object.freeze(pinned);
+  } catch {
+    throw new Error(DENIED);
+  }
+}
+
+function pinScope(value: unknown): LifeMovieRenderScope {
+  try {
+    const fields = ["projectId", "renderPlanDigest", "sourceSetDigest"];
+    const pinned = pinOwnEvidence(value, fields);
+    if (Reflect.ownKeys(value as object).length !== fields.length || !validScope(pinned)) {
+      throw new Error(DENIED);
+    }
+    return pinned as LifeMovieRenderScope;
+  } catch {
+    throw new Error(DENIED);
+  }
+}
 function validScope(value: unknown): value is LifeMovieRenderScope {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const scope = value as Record<string, unknown>;
@@ -101,11 +139,26 @@ function verifiedFresh(value: string, nowMs: number, maxAgeMs: number): boolean 
 export function assembleLifeMovieScopedGrantProposal(
   input: ScopedGrantAssemblyInput
 ): Readonly<{ record: Readonly<LifeMovieScopedReceipt>; receiptHash: string }> {
-  if (!input || !Number.isSafeInteger(input.nowMs) || input.nowMs <= 0 ||
-      typeof input.ownerUid !== "string" || !ID.test(input.ownerUid) ||
-      typeof input.tenantId !== "string" || !ID.test(input.tenantId)) throw new Error(DENIED);
-
-  const { ownerUid, tenantId, notice, approval, selection, rights, nowMs } = input;
+  const pinned = pinOwnEvidence(input,
+    ["ownerUid", "tenantId", "notice", "approval", "selection", "rights", "nowMs"]);
+  if (typeof pinned.nowMs !== "number" || !Number.isSafeInteger(pinned.nowMs) || pinned.nowMs <= 0 ||
+      typeof pinned.ownerUid !== "string" || !ID.test(pinned.ownerUid) ||
+      typeof pinned.tenantId !== "string" || !ID.test(pinned.tenantId)) throw new Error(DENIED);
+  const ownerUid = pinned.ownerUid;
+  const tenantId = pinned.tenantId;
+  const nowMs = pinned.nowMs;
+  const notice = pinOwnEvidence(pinned.notice,
+    ["reviewEventId", "noticeVersion", "noticeHash", "policyVersion", "surface", "jurisdiction"]) as unknown as ReviewedMovieNotice;
+  const rawApproval = pinOwnEvidence(pinned.approval,
+    ["eventId", "actorUid", "ownerUid", "tenantId", "purpose", "status", "noticeVersion",
+     "noticeHash", "renderScope", "approvedAt", "expiresAt"]);
+  const rawSelection = pinOwnEvidence(pinned.selection,
+    ["eventId", "ownerUid", "tenantId", "renderScope", "verifiedAt"]);
+  const rawRights = pinOwnEvidence(pinned.rights,
+    ["rightsEventId", "ownerUid", "tenantId", "renderScope", "verifiedAt"]);
+  const selection = { ...rawSelection, renderScope: pinScope(rawSelection.renderScope) } as unknown as VerifiedMovieSelection;
+  const approval = { ...rawApproval, renderScope: pinScope(rawApproval.renderScope) } as unknown as RecordedOwnerMovieApproval;
+  const rights = { ...rawRights, renderScope: pinScope(rawRights.renderScope) } as unknown as VerifiedMovieSourceRights;
   if (!notice || !approval || !selection || !rights ||
       !validScope(selection.renderScope) ||
       !sameScope(approval.renderScope, selection.renderScope) ||
