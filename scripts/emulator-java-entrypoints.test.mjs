@@ -13,6 +13,7 @@ const ENTRYPOINTS = [
   'test:emulators',
   'test:life-movie:review:firestore:emulated',
   'test:life-movie:jobs-rights:bridge:emulated',
+  'test:life-movie:jobs264-rights:bridge:emulated',
   'test:life-movie:negative:emulated',
 ];
 const source = () => JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
@@ -29,7 +30,7 @@ test('R543: every repository emulator entrypoint checks Java before executing Fi
 });
 
 test('R543: the maintained unit suite enrolls this guard', () => {
-  assert.match(source().scripts['test:unit'], /^node --test scripts\/emulator-java-entrypoints\.test\.mjs && npm run test:jobs-checkout:attestation && npm run test:jobs-compiled:attestation && vitest run tests\/unit$/);
+  assert.match(source().scripts['test:unit'], /^node --test scripts\/emulator-java-entrypoints\.test\.mjs && npm run test:jobs-checkout:attestation && npm run test:jobs-compiled:attestation && vitest run tests\/unit && node --test scripts\/review-only\/assert-privacy-jobs264-bridge\.test\.mjs$/);
   assert.equal(source().scripts['test:jobs-checkout:attestation'], 'node --test scripts/assert-privacy-jobs261-checkout.test.mjs');
   assert.equal(source().scripts['test:jobs-compiled:attestation'], 'node --test scripts/attest-jobs261-generated.test.mjs scripts/assert-privacy-jobs261-build-bridge.test.mjs scripts/assert-privacy-jobs261-compiled-output.test.mjs');
 });
