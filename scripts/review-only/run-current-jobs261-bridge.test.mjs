@@ -95,7 +95,7 @@ exit 0
       PATH: dir + ':' + process.env.PATH,
       R555_FAIL_GIT_STAGE: stage,
       URAI_DISPOSABLE_REVIEW:'YES_SYNTHETIC_ONLY',
-      URAI_EXPECTED_PRIVACY_SHA:'2567d6e9c0a30068c799ffe80b443fe45b7b67b5',
+      URAI_EXPECTED_PRIVACY_SHA:'c90136dcc4933c28b51cc548f72d3d8ecdf4f6fd',
     });
   } finally {
     rmSync(dir, {force:true, recursive:true});
@@ -127,9 +127,9 @@ test('R561: arbitrary valid-looking Privacy hash fails before checkout', () => {
   assert.match(r.stderr,/Privacy revision not approved by this reviewed runner/);
   assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=/);
 });
-test('R564: reviewed R562 Privacy commit and tree are pinned before any Jobs fetch', () => {
-  assert.match(source,/APPROVED_PRIVACY_SHA='2567d6e9c0a30068c799ffe80b443fe45b7b67b5'/);
-  assert.match(source,/APPROVED_PRIVACY_TREE='9c878321ceae8072b85371859e73f66add1d89af'/);
+test('R569: reviewed R567 converged Privacy commit and tree are pinned before any Jobs fetch', () => {
+  assert.match(source,/APPROVED_PRIVACY_SHA='c90136dcc4933c28b51cc548f72d3d8ecdf4f6fd'/);
+  assert.match(source,/APPROVED_PRIVACY_TREE='1e4ee0aad3837f4f8bbbdfc463fd1023d761b1bc'/);
   const privacyFetch = source.indexOf('run_step privacy_exact_fetch fetch_exact');
   const treeGuard = source.indexOf("privacy_actual_tree=");
   const jobsFetch = source.indexOf('run_step jobs_exact_fetch fetch_exact');
@@ -175,14 +175,14 @@ const valid = Object.freeze({
   productionSignedJobsIdentityVerified:false,
   finalReleaseAccepted:false
 });
-function verifySyntheticReceipt({receipt=valid, parity=true, duplicateParity=false, digest='a'.repeat(64)}={}) {
+function verifySyntheticReceipt({receipt=valid, extraReceipts=[], parity=true, digest='a'.repeat(64), parityCount=1, moduleCount=20}={}) {
   const temp=mkdtempSync(join(tmpdir(),'urai-r565-bridge-receipt-'));
   const log=join(temp,'emulator.log');
   try {
     const rows=[];
-    if(parity)rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS 20 '+digest);
-    if(duplicateParity)rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS 20 '+digest);
+    if(parity) for(let i=0;i<parityCount;i++) rows.push('R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS '+moduleCount+' '+digest);
     rows.push('R454_REVIEW_ONLY_FIRESTORE_PASS '+JSON.stringify(receipt));
+    for (const extra of extraReceipts) rows.push('R454_REVIEW_ONLY_FIRESTORE_PASS '+JSON.stringify(extra));
     writeFileSync(log,rows.join('\n')+'\n');
     return spawnSync(process.execPath,['-',log],{input:parserSource(),encoding:'utf8',timeout:10000});
   }finally{rmSync(temp,{recursive:true,force:true});}
@@ -195,17 +195,12 @@ test('R565: actual review runner parser accepts pinned parity plus real Storage 
 test('R565: absent fresh-compiled parity receipt is denied',()=>{
   const r=verifySyntheticReceipt({parity:false});
   assert.notEqual(r.status,0);
-  assert.match(r.stderr,/compiled Jobs parity receipt missing or ambiguous/);
+  assert.match(r.stderr,/R566: compiled Jobs parity receipt missing or ambiguous/);
 });
 test('R565: malformed parity digest is denied',()=>{
   const r=verifySyntheticReceipt({digest:'forged-hash'});
   assert.notEqual(r.status,0);
-  assert.match(r.stderr,/malformed compiled Jobs parity receipt/);
-});
-test('R567: duplicated parity receipt is rejected as ambiguous',()=>{
-  const r=verifySyntheticReceipt({duplicateParity:true});
-  assert.notEqual(r.status,0);
-  assert.match(r.stderr,/compiled Jobs parity receipt missing or ambiguous/);
+  assert.match(r.stderr,/R566: malformed compiled Jobs parity receipt/);
 });
 test('R565: Storage-generation proof cannot be omitted despite 23 synthetic checks',()=>{
   const altered=[...checks];altered[0]='synthetic-does-not-prove-storage-generation';
@@ -230,4 +225,79 @@ test('R565: production authorization can never be an emulator acceptance',()=>{
     const r=verifySyntheticReceipt({receipt:{...valid,[key]:true}});
     assert.notEqual(r.status,0,key);
   }
+});
+
+test('R566: duplicate parity receipts are denied rather than first-match accepted',()=>{
+  const r=verifySyntheticReceipt({parityCount:2});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/R566: compiled Jobs parity receipt missing or ambiguous/);
+});
+test('R566: parity reports fewer than four imported modules fail closed',()=>{
+  const r=verifySyntheticReceipt({moduleCount:1});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/R566: malformed compiled Jobs parity receipt/);
+});
+test('R566: generated Jobs artifact manifest is included in the evidence index',()=>{
+  assert.match(source,/files\+=\(COMPILED_JOBS_SHA256SUMS\.txt\)/);
+  assert.match(source,/sha256sum "\$\{files\[@\]\}" > SHA256SUMS\.txt/);
+  assert.match(source,/R565: missing generated-Jobs manifest on successful run/);
+});
+
+// R567: the formerly approved source cannot be mistaken for current acceptance.
+test('R567: superseded Privacy commit is denied before any checkout', () => {
+  const r=invoke(['--execute-disposable'],{
+    URAI_DISPOSABLE_REVIEW:'YES_SYNTHETIC_ONLY',
+    URAI_EXPECTED_PRIVACY_SHA:'2567d6e9c0a30068c799ffe80b443fe45b7b67b5',
+  });
+  assert.equal(r.status,2,r.stdout+r.stderr);
+  assert.match(r.stderr,/Privacy revision not approved by this reviewed runner/);
+  assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=/);
+});
+
+test('R568: duplicate emulator receipts are rejected, including contradictory outcomes',()=>{
+  for (const extra of [valid, {...valid,productionAuthorized:true}]) {
+    const r=verifySyntheticReceipt({extraReceipts:[extra]});
+    assert.notEqual(r.status,0,r.stderr);
+    assert.match(r.stderr,/R568: original emulator receipt missing or ambiguous/);
+  }
+});
+test('R568: 23 claimed checks cannot reuse the same check name',()=>{
+  const repeated=[checks[0],checks[1],...Array.from({length:21},()=>checks[0])];
+  const r=verifySyntheticReceipt({receipt:{...valid,checks:repeated}});
+  assert.notEqual(r.status,0,r.stderr);
+  assert.match(r.stderr,/incomplete, unsafe, or misclassified/);
+});
+test('R568: check entries must be nonempty bounded strings',()=>{
+  for (const altered of [42, '', 'x'.repeat(201)]) {
+    const r=verifySyntheticReceipt({receipt:{...valid,checks:[...checks.slice(0,-1),altered]}});
+    assert.notEqual(r.status,0,r.stderr);
+    assert.match(r.stderr,/incomplete, unsafe, or misclassified/);
+  }
+});
+
+// R569: the former R566 Privacy candidate must not be treated as current.
+test('R569: prior R566 source is rejected before any checkout', () => {
+  const r=invoke(['--execute-disposable'],{
+    URAI_DISPOSABLE_REVIEW:'YES_SYNTHETIC_ONLY',
+    URAI_EXPECTED_PRIVACY_SHA:'e8ad5d61efd9092651a6ea90b094464343210762',
+  });
+  assert.equal(r.status,2,r.stdout+r.stderr);
+  assert.match(r.stderr,/Privacy revision not approved by this reviewed runner/);
+  assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=/);
+});
+
+test('R570: independently pinned Jobs manifest is prepared before emulators', () => {
+  const manifest = source.indexOf('run_step reviewed_jobs_generated_manifest');
+  const emulator = source.indexOf('run_step actual_four_emulator_bridge');
+  assert.ok(manifest > 0 && emulator > manifest);
+  assert.match(source, /observed\.digest, guard\.R562_REVIEWED_JOBS261_MANIFEST_SHA256/);
+  assert.match(source, /parsed\.treeSha256, guard\.R562_REVIEWED_JOBS261_TREE_SHA256/);
+  assert.match(source, /URAI_JOBS_COMPILED_MANIFEST="\$REVIEWED_JOBS_COMPILED_MANIFEST"/);
+  assert.match(source, /URAI_JOBS_COMPILED_EXPECTED_SHA256="\$REVIEWED_JOBS_COMPILED_DIGEST"/);
+});
+test('R570: expected Jobs manifest digest is fixed and checked against SHA256', () => {
+  assert.match(source, /REVIEWED_JOBS_COMPILED_DIGEST='6fa8b9e6ea767c0d709be46d718ebcf29f3fdb5ad1bb7961669c0a12edba7a96'/);
+  assert.match(source, /sha256sum "\$EVIDENCE_ROOT\/reviewed_jobs_generated_manifest\.log"/);
+  assert.match(source, /DENIED: R570 reviewed Jobs manifest digest mismatch/);
+  assert.doesNotMatch(source, /REVIEWED_JOBS_COMPILED_DIGEST="\$\(/);
 });

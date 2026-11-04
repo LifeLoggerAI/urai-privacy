@@ -30,10 +30,10 @@ if [[ ! "$PRIVACY_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   exit 2
 fi
 # A caller-provided 40-hex commit is not a release approval. Only the
-# exact Git-tree-verified R562 Privacy review candidate is in this runner's
+# exact Git-tree-verified R569 converged Privacy review candidate is in this runner's
 # reviewed allowlist. Future changes require a new reviewed runner commit.
-APPROVED_PRIVACY_SHA='2567d6e9c0a30068c799ffe80b443fe45b7b67b5'
-APPROVED_PRIVACY_TREE='9c878321ceae8072b85371859e73f66add1d89af'
+APPROVED_PRIVACY_SHA='c90136dcc4933c28b51cc548f72d3d8ecdf4f6fd'
+APPROVED_PRIVACY_TREE='1e4ee0aad3837f4f8bbbdfc463fd1023d761b1bc'
 if [[ "$PRIVACY_SHA" != "$APPROVED_PRIVACY_SHA" ]]; then
   echo 'DENIED: Privacy revision not approved by this reviewed runner' >&2
   exit 2
@@ -179,12 +179,38 @@ for artifact in   functions/lib/functions/jobs/studioLifeMovieContract.js   func
   sha256sum "$JOBS_DIR/$artifact" >> "$EVIDENCE_ROOT/COMPILED_JOBS_SHA256SUMS.txt"
 done
 
+# R570: capture the newly built Jobs artifact manifest, but never accept a
+# self-issued expected digest. The hardcoded R562 pin was reproduced on two
+# independent CPU hosts and must match before the four emulators start.
+run_step reviewed_jobs_generated_manifest node --input-type=module -e '
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+import { join } from "node:path";
+const [jobsDir, privacyDir] = process.argv.slice(1);
+const source = await import(pathToFileURL(join(privacyDir, "scripts/review-only/attest-jobs261-generated.mjs")).href);
+const guard = await import(pathToFileURL(join(privacyDir, "scripts/review-only/assert-privacy-jobs261-build-bridge.mjs")).href);
+const observed = source.captureJobs261GeneratedManifest(jobsDir);
+const parsed = JSON.parse(observed.manifest);
+assert.equal(observed.digest, guard.R562_REVIEWED_JOBS261_MANIFEST_SHA256, "R570: independently pinned Jobs manifest digest mismatch");
+assert.equal(parsed.treeSha256, guard.R562_REVIEWED_JOBS261_TREE_SHA256, "R570: independently pinned Jobs compiled tree mismatch");
+assert.equal(parsed.treeCount, guard.R562_REVIEWED_JOBS261_FILE_COUNT, "R570: independently pinned Jobs compiled file count mismatch");
+process.stdout.write(observed.manifest);
+' "$JOBS_DIR" "$PRIVACY_DIR"
+REVIEWED_JOBS_COMPILED_DIGEST='6fa8b9e6ea767c0d709be46d718ebcf29f3fdb5ad1bb7961669c0a12edba7a96'
+if [[ "$(sha256sum "$EVIDENCE_ROOT/reviewed_jobs_generated_manifest.log" | cut -d' ' -f1)" != "$REVIEWED_JOBS_COMPILED_DIGEST" ]]; then
+  echo 'DENIED: R570 reviewed Jobs manifest digest mismatch' >&2
+  exit 2
+fi
+REVIEWED_JOBS_COMPILED_MANIFEST="$(cat "$EVIDENCE_ROOT/reviewed_jobs_generated_manifest.log")"
+
 # All four emulators are disposable; both Jobs and Privacy are on detached
 # immutable commits. The fixture keeps C6 reviewOnlyEmulator=true and
 # productionAuthorized=false and checks generation-bound deletion.
 run_step actual_four_emulator_bridge env \
   URAI_JOBS_SOURCE_SHA="$JOBS_SHA" \
   URAI_JOBS_DIR="$JOBS_DIR" \
+  URAI_JOBS_COMPILED_MANIFEST="$REVIEWED_JOBS_COMPILED_MANIFEST" \
+  URAI_JOBS_COMPILED_EXPECTED_SHA256="$REVIEWED_JOBS_COMPILED_DIGEST" \
   npm --prefix "$PRIVACY_DIR" run test:life-movie:jobs-rights:bridge:emulated
 
 # A zero exit is not enough: require the original fixture's explicit denied-
@@ -203,11 +229,14 @@ const parity = parityEntries[0].match(/R558_JOBS_COMPILED_ARTIFACT_PARITY_PASS (
 if (!parity || !Number.isSafeInteger(Number(parity[1])) || Number(parity[1]) < 4) {
   throw Error('R566: malformed compiled Jobs parity receipt');
 }
-const entry = data.split(/\r?\n/).find(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
-if (!entry) throw Error('R554: missing original emulator pass receipt');
+const receipts = data.split(/\r?\n/).filter(x => x.startsWith('R454_REVIEW_ONLY_FIRESTORE_PASS '));
+if (receipts.length !== 1) throw Error('R568: original emulator receipt missing or ambiguous');
+const entry = receipts[0];
 const r = JSON.parse(entry.slice('R454_REVIEW_ONLY_FIRESTORE_PASS '.length));
 if (!Number.isInteger(r.checksPassed) || r.checksPassed < 23 ||
     !Array.isArray(r.checks) || r.checks.length !== r.checksPassed ||
+    !r.checks.every(x => typeof x === 'string' && x.length > 0 && x.length <= 200) ||
+    new Set(r.checks).size !== r.checks.length ||
     !r.checks.includes('Jobs-original-scope-derived-from-actual-Storage-generation') ||
     !r.checks.includes('original-Jobs-erases-pinned-private-generation-after-review-revocation') ||
     r.syntheticReviewProjectionOnly !== true || r.jobsWorkerRuntimeIntegrated !== false ||
