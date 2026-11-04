@@ -31,7 +31,7 @@ test('R543: every repository emulator entrypoint checks Java before executing Fi
 test('R543: the maintained unit suite enrolls this guard', () => {
   assert.match(source().scripts['test:unit'], /^node --test scripts\/emulator-java-entrypoints\.test\.mjs && npm run test:jobs-checkout:attestation && npm run test:jobs-compiled:attestation && vitest run tests\/unit$/);
   assert.equal(source().scripts['test:jobs-checkout:attestation'], 'node --test scripts/assert-privacy-jobs261-checkout.test.mjs');
-  assert.equal(source().scripts['test:jobs-compiled:attestation'], 'node --test scripts/attest-jobs261-generated.test.mjs scripts/assert-privacy-jobs261-build-bridge.test.mjs');
+  assert.equal(source().scripts['test:jobs-compiled:attestation'], 'node --test scripts/attest-jobs261-generated.test.mjs scripts/assert-privacy-jobs261-build-bridge.test.mjs scripts/assert-privacy-jobs261-compiled-output.test.mjs');
 });
 
 test('R543: CLI and protected workflow both require JDK 21', () => {

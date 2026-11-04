@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:unit": "node --test scripts/emulator-java-entrypoints.test.mjs && npm run test:jobs-checkout:attestation && npm run test:jobs-compiled:attestation && vitest run tests/unit",
     "test:jobs-checkout:attestation": "node --test scripts/assert-privacy-jobs261-checkout.test.mjs",
-    "test:jobs-compiled:attestation": "node --test scripts/attest-jobs261-generated.test.mjs scripts/assert-privacy-jobs261-build-bridge.test.mjs",
+    "test:jobs-compiled:attestation": "node --test scripts/attest-jobs261-generated.test.mjs scripts/assert-privacy-jobs261-build-bridge.test.mjs scripts/assert-privacy-jobs261-compiled-output.test.mjs",
     "test:integration": "vitest run tests/integration --passWithNoTests",
     "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --minWorkers=1 --passWithNoTests",
     "test:e2e": "node scripts/smoke-routes.mjs",
