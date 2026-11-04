@@ -28,8 +28,18 @@ test('R543: every repository emulator entrypoint checks Java before executing Fi
   }
 });
 
-test('R543: the maintained unit suite enrolls this guard', () => {
-  assert.match(source().scripts['test:unit'], /^node --test scripts\/emulator-java-entrypoints\.test\.mjs && vitest run tests\/unit$/);
+test('R543/R553: the maintained unit suite enrolls both source-integrity guards', () => {
+  const scripts = source().scripts;
+  assert.equal(
+    scripts['test:jobs-checkout:attestation'],
+    'node --test scripts/assert-privacy-jobs261-checkout.test.mjs',
+    'Jobs checkout attestation alias must run the native tests',
+  );
+  assert.deepEqual(scripts['test:unit'].split(' && '), [
+    'node --test scripts/emulator-java-entrypoints.test.mjs',
+    'npm run test:jobs-checkout:attestation',
+    'vitest run tests/unit',
+  ], 'maintained unit gate must run Java guard, Jobs attestation and Vitest in order');
 });
 
 test('R543: CLI and protected workflow both require JDK 21', () => {
