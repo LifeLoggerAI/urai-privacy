@@ -225,7 +225,6 @@ try {
   });
   now = Date.now(); // Privacy's frozen transaction clock AFTER Jobs' real audit.
   const result = await writeReviewOnlyScopedGrantCandidate(first.req, first.backend);
-  const result = await writeReviewOnlyScopedGrantCandidate(first.req, first.backend);
   assert.match(result.receiptHash, /^[0-9a-f]{64}$/);
   assert.equal(result.recordId, first.uid + "_life-movie_render");
   const stored = await adminDb.collection("consentRecords").doc(result.recordId).get();
