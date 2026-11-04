@@ -31,8 +31,8 @@ function localOnly(app: App): void {
   }
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS ||
       process.env.FIREBASE_TOKEN ||
-      process.env.GCLOUD_PROJECT ||
-      process.env.GOOGLE_CLOUD_PROJECT ||
+      (process.env.GCLOUD_PROJECT && process.env.GCLOUD_PROJECT !== PROJECT) ||
+      (process.env.GOOGLE_CLOUD_PROJECT && process.env.GOOGLE_CLOUD_PROJECT !== PROJECT) ||
       !app || app.options.projectId !== PROJECT) {
     throw new Error(DENIED);
   }

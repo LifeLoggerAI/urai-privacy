@@ -85,4 +85,37 @@ describe("pure Life Movie scoped verifier authorization", () => {
     expect(decision).toMatchObject({ allowed: reason === "ALLOWED", reason });
   });
 
+
+  // The development-only Firestore issuer adapter writes reviewOnlyEmulator
+  // and productionAuthorized metadata into the same collection. Such
+  // correctly hashed synthetic candidates are NEVER real render permission.
+  it.each([
+    ["review-only candidate", { ...record, reviewOnlyEmulator: true, productionAuthorized: false }],
+    ["false review-only tag", { ...record, reviewOnlyEmulator: false }],
+    ["explicitly denied production tag", { ...record, productionAuthorized: false }],
+    ["caller-asserted production tag", { ...record, productionAuthorized: true }]
+  ])("denies %s, even with valid C6 receipt hash", (_label, document) => {
+    expect(evaluateLifeMovieRenderAuthorization({ ...base, record: document })).toMatchObject({
+      allowed: false, reason: "REVIEW_ONLY_EVIDENCE"
+    });
+  });
+
+  it("rejects inherited review-only marker without invoking its getter", () => {
+    let getterCalls = 0;
+    const prototype = Object.defineProperty({}, "reviewOnlyEmulator", {
+      get() { getterCalls++; throw new Error("marker getter must not execute"); }
+    });
+    const inherited = Object.assign(Object.create(prototype), record);
+    expect(evaluateLifeMovieRenderAuthorization({ ...base, record: inherited })).toMatchObject({
+      allowed: false, reason: "REVIEW_ONLY_EVIDENCE"
+    });
+    expect(getterCalls).toBe(0);
+  });
+
+  it("preserves revocation reason priority for a review-only tagged record", () => {
+    expect(evaluateLifeMovieRenderAuthorization({
+      ...base, record: { ...record, reviewOnlyEmulator: true, status: "revoked" }
+    })).toMatchObject({ allowed: false, reason: "REVOKED" });
+  });
+
 });

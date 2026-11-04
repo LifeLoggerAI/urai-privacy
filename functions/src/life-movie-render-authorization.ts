@@ -40,6 +40,18 @@ export function evaluateLifeMovieRenderAuthorization(
   const purpose = LIFE_MOVIE_RENDER_CONSENT_PURPOSE;
   const record = input.record && typeof input.record === "object" && !Array.isArray(input.record)
     ? input.record as Record<string, unknown> : null;
+  // Nonproduction issuer adapters may write correctly hashed, review-only
+  // proposal records into disposable Firestore. A valid hash is not approval.
+  // Never promote an emulator/review-only metadata-bearing record into a C6
+  // allow decision, regardless of the marker's caller-controlled value.
+  const reviewOnlyEvidence = (() => {
+    if (!record) return false;
+    try {
+      return Reflect.has(record, "reviewOnlyEmulator") || Reflect.has(record, "productionAuthorized");
+    } catch {
+      return true;
+    }
+  })();
   const evaluated = evaluateConsentDecision({ purpose, record, now: input.now });
 
   const subjectMatches = record?.uid === input.subjectUid;
@@ -61,13 +73,15 @@ export function evaluateLifeMovieRenderAuthorization(
   // must prove the current deletion fence has been checked and is inactive.
   const deletionStateVerifiedClear = input.deletionActive === false;
   const allowed = evaluated.allowed && receiptMatches && subjectMatches
-    && scopeMatches && receiptBindsScope && policyMatches && deletionStateVerifiedClear;
+    && scopeMatches && receiptBindsScope && policyMatches && deletionStateVerifiedClear
+    && !reviewOnlyEvidence;
 
   // Preserve the actual revocation/expiry/denial reason in the audit record,
   // rather than incorrectly reporting an integrity mismatch for every denial.
   const reason = deletionActive ? "ACCOUNT_DELETED"
     : !deletionStateVerifiedClear ? "ACCOUNT_DELETION_STATE_UNVERIFIED"
     : !evaluated.allowed ? evaluated.reason
+    : reviewOnlyEvidence ? "REVIEW_ONLY_EVIDENCE"
     : !subjectMatches ? "SUBJECT_MISMATCH"
     : !scopeMatches ? "RENDER_SCOPE_MISMATCH"
     : !receiptMatches ? "RECEIPT_MISMATCH"

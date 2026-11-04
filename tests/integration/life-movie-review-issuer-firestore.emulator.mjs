@@ -4,13 +4,15 @@
  * Privacy review module, not an actual independently approved grant issuer.
  */
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { initializeApp, deleteApp } from "firebase/app";
 import {
   getAuth, connectAuthEmulator, createUserWithEmailAndPassword,
-  getIdToken, deleteUser,
+  getIdToken, signInWithCustomToken,
 } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator, doc, setDoc } from "firebase/firestore";
-import { initializeApp as initializeAdminApp, deleteApp as deleteAdminApp } from "firebase-admin/app";
+import { getFunctions, connectFunctionsEmulator, httpsCallable } from "firebase/functions";
+import { initializeApp as initializeAdminApp, deleteApp as deleteAdminApp, cert } from "firebase-admin/app";
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { createEmulatorOnlyReviewMovieGrantBackend } from "../../functions/lib/life-movie-scoped-issuer-firestore-emulator.js";
@@ -21,10 +23,15 @@ const EXPECTED = {
   URAI_EMULATOR_PROJECT: PROJECT,
   FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
   FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080",
+  FIREBASE_FUNCTIONS_EMULATOR_HOST: "127.0.0.1:5001",
+  URAI_PRIVACY_JOBS_VERIFIER_UID: "synthetic-jobs-verifier-uid",
 };
 for (const [key, value] of Object.entries(EXPECTED)) assert.equal(process.env[key], value);
-for (const name of ["GOOGLE_APPLICATION_CREDENTIALS", "FIREBASE_TOKEN", "GCLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"]) {
+for (const name of ["GOOGLE_APPLICATION_CREDENTIALS", "FIREBASE_TOKEN"]) {
   assert.equal(process.env[name] ?? "", "", name + " must not be set");
+}
+for (const name of ["GCLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT"]) {
+  if (process.env[name]) assert.equal(process.env[name], PROJECT, name + " must refer to the disposable project");
 }
 const config = {
   apiKey: "local-synthetic-emulator-only",
@@ -32,12 +39,24 @@ const config = {
   authDomain: PROJECT + ".firebaseapp.com",
   appId: "1:123:web:review",
 };
-const adminApp = initializeAdminApp({ projectId: PROJECT }, "review-issuer-admin");
+// Ephemeral TEST-ONLY RSA key: no real service-account credentials or production IAM.
+// Firebase Auth emulator accepts a custom-token sign-in to exercise the onCall
+// role, identity and current-consent checks. This is NOT production token proof.
+const key = generateKeyPairSync("rsa", { modulusLength: 2048,
+  privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  publicKeyEncoding: { type: "spki", format: "pem" },
+});
+const adminApp = initializeAdminApp({ projectId: PROJECT, credential: cert({
+  projectId: PROJECT,
+  clientEmail: "synthetic-verifier@urai-privacy-integration-test.iam.gserviceaccount.com",
+  privateKey: key.privateKey,
+}) }, "review-issuer-admin");
 const adminDb = getAdminFirestore(adminApp);
 const adminAuth = getAdminAuth(adminApp);
 const clients = [];
 const checks = [];
-const now = Date.parse("2026-11-03T18:00:00.000Z");
+// Keep synthetic grant unexpired while testing the original Privacy callable.
+const now = Date.now();
 const iso = (delta = 0) => new Date(now + delta).toISOString();
 const scope = {
   projectId: "synthetic-movie-1",
@@ -192,10 +211,57 @@ try {
   process.env.FIRESTORE_EMULATOR_HOST = before;
   checks.push("non-disposable-backend-endpoint-rejected");
 
+  // ACTUAL Privacy Functions callable with emulated dedicated custom sign-in:
+  // exercise owner-scoped transaction decisions end-to-end, but NEVER accept
+  // a proposal as production permission. No Jobs worker or signed IAM proof.
+  const jobsApp = initializeApp(config, "review-synthetic-jobs");
+  clients.push(jobsApp);
+  const jobsAuth = getAuth(jobsApp);
+  connectAuthEmulator(jobsAuth, "http://127.0.0.1:9099", { disableWarnings: true });
+  const customToken = await adminAuth.createCustomToken("synthetic-jobs-verifier-uid", {
+    system: true, role: "system", consumerId: "urai-jobs",
+  });
+  const jobsSignIn = await signInWithCustomToken(jobsAuth, customToken);
+  assert.equal(jobsSignIn.user.uid, "synthetic-jobs-verifier-uid");
+  const jobsFunctions = getFunctions(jobsApp, "us-central1");
+  connectFunctionsEmulator(jobsFunctions, "127.0.0.1", 5001);
+  const verify = httpsCallable(jobsFunctions, "verifyLifeMovieRenderConsent");
+  const request = {
+    subjectUid: first.uid, tenantId: "tenant-1",
+    correlationId: "synthetic-jobs-review-verifier-01",
+    decisionReceiptId: result.receiptHash,
+    policyVersion: "1.1.0", renderScope: scope,
+  };
+  const decision = (await verify(request)).data;
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, "REVIEW_ONLY_EVIDENCE");
+  assert.equal(decision.receiptHash, null);
+  const readAudit = await adminDb.collection("dataAccessEvents")
+    .where("uid", "==", first.uid).get();
+  assert.equal(readAudit.docs.some(x => x.data().consumerId === "urai-jobs" &&
+    x.data().decision === "deny" && x.data().reason === "REVIEW_ONLY_EVIDENCE"), true);
+  checks.push("actual-privacy-callable-denies-emulator-review-grant-for-custom-jobs-login");
+
+  await adminDb.collection("privacyDeletionTombstones").doc(first.uid)
+    .set({ active: true, uid: first.uid });
+  const deletionDecision = (await verify(request)).data;
+  assert.equal(deletionDecision.allowed, false);
+  assert.equal(deletionDecision.reason, "ACCOUNT_DELETED");
+  checks.push("actual-privacy-callable-denies-existing-grant-after-owner-deletion");
+
+  await adminAuth.updateUser("synthetic-jobs-verifier-uid", { disabled: true });
+  await assert.rejects(() => verify(request), error => {
+    const code = String(error?.code || error);
+    assert.match(code, /permission-denied|unauthenticated/);
+    return true;
+  });
+  checks.push("original-privacy-callable-rejects-disabled-custom-jobs-login");
+
   console.log("R454_REVIEW_ONLY_FIRESTORE_PASS " + JSON.stringify({
     schemaVersion: "urai-review-only-firestore-emulator-1",
     projectId: PROJECT, checksPassed: checks.length, checks,
-    authEmulator: true, firestoreEmulator: true,
+    authEmulator: true, firestoreEmulator: true, functionsEmulator: true,
+    jobsIdentityEmulatorOnly: true, productionSignedJobsIdentityVerified: false,
     deployedIssuer: false, approvedEvidenceIssuer: false,
     jobsWorkerRuntimeIntegrated: false, renderEnabled: false,
     productionAuthorized: false, finalReleaseAccepted: false,
