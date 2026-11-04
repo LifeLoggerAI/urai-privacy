@@ -30,10 +30,10 @@ if [[ ! "$PRIVACY_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   exit 2
 fi
 # A caller-provided 40-hex commit is not a release approval. Only the
-# independently source-verified Privacy #196 revision is in this runner's
+# exact Git-tree-verified R562 Privacy review candidate is in this runner's
 # reviewed allowlist. Future changes require a new reviewed runner commit.
-APPROVED_PRIVACY_SHA='9620cf75c3e0914a86f47f694423c9a1e0a2da1a'
-APPROVED_PRIVACY_TREE='ac86eee8d2971d0bf8b27ba2040cda018b1b6626'
+APPROVED_PRIVACY_SHA='2567d6e9c0a30068c799ffe80b443fe45b7b67b5'
+APPROVED_PRIVACY_TREE='9c878321ceae8072b85371859e73f66add1d89af'
 if [[ "$PRIVACY_SHA" != "$APPROVED_PRIVACY_SHA" ]]; then
   echo 'DENIED: Privacy revision not approved by this reviewed runner' >&2
   exit 2
