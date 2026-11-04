@@ -29,6 +29,15 @@ if [[ ! "$PRIVACY_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo 'DENIED: exact 40-hex URAI_EXPECTED_PRIVACY_SHA is required' >&2
   exit 2
 fi
+# A caller-provided 40-hex commit is not a release approval. Only the
+# independently source-verified Privacy #196 revision is in this runner's
+# reviewed allowlist. Future changes require a new reviewed runner commit.
+APPROVED_PRIVACY_SHA='9620cf75c3e0914a86f47f694423c9a1e0a2da1a'
+APPROVED_PRIVACY_TREE='ac86eee8d2971d0bf8b27ba2040cda018b1b6626'
+if [[ "$PRIVACY_SHA" != "$APPROVED_PRIVACY_SHA" ]]; then
+  echo 'DENIED: Privacy revision not approved by this reviewed runner' >&2
+  exit 2
+fi
 
 # Abort rather than silently use live-cloud credentials. Read-only public Git
 # fetches and local Firebase emulators must work without provider credentials.
@@ -104,6 +113,15 @@ fetch_exact() {
 }
 
 run_step privacy_exact_fetch fetch_exact "$PRIVACY_REPO" "$PRIVACY_DIR" "$PRIVACY_SHA"
+# Pin the Privacy tree as well as the commit before any package command.
+privacy_actual_tree="$(git -C "$PRIVACY_DIR" rev-parse 'HEAD^{tree}')" || {
+  echo 'DENIED: unable to inspect Privacy checkout tree' >&2
+  exit 2
+}
+if [[ "$privacy_actual_tree" != "$APPROVED_PRIVACY_TREE" ]]; then
+  echo 'DENIED: approved Privacy source tree mismatch' >&2
+  exit 2
+fi
 run_step jobs_exact_fetch fetch_exact "$JOBS_REPO" "$JOBS_DIR" "$JOBS_SHA"
 if [[ "$(git -C "$JOBS_DIR" rev-parse 'HEAD^{tree}')" != "$JOBS_TREE" ]]; then
   echo 'DENIED: immutable Jobs #261 tree mismatch' >&2
