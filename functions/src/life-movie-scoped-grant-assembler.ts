@@ -78,6 +78,11 @@ const own = (value: object, key: string): boolean => Object.prototype.hasOwnProp
 function pinOwnEvidence(value: unknown, fields: readonly string[]): Record<string, unknown> {
   try {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(DENIED);
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) throw new Error(DENIED);
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== fields.length ||
+        keys.some(key => typeof key !== "string" || !fields.includes(key))) throw new Error(DENIED);
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const pinned: Record<string, unknown> = Object.create(null);
     for (const name of fields) {

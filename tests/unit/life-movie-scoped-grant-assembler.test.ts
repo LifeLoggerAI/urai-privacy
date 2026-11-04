@@ -76,3 +76,17 @@ describe("Life Movie scoped-grant issuer evidence is literal and immutable (R435
     deny(candidate);
   });
 });
+
+
+describe("Life Movie issuer evidence exact-shape admission (R443)", () => {
+  it.each([
+    ["unexpected top-level authority field", { ...base, forceGrant: true }],
+    ["surplus owner approval field", { ...base, approval: { ...approval, serviceRole: "system" } }],
+    ["surplus media rights field", { ...base, rights: { ...rights, bypassOwnerCheck: true } }],
+    ["surplus notice field", { ...base, notice: { ...notice, jurisdictionOverride: "ANY" } }],
+    ["surplus selection field", { ...base, selection: { ...selection, unreviewedSource: "other" } }],
+    ["inherited prototype on root", Object.assign(Object.create({ inherited: "fake" }), base)],
+    ["inherited prototype on approval", { ...base, approval: Object.assign(Object.create({ grantedBy: "admin" }), approval) }],
+    ["symbol authority in rights evidence", { ...base, rights: { ...rights, [Symbol("override")]: true } }],
+  ])("rejects %s", (_name, evidence) => deny(evidence));
+});
