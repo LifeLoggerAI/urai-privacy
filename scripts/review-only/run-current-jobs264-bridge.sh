@@ -32,8 +32,8 @@ fi
 # A caller-provided 40-hex commit is not a release approval. Only the
 # exact Git-tree-verified R569 converged Privacy review candidate is in this runner's
 # reviewed allowlist. Future changes require a new reviewed runner commit.
-APPROVED_PRIVACY_SHA='151d672f25f0efbf69a9578278f3070894aab288'
-APPROVED_PRIVACY_TREE='aba80aa581fa50d0cdc2a45f8d3719839dcab30f'
+APPROVED_PRIVACY_SHA='380530b558aa093de9346fc5d0f4163cf6578bc0'
+APPROVED_PRIVACY_TREE='5e5541173d0ca34509eeef095b745e5febd97c54'
 if [[ "$PRIVACY_SHA" != "$APPROVED_PRIVACY_SHA" ]]; then
   echo 'DENIED: Privacy revision not pinned by this review-only runner' >&2
   exit 2
