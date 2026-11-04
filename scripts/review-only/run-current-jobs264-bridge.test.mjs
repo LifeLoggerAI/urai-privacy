@@ -25,8 +25,8 @@ test('R575: immutable Jobs264 and source-anchor Privacy identity precede frozen 
  for(const s of [
  "JOBS_SHA='e2a700bd186c4dcff47c6da763e647992145d8b0'",
  "JOBS_TREE='9ca86b4a60ef2969203819a52ff9f827ac710d59'",
- "APPROVED_PRIVACY_SHA='380530b558aa093de9346fc5d0f4163cf6578bc0'",
- "APPROVED_PRIVACY_TREE='5e5541173d0ca34509eeef095b745e5febd97c54'",
+ "APPROVED_PRIVACY_SHA='17883515f8160bc4eacbc667d4f7a6d8a67a7d17'",
+ "APPROVED_PRIVACY_TREE='23b223c1bb133281b20b82e25ef9d52ef314c182'",
  "R575_REVIEWED_JOBS264_MANIFEST_SHA256",
  "R575_REVIEWED_JOBS264_TREE_SHA256",
  "R575_REVIEWED_JOBS264_FILE_COUNT",
@@ -41,8 +41,10 @@ test('R575: immutable Jobs264 and source-anchor Privacy identity precede frozen 
  const priv=src.indexOf('run_step privacy_exact_fetch fetch_exact');
  const jobs=src.indexOf('run_step jobs_exact_fetch fetch_exact');
  const digest=src.indexOf('run_step reviewed_jobs_generated_manifest');
+ const independent=src.indexOf('run_step independently_reproduced_jobs264_manifest');
  const emulator=src.indexOf('run_step actual_four_emulator_bridge');
- assert.ok(priv>=0&&jobs>priv&&digest>jobs&&emulator>digest);
+ assert.ok(priv>=0&&jobs>priv&&digest>jobs&&independent>digest&&emulator>independent);
+ for(const proof of ['R580_REVIEWED_JOBS264_MANIFEST_SHA256','R580_REVIEWED_JOBS264_TREE_SHA256','R580_REVIEWED_JOBS264_FILE_COUNT','R580_REVIEWED_JOBS264_TREE_BYTES','R583_INDEPENDENT_JOBS264_MANIFEST_PASS','productionAuthorized=false'])assert.ok(src.includes(proof),proof);
 });
 test('R575: reviewer-selected digest, prod commands and fabricated release GO absent',()=>{
  assert.doesNotMatch(src,/REVIEWED_JOBS_COMPILED_DIGEST="\$\(/);
