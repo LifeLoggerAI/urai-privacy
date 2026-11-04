@@ -285,3 +285,19 @@ test('R569: prior R566 source is rejected before any checkout', () => {
   assert.match(r.stderr,/Privacy revision not approved by this reviewed runner/);
   assert.doesNotMatch(r.stdout,/R554_STAGE_BEGIN=/);
 });
+
+test('R570: independently pinned Jobs manifest is prepared before emulators', () => {
+  const manifest = source.indexOf('run_step reviewed_jobs_generated_manifest');
+  const emulator = source.indexOf('run_step actual_four_emulator_bridge');
+  assert.ok(manifest > 0 && emulator > manifest);
+  assert.match(source, /observed\.digest, guard\.R562_REVIEWED_JOBS261_MANIFEST_SHA256/);
+  assert.match(source, /parsed\.treeSha256, guard\.R562_REVIEWED_JOBS261_TREE_SHA256/);
+  assert.match(source, /URAI_JOBS_COMPILED_MANIFEST="\$REVIEWED_JOBS_COMPILED_MANIFEST"/);
+  assert.match(source, /URAI_JOBS_COMPILED_EXPECTED_SHA256="\$REVIEWED_JOBS_COMPILED_DIGEST"/);
+});
+test('R570: expected Jobs manifest digest is fixed and checked against SHA256', () => {
+  assert.match(source, /REVIEWED_JOBS_COMPILED_DIGEST='6fa8b9e6ea767c0d709be46d718ebcf29f3fdb5ad1bb7961669c0a12edba7a96'/);
+  assert.match(source, /sha256sum "\$EVIDENCE_ROOT\/reviewed_jobs_generated_manifest\.log"/);
+  assert.match(source, /DENIED: R570 reviewed Jobs manifest digest mismatch/);
+  assert.doesNotMatch(source, /REVIEWED_JOBS_COMPILED_DIGEST="\$\(/);
+});

@@ -179,12 +179,38 @@ for artifact in   functions/lib/functions/jobs/studioLifeMovieContract.js   func
   sha256sum "$JOBS_DIR/$artifact" >> "$EVIDENCE_ROOT/COMPILED_JOBS_SHA256SUMS.txt"
 done
 
+# R570: capture the newly built Jobs artifact manifest, but never accept a
+# self-issued expected digest. The hardcoded R562 pin was reproduced on two
+# independent CPU hosts and must match before the four emulators start.
+run_step reviewed_jobs_generated_manifest node --input-type=module -e '
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+import { join } from "node:path";
+const [jobsDir, privacyDir] = process.argv.slice(1);
+const source = await import(pathToFileURL(join(privacyDir, "scripts/review-only/attest-jobs261-generated.mjs")).href);
+const guard = await import(pathToFileURL(join(privacyDir, "scripts/review-only/assert-privacy-jobs261-build-bridge.mjs")).href);
+const observed = source.captureJobs261GeneratedManifest(jobsDir);
+const parsed = JSON.parse(observed.manifest);
+assert.equal(observed.digest, guard.R562_REVIEWED_JOBS261_MANIFEST_SHA256, "R570: independently pinned Jobs manifest digest mismatch");
+assert.equal(parsed.treeSha256, guard.R562_REVIEWED_JOBS261_TREE_SHA256, "R570: independently pinned Jobs compiled tree mismatch");
+assert.equal(parsed.treeCount, guard.R562_REVIEWED_JOBS261_FILE_COUNT, "R570: independently pinned Jobs compiled file count mismatch");
+process.stdout.write(observed.manifest);
+' "$JOBS_DIR" "$PRIVACY_DIR"
+REVIEWED_JOBS_COMPILED_DIGEST='6fa8b9e6ea767c0d709be46d718ebcf29f3fdb5ad1bb7961669c0a12edba7a96'
+if [[ "$(sha256sum "$EVIDENCE_ROOT/reviewed_jobs_generated_manifest.log" | cut -d' ' -f1)" != "$REVIEWED_JOBS_COMPILED_DIGEST" ]]; then
+  echo 'DENIED: R570 reviewed Jobs manifest digest mismatch' >&2
+  exit 2
+fi
+REVIEWED_JOBS_COMPILED_MANIFEST="$(cat "$EVIDENCE_ROOT/reviewed_jobs_generated_manifest.log")"
+
 # All four emulators are disposable; both Jobs and Privacy are on detached
 # immutable commits. The fixture keeps C6 reviewOnlyEmulator=true and
 # productionAuthorized=false and checks generation-bound deletion.
 run_step actual_four_emulator_bridge env \
   URAI_JOBS_SOURCE_SHA="$JOBS_SHA" \
   URAI_JOBS_DIR="$JOBS_DIR" \
+  URAI_JOBS_COMPILED_MANIFEST="$REVIEWED_JOBS_COMPILED_MANIFEST" \
+  URAI_JOBS_COMPILED_EXPECTED_SHA256="$REVIEWED_JOBS_COMPILED_DIGEST" \
   npm --prefix "$PRIVACY_DIR" run test:life-movie:jobs-rights:bridge:emulated
 
 # A zero exit is not enough: require the original fixture's explicit denied-
