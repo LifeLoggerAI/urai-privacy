@@ -165,7 +165,7 @@ describe("deletion manifest safeguards", () => {
   });
   it("reports pending adapter readiness without promoting request-only deletion", () => {
     const summary = deletionAdapterSummary();
-    expect(summary.manifestVersion).toBe("1.8.0");
+    expect(summary.manifestVersion).toBe(DELETION_MANIFEST_VERSION);
     expect(summary.executableCrossSystemDelete).toBe(false);
     expect(summary.pendingAdapters).toEqual(expect.arrayContaining([
       expect.objectContaining({
