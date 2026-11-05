@@ -117,14 +117,50 @@ export function deletionManifestHash(value: DeletionManifest) {
     .digest("hex");
 }
 
+/** A stored or caller-assembled plan is never itself contributor authority.
+ * Exact registry admission remains required even when a manifest claims every
+ * downstream system is active. Do not mark cross-system deletion executable
+ * by omitting a pending system, duplicating one, or forging its status.
+ */
 export function deletionExecutionBlockers(value: DeletionManifest) {
-  const blockers: string[] = [];
-  if (value.legalHold) blockers.push("ACTIVE_LEGAL_HOLD");
-  if (value.adapters.some((adapter) => adapter.status !== "active")) {
-    blockers.push("PENDING_ADAPTERS");
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value) ||
+        value.version !== DELETION_MANIFEST_VERSION ||
+        typeof value.subjectHash !== "string" || !/^[0-9a-f]{64}$/.test(value.subjectHash) ||
+        typeof value.requestId !== "string" || !value.requestId.trim() ||
+        value.requestId.length > 160 || typeof value.legalHold !== "boolean" ||
+        !Array.isArray(value.adapters)) {
+      return ["INVALID_DELETION_MANIFEST"];
+    }
+    const blockers: string[] = [];
+    if (value.legalHold) blockers.push("ACTIVE_LEGAL_HOLD");
+    if (value.adapters.length === 0) blockers.push("NO_ADAPTERS_REGISTERED");
+
+    const registered = new Map(DELETION_ADAPTERS.map((adapter) => [adapter.id, adapter]));
+    const seen = new Set<string>();
+    let mismatch = value.adapters.length !== registered.size;
+    let pending = false;
+    for (const adapter of value.adapters) {
+      if (!adapter || typeof adapter !== "object" || Array.isArray(adapter) ||
+          typeof adapter.adapterId !== "string" || seen.has(adapter.adapterId)) {
+        mismatch = true;
+        continue;
+      }
+      seen.add(adapter.adapterId);
+      const expected = registered.get(adapter.adapterId);
+      if (!expected || adapter.system !== expected.system ||
+          adapter.status !== expected.status ||
+          (adapter.status === "active"
+            ? !Number.isSafeInteger(adapter.itemCount) || (adapter.itemCount as number) < 0
+            : adapter.itemCount !== null)) mismatch = true;
+      if (adapter.status !== "active") pending = true;
+    }
+    if (mismatch || seen.size !== registered.size) blockers.push("ADAPTER_REGISTRY_MISMATCH");
+    if (pending) blockers.push("PENDING_ADAPTERS");
+    return blockers;
+  } catch {
+    return ["INVALID_DELETION_MANIFEST"];
   }
-  if (value.adapters.length === 0) blockers.push("NO_ADAPTERS_REGISTERED");
-  return blockers;
 }
 
 export function canExecuteDeletion(value: DeletionManifest) {
