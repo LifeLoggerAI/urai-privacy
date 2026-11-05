@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.8.0";
+export const DELETION_MANIFEST_VERSION = "1.9.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -92,6 +92,18 @@ export const DELETION_ADAPTERS = [
     schemaVersion: "1.0.0",
     operations: ["delete", "tenant_delete", "retention_purge"] as const,
     reason: "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
+  },
+  {
+    // RuAi is a separately governed B2B tenant boundary. No consumer memory
+    // or medical content is authorized to flow to RuAi merely by this entry.
+    // A no-subject-data attestation OR verified restricted-data disposition,
+    // including central-analytics retraction, is still missing. Stay hard-off.
+    id: "ruai-b2bportal",
+    system: "ruai-b2bportal",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["subject_linkage_review", "tenant_access_withdrawal", "central_analytics_retraction", "disposition_receipt"] as const,
+    reason: "RUAi_CONSUMER_DATA_DISPOSITION_AND_RETRACTION_STAGING_E2E_REQUIRED"
   }
 ] as const;
 
