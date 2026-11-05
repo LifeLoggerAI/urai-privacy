@@ -148,7 +148,9 @@ export function deletionExecutionBlockers(value: DeletionManifest) {
     if (value.legalHold) blockers.push("ACTIVE_LEGAL_HOLD");
     if (value.adapters.length === 0) blockers.push("NO_ADAPTERS_REGISTERED");
 
-    const registered = new Map(DELETION_ADAPTERS.map((adapter) => [adapter.id, adapter]));
+    const registered = new Map<string, (typeof DELETION_ADAPTERS)[number]>(
+      DELETION_ADAPTERS.map((adapter) => [adapter.id, adapter] as const)
+    );
     const seen = new Set<string>();
     let mismatch = value.adapters.length !== registered.size;
     let pending = false;
@@ -177,6 +179,24 @@ export function deletionExecutionBlockers(value: DeletionManifest) {
 
 export function canExecuteDeletion(value: DeletionManifest) {
   return deletionExecutionBlockers(value).length === 0;
+}
+
+/**
+ * The active deletion callable scans only local Firebase resources. A clean
+ * local scan MUST NOT be represented as complete One UrAi deletion while
+ * externally verifiable, subject-scoped acknowledgements are unavailable.
+ *
+ * This policy has no caller-supplied flag, manifest, or environment override.
+ * Once all contributors are integrated, the second blocker must be replaced
+ * by a real trusted receipt verifier, not by a hard-coded approval boolean.
+ */
+export function deletionEcosystemCompletionBlockReason(): string {
+  const hasPendingContributors = DELETION_ADAPTERS.some(
+    (adapter) => adapter.status === "pending"
+  );
+  return hasPendingContributors
+    ? "PENDING_DOWNSTREAM_DELETION_CONTRIBUTORS"
+    : "VERIFIED_SUBJECT_SCOPED_DOWNSTREAM_RECEIPTS_REQUIRED";
 }
 
 export function nextDeletionFailureState(attempt: number): DeletionExecutionState {
