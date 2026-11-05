@@ -84,7 +84,7 @@ require_pattern "tests/unit/deletion-completion-authority.test.ts" 'rejects an e
 require_pattern "tests/unit/deletion-completion-authority.test.ts" 'rejects verification that is no longer pending' "verification-state regression test"
 
 require_pattern "functions/src/deletion-contract.ts" 'deletionEcosystemCompletionBlockReason' "ecosystem completion cannot rely on local-only residuals"
-require_pattern "functions/src/deletion-mutation-guard.ts" 'const downstreamReason = deletionEcosystemCompletionBlockReason\\(\\)' "downstream completion admission before completed status"
+require_pattern "functions/src/deletion-mutation-guard.ts" 'const downstreamReason = deletionEcosystemCompletionBlockReason' "downstream completion admission before completed status"
 require_pattern "tests/unit/deletion-completion-verifier.test.ts" 'cross-system deletion completion authority' "downstream completion regression tests"
 
 echo "[security-gate] Full npm audit visibility (non-blocking)"
