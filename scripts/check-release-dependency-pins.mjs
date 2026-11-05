@@ -92,7 +92,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const result = reviewReleaseDependencyPins(process.cwd());
   for (const failure of result.failures) console.error(`[dependency-pins] DENIED: ${failure}`);
   if (!result.pass) {
-    console.error(g[dependency-pins] Critical security floors fail. Do not bypass npm audit or promote this build.');
+    console.error('[dependency-pins] Critical security floors fail. Do not bypass npm audit or promote this build.');
     process.exitCode = 1;
   } else console.log('[dependency-pins] Security floors pass. Continue complete npm audit and original acceptance.');
 }
