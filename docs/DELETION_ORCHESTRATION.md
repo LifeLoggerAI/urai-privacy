@@ -2,7 +2,7 @@
 
 Status: `RETAINED PREVIEW SOURCE — NOT ACTIVE — NOT DEPLOYED`
 
-Manifest version: `1.8.0`
+Manifest version: `1.9.0`
 
 ## Authority boundary
 
@@ -53,7 +53,17 @@ The following adapters remain pending and therefore block complete ecosystem del
 - urai-content;
 - urai-jobs;
 - asset-factory;
-- urai-communications.
+- urai-communications;
+- ruai-b2bportal.
+
+RuAi is a distinct professional-portal and tenant boundary. Manifest v1.9.0
+registers it as **pending**, not as authority to transfer consumer memories or
+medical information. Review must establish either verified absence of any
+subject-linked consumer data or a strictly authorized disposition and withdrawal
+lifecycle. Any necessary central Analytics retractions require authenticated
+server-side authorization, tenant binding, idempotent persisted receipts and
+staging verification. Client-supplied requests or metadata are not proof of
+completed deletion.
 
 An active legal hold also blocks execution.
 

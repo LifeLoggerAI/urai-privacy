@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const DELETION_MANIFEST_VERSION = "1.8.0";
+export const DELETION_MANIFEST_VERSION = "1.9.0";
 export const DELETION_MAX_ATTEMPTS = 5;
 
 export type DeletionExecutionState =
@@ -92,6 +92,18 @@ export const DELETION_ADAPTERS = [
     schemaVersion: "1.0.0",
     operations: ["delete", "tenant_delete", "retention_purge"] as const,
     reason: "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
+  },
+  {
+    // RuAi is a separately governed B2B tenant boundary. No consumer memory
+    // or medical content is authorized to flow to RuAi merely by this entry.
+    // A no-subject-data attestation OR verified restricted-data disposition,
+    // including central-analytics retraction, is still missing. Stay hard-off.
+    id: "ruai-b2bportal",
+    system: "ruai-b2bportal",
+    status: "pending",
+    schemaVersion: "1.0.0",
+    operations: ["subject_linkage_review", "tenant_access_withdrawal", "central_analytics_retraction", "disposition_receipt"] as const,
+    reason: "RUAi_CONSUMER_DATA_DISPOSITION_AND_RETRACTION_STAGING_E2E_REQUIRED"
   }
 ] as const;
 
@@ -117,14 +129,50 @@ export function deletionManifestHash(value: DeletionManifest) {
     .digest("hex");
 }
 
+/** A stored or caller-assembled plan is never itself contributor authority.
+ * Exact registry admission remains required even when a manifest claims every
+ * downstream system is active. Do not mark cross-system deletion executable
+ * by omitting a pending system, duplicating one, or forging its status.
+ */
 export function deletionExecutionBlockers(value: DeletionManifest) {
-  const blockers: string[] = [];
-  if (value.legalHold) blockers.push("ACTIVE_LEGAL_HOLD");
-  if (value.adapters.some((adapter) => adapter.status !== "active")) {
-    blockers.push("PENDING_ADAPTERS");
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value) ||
+        value.version !== DELETION_MANIFEST_VERSION ||
+        typeof value.subjectHash !== "string" || !/^[0-9a-f]{64}$/.test(value.subjectHash) ||
+        typeof value.requestId !== "string" || !value.requestId.trim() ||
+        value.requestId.length > 160 || typeof value.legalHold !== "boolean" ||
+        !Array.isArray(value.adapters)) {
+      return ["INVALID_DELETION_MANIFEST"];
+    }
+    const blockers: string[] = [];
+    if (value.legalHold) blockers.push("ACTIVE_LEGAL_HOLD");
+    if (value.adapters.length === 0) blockers.push("NO_ADAPTERS_REGISTERED");
+
+    const registered = new Map(DELETION_ADAPTERS.map((adapter) => [adapter.id, adapter]));
+    const seen = new Set<string>();
+    let mismatch = value.adapters.length !== registered.size;
+    let pending = false;
+    for (const adapter of value.adapters) {
+      if (!adapter || typeof adapter !== "object" || Array.isArray(adapter) ||
+          typeof adapter.adapterId !== "string" || seen.has(adapter.adapterId)) {
+        mismatch = true;
+        continue;
+      }
+      seen.add(adapter.adapterId);
+      const expected = registered.get(adapter.adapterId);
+      if (!expected || adapter.system !== expected.system ||
+          adapter.status !== expected.status ||
+          (adapter.status === "active"
+            ? !Number.isSafeInteger(adapter.itemCount) || (adapter.itemCount as number) < 0
+            : adapter.itemCount !== null)) mismatch = true;
+      if (adapter.status !== "active") pending = true;
+    }
+    if (mismatch || seen.size !== registered.size) blockers.push("ADAPTER_REGISTRY_MISMATCH");
+    if (pending) blockers.push("PENDING_ADAPTERS");
+    return blockers;
+  } catch {
+    return ["INVALID_DELETION_MANIFEST"];
   }
-  if (value.adapters.length === 0) blockers.push("NO_ADAPTERS_REGISTERED");
-  return blockers;
 }
 
 export function canExecuteDeletion(value: DeletionManifest) {
