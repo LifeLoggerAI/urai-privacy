@@ -16,6 +16,7 @@ import {
   deletionCompletionBlockReason,
   type DeletionCompletionResiduals
 } from "./deletion-completion-verifier";
+import { deletionEcosystemCompletionBlockReason } from "./deletion-contract";
 import {
   buildDeletionMutationLeasePatch,
   deletionMutationBlockReason,
@@ -307,6 +308,25 @@ async function verifyCompletedDeletion(
       reason: blocked.message
     });
     throw new HttpsError(blocked.code, blocked.message, { auditId });
+  }
+
+  // A successful Privacy-local residual scan is necessary but not sufficient
+  // for an ecosystem-wide completed/deleted claim. No downstream signed
+  // subject receipts are verified by this callable, so fail closed.
+  const downstreamReason = deletionEcosystemCompletionBlockReason();
+  if (downstreamReason) {
+    const auditId = await writeCompletionVerification({
+      requestId,
+      ...authority,
+      residuals,
+      verified: false,
+      reason: downstreamReason
+    });
+    throw new HttpsError(
+      "failed-precondition",
+      "Deletion completion is awaiting independently verified downstream acknowledgements.",
+      { auditId, blocker: downstreamReason }
+    );
   }
 
   await writeCompletionVerification({
