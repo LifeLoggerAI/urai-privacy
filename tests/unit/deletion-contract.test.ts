@@ -85,16 +85,39 @@ describe("deletion manifest safeguards", () => {
       ...entry,
       status: "active" as const
     }));
-    expect(deletionExecutionBlockers(value)).toEqual(["ACTIVE_LEGAL_HOLD"]);
+    expect(deletionExecutionBlockers(value)).toContain("ACTIVE_LEGAL_HOLD");
   });
 
-  it("permits execution only after every adapter is active", () => {
+  it("rejects forged active labels without independent registry certification", () => {
     const value = makeManifest();
     value.adapters = value.adapters.map((entry) => ({
       ...entry,
       status: "active" as const
     }));
-    expect(canExecuteDeletion(value)).toBe(true);
+    expect(canExecuteDeletion(value)).toBe(false);
+    expect(deletionExecutionBlockers(value)).toContain("ADAPTER_REGISTRY_MISMATCH");
+  });
+
+  it("rejects omitted, duplicate or renamed contributors", () => {
+    const missing = makeManifest();
+    missing.adapters = missing.adapters.filter(entry => entry.adapterId !== "urai-jobs");
+    expect(deletionExecutionBlockers(missing)).toContain("ADAPTER_REGISTRY_MISMATCH");
+    const repeated = makeManifest();
+    repeated.adapters = [...repeated.adapters.slice(0, -1), { ...repeated.adapters[0] }];
+    expect(deletionExecutionBlockers(repeated)).toContain("ADAPTER_REGISTRY_MISMATCH");
+    const substituted = makeManifest();
+    substituted.adapters[0] = { ...substituted.adapters[0], system: "not-privacy" };
+    expect(deletionExecutionBlockers(substituted)).toContain("ADAPTER_REGISTRY_MISMATCH");
+  });
+
+  it("rejects impossible item counts, mismatched versions and malformed manifests", () => {
+    const negative = makeManifest();
+    negative.adapters[0] = { ...negative.adapters[0], itemCount: -1 };
+    expect(deletionExecutionBlockers(negative)).toContain("ADAPTER_REGISTRY_MISMATCH");
+    const legacy = makeManifest();
+    legacy.version = "legacy";
+    expect(deletionExecutionBlockers(legacy)).toEqual(["INVALID_DELETION_MANIFEST"]);
+    expect(canExecuteDeletion(null as unknown as DeletionManifest)).toBe(false);
   });
 
   it("hashes the same manifest consistently", () => {
