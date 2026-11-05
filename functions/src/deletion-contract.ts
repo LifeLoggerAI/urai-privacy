@@ -148,7 +148,9 @@ export function deletionExecutionBlockers(value: DeletionManifest) {
     if (value.legalHold) blockers.push("ACTIVE_LEGAL_HOLD");
     if (value.adapters.length === 0) blockers.push("NO_ADAPTERS_REGISTERED");
 
-    const registered = new Map(DELETION_ADAPTERS.map((adapter) => [adapter.id, adapter]));
+    const registered = new Map<string, (typeof DELETION_ADAPTERS)[number]>(
+      DELETION_ADAPTERS.map((adapter) => [adapter.id, adapter] as const)
+    );
     const seen = new Set<string>();
     let mismatch = value.adapters.length !== registered.size;
     let pending = false;
