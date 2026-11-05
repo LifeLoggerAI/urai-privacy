@@ -29,7 +29,7 @@ function makeManifest(): DeletionManifest {
 
 describe("deletion manifest safeguards", () => {
   it("uses a versioned manifest and opaque subject hash", () => {
-    expect(DELETION_MANIFEST_VERSION).toBe("1.8.0");
+    expect(DELETION_MANIFEST_VERSION).toBe("1.9.0");
     expect(deletionSubjectHash("example-user")).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -50,6 +50,39 @@ describe("deletion manifest safeguards", () => {
         "SOURCE_CONTRACT_REGISTERED_PROTECTED_STAGING_E2E_REQUIRED"
       );
     }
+  });
+
+  it("registers RuAi as pending subject-disposition and retraction authority", () => {
+    const ruai = DELETION_ADAPTERS.find((entry) => entry.id === "ruai-b2bportal");
+    expect(ruai?.status).toBe("pending");
+    expect(ruai?.system).toBe("ruai-b2bportal");
+    expect("schemaVersion" in (ruai ?? {})).toBe(true);
+    if (ruai && "schemaVersion" in ruai) {
+      expect(ruai.schemaVersion).toBe("1.0.0");
+      expect(ruai.operations).toEqual([
+        "subject_linkage_review", "tenant_access_withdrawal",
+        "central_analytics_retraction", "disposition_receipt"
+      ]);
+    }
+    const summary = deletionAdapterSummary();
+    expect(summary.executableCrossSystemDelete).toBe(false);
+    expect(summary.pendingAdapters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "ruai-b2bportal",
+        reason: "RUAi_CONSUMER_DATA_DISPOSITION_AND_RETRACTION_STAGING_E2E_REQUIRED"
+      })
+    ]));
+  });
+
+  it("does not accept forged RuAi completion or a missing B2B contributor", () => {
+    const forged = makeManifest();
+    const index = forged.adapters.findIndex((entry) => entry.adapterId === "ruai-b2bportal");
+    expect(index).toBeGreaterThanOrEqual(0);
+    forged.adapters[index] = { ...forged.adapters[index], status: "active" };
+    expect(deletionExecutionBlockers(forged)).toContain("ADAPTER_REGISTRY_MISMATCH");
+    const omitted = makeManifest();
+    omitted.adapters = omitted.adapters.filter((entry) => entry.adapterId !== "ruai-b2bportal");
+    expect(deletionExecutionBlockers(omitted)).toContain("ADAPTER_REGISTRY_MISMATCH");
   });
 
   it("registers the Jobs governed protected-staging deletion executor without activating it", () => {
