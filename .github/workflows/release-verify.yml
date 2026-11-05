@@ -1,4 +1,4 @@
-name: URAI Privacy Release Verification
+name: URAI Privacy Release Gates
 
 on:
   push:
