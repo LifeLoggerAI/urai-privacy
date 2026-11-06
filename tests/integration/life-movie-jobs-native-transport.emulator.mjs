@@ -151,7 +151,12 @@ try {
     httpsCallable(ownerFns, 'setCanonicalConsent')({
       purpose: 'life-movie.render', status: 'granted', surface: 'movie-selection'
     }),
-    /failed-precondition/
+    (error) => {
+      // Firebase callable errors expose the canonical rejection in .code, not
+      // necessarily in .message. Do not weaken the asserted Privacy denial.
+      assert.equal(error?.code, 'functions/failed-precondition');
+      return true;
+    }
   );
   const recordRef = adminDb.collection('consentRecords').doc(ownerUid + '_life-movie_render');
   assert.equal((await recordRef.get()).exists, false);
