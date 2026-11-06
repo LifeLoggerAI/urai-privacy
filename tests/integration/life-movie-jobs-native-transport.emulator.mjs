@@ -5,7 +5,7 @@
  * mocked or granted production privileges.
  */
 import assert from 'node:assert/strict';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, createSign } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { resolve, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -96,6 +96,22 @@ const adminApp = initializeAdminApp({
     privateKey: testKey.privateKey,
   }),
 }, 'r818-native-jobs-admin');
+// Only this process holds this freshly generated private key, never a production
+// service-account credential or a downloadable long-lived key file.
+const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+function signEphemeralJwt(header, payload) {
+  const message = encode(header) + '.' + encode(payload);
+  const signer = createSign('RSA-SHA256');
+  signer.update(message);
+  signer.end();
+  return message + '.' + signer.sign(testKey.privateKey).toString('base64url');
+}
+function shapeOnly(jwt) {
+  const pieces = String(jwt || '').split('.');
+  let header = {};
+  try { header = JSON.parse(Buffer.from(pieces[0] || '', 'base64url').toString('utf8')); } catch { /* deny */ }
+  return { segments: pieces.length, alg: header.alg || 'unknown', hasSignature: Boolean(pieces[2]) };
+}
 const adminAuth = getAdminAuth(adminApp);
 const adminDb = getAdminFirestore(adminApp);
 const ownerApp = initializeClientApp({
@@ -112,6 +128,11 @@ connectFunctionsEmulator(ownerFns, '127.0.0.1', 5001);
 let identityCalls = 0;
 let privacyCalls = 0;
 let privacyStatus = 0;
+let privacyResponseText = '';
+let emulatorIdTokenShape = null;
+let reviewOnlySignedIdToken = false;
+let syntheticSignedIdTokenCount = 0;
+let syntheticSignedCustomTokenCount = 0;
 const realFetch = globalThis.fetch.bind(globalThis);
 async function emulatorOnlyTransport(input, init) {
   const target = String(input);
@@ -121,7 +142,33 @@ async function emulatorOnlyTransport(input, init) {
     assert.equal(init?.redirect, 'error');
     const response = await realFetch(EMULATOR_AUTH_URL, { ...init, redirect: 'error' });
     assert.equal(response.status, 200, 'Actual Firebase Auth emulator must issue signed-in ID token');
-    return response;
+    if (!reviewOnlySignedIdToken) return response;
+    // The Firebase Auth emulator deliberately returns an unsigned ID token.
+    // Never modify Jobs or Privacy production authentication to accept it.
+    // In a separately labeled *synthetic negative-only* stage, re-sign only
+    // the verified local emulator claims with our one-use test key so the
+    // original Jobs transport can issue a request. This token is NOT issued
+    // by Google, cannot establish production IAM, and MUST NOT yield a grant.
+    const json = await response.json();
+    const rawIdToken = String(json.idToken || '');
+    const segments = rawIdToken.split('.');
+    const rawHeader = JSON.parse(Buffer.from(segments[0] || '', 'base64url').toString('utf8'));
+    const rawClaims = JSON.parse(Buffer.from(segments[1] || '', 'base64url').toString('utf8'));
+    emulatorIdTokenShape = shapeOnly(rawIdToken);
+    assert.equal(rawHeader.alg, 'none', 'only unsigned Firebase emulator ID tokens may be adapted');
+    assert.equal(segments.length, 3);
+    assert.equal(segments[2], '');
+    assert.equal(rawClaims.aud, PROJECT);
+    assert.equal(rawClaims.iss, 'https://securetoken.google.com/' + PROJECT);
+    assert.equal(rawClaims.sub, JOBS_UID);
+    assert.equal(rawClaims.system, true);
+    assert.equal(rawClaims.role, 'system');
+    assert.equal(rawClaims.consumerId, 'urai-jobs');
+    assert.equal(rawClaims.firebase?.sign_in_provider, 'custom');
+    json.idToken = signEphemeralJwt({ alg: 'RS256', typ: 'JWT' }, rawClaims);
+    syntheticSignedIdTokenCount++;
+    return new Response(JSON.stringify(json), { status: response.status,
+      headers: { 'content-type': 'application/json' } });
   }
   if (target === PRIVACY_PUBLIC_URL) {
     privacyCalls++;
@@ -133,6 +180,7 @@ async function emulatorOnlyTransport(input, init) {
     assert.equal(payload.data?.subjectUid, ownerUid);
     const response = await realFetch(EMULATOR_PRIVACY_URL, { ...init, redirect: 'error' });
     privacyStatus = response.status;
+    privacyResponseText = await response.clone().text();
     return response;
   }
   throw new Error('R818_FORBIDDEN_OUTBOUND_NETWORK_TARGET:' + target);
@@ -179,7 +227,30 @@ try {
         const token = await adminAuth.createCustomToken(uid, claims);
         signingSuccesses++;
         assert.equal(typeof token, 'string');
-        return token;
+        const shape = shapeOnly(token);
+        console.log('[R818 CUSTOM_TOKEN_SHAPE]', JSON.stringify(shape));
+        if (shape.hasSignature && shape.alg === 'RS256') return token;
+        // The Firebase Admin Auth emulator may use alg=none for local tests.
+        // Only an exact local unsigned token can trigger the review-only
+        // ephemeral signer. No production credential/provider is touched.
+        assert.equal(process.env.FIREBASE_AUTH_EMULATOR_HOST, '127.0.0.1:9099');
+        assert.equal(shape.alg, 'none');
+        assert.equal(shape.segments, 3);
+        const originalPieces = token.split('.');
+        assert.equal(originalPieces[2], '');
+        const unsignedClaims = JSON.parse(Buffer.from(originalPieces[1], 'base64url').toString('utf8'));
+        assert.equal(unsignedClaims.uid, uid);
+        assert.equal(unsignedClaims.claims?.system, true);
+        assert.equal(unsignedClaims.claims?.consumerId, 'urai-jobs');
+        const signerEmail = 'r818-ephemeral-test@' + PROJECT + '.iam.gserviceaccount.com';
+        const iat = Math.floor(Date.now() / 1000);
+        const fixture = signEphemeralJwt({ alg: 'RS256', typ: 'JWT' }, {
+          iss: signerEmail, sub: signerEmail,
+          aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+          iat, exp: iat + 3600, uid, claims,
+        });
+        syntheticSignedCustomTokenCount++;
+        return fixture;
       } catch (error) {
         console.log('[R818 SIGNING_DIAGNOSTIC]', String(error?.code || error?.name || 'unknown'),
           String(error?.message || '').slice(0, 140));
@@ -192,15 +263,47 @@ try {
     firebaseWebApiKey: API_KEY, region: 'us-central1',
   }, { adminAuth: tracedAdminAuth, fetchImpl: emulatorOnlyTransport });
 
+  // Stage 1: original unsigned Auth-emulator ID token MUST fail within Jobs.
   await assert.rejects(() => client(expected), error => {
     assert.match(String(error), /life_movie_consent_transport_unavailable|life_movie_consent_decision_denied|life_movie_consent_jobs_identity_unavailable/);
     return true;
   });
-  console.log('[R818 TOKEN_STAGE_COUNTS]', JSON.stringify({ signingAttempts, signingSuccesses, identityCalls, privacyCalls }));
-  assert.equal(identityCalls, 1, 'original Jobs provider must exchange its custom token via real Auth emulator');
-  assert.equal(privacyCalls, 1, 'original Jobs transport must actually reach original Privacy callable');
-  assert.equal(privacyStatus, 403, 'Privacy must explicitly reject the unapproved Jobs identity');
-  pass('REAL_JOBS_IDENTITY_TO_PRIVACY_FUNCTIONS_HTTP_PERMISSION_DENIED');
+  console.log('[R818 ORIGINAL_EMULATOR_TOKEN_STAGE]', JSON.stringify({
+    signingAttempts, signingSuccesses, identityCalls, privacyCalls,
+    syntheticSignedCustomTokenCount,
+  }));
+  assert.equal(identityCalls, 1, 'original Jobs token provider must call real Auth emulator');
+  assert.equal(privacyCalls, 0, 'original Jobs transport must reject unsigned emulator ID token');
+  pass('ORIGINAL_JOBS_TRANSPORT_REJECTS_UNSIGNED_EMULATOR_ID_TOKEN');
+
+  // Stage 2 is explicitly NOT a production-identity acceptance. Repack
+  // emulator ID claims using ephemeral in-process RSA only for an authenticated
+  // NEGATIVE test of the original callable's current grant/identity denial.
+  reviewOnlySignedIdToken = true;
+  await assert.rejects(() => client(expected), error => {
+    assert.match(String(error), /life_movie_consent_transport_unavailable|life_movie_consent_decision_denied|life_movie_consent_jobs_identity_unavailable/);
+    return true;
+  });
+  console.log('[R818 TOKEN_STAGE_COUNTS]', JSON.stringify({ signingAttempts,
+    signingSuccesses, identityCalls, privacyCalls, privacyStatus,
+    emulatorIdTokenShape, syntheticSignedCustomTokenCount, syntheticSignedIdTokenCount }));
+  assert.equal(identityCalls, 2, 'two real Auth emulator custom-token exchanges required');
+  assert.equal(privacyCalls, 1, 'original Jobs consent transport must reach real Privacy emulator');
+  assert.equal(syntheticSignedIdTokenCount, 1);
+  assert.ok([200, 401, 403].includes(privacyStatus), 'Privacy must respond with explicit authentication/consent result');
+  if (privacyStatus === 200) {
+    const decisionEnvelope = JSON.parse(privacyResponseText);
+    assert.equal(decisionEnvelope?.result?.allowed, false, 'Privacy never grants without real C6 consent');
+    pass('ORIGINAL_PRIVACY_CALLABLE_DENIES_UNISSUED_C6_GRANT');
+  } else {
+    const denialEnvelope = JSON.parse(privacyResponseText);
+    assert.ok(denialEnvelope?.error?.status === 'PERMISSION_DENIED' ||
+      denialEnvelope?.error?.status === 'UNAUTHENTICATED' ||
+      denialEnvelope?.error?.code === 401 || denialEnvelope?.error?.code === 403,
+      'Must be explicit Firebase auth denial, not a generic infrastructure error');
+    pass('PRIVACY_FUNCTIONS_AUTHENTICATION_REJECTS_SYNTHETIC_IDENTITY');
+  }
+  pass('REAL_JOBS_TO_PRIVACY_HTTP_NEGATIVE_TRANSPORT_REACHED');
 
   assert.equal((await recordRef.get()).exists, false, 'denied transport must never create a C6 consent grant');
   const [jobsSnapshot, queueSnapshot] = await Promise.all([
@@ -213,6 +316,7 @@ try {
   console.log('URAI_R818_REAL_JOBS_PRIVACY_CALLABLE_DENIAL_PASS ' + JSON.stringify({
     privacyHead: PRIVACY_SHA, jobsHead: JOBS_SHA,
     projectId: PROJECT, identityCalls, privacyCalls, privacyStatus,
+    syntheticEmulatorSignatureFixture: true, productionServiceIdentityAccepted: false,
     nativeJobsIdentityProvider: true, nativeJobsCallableTransport: true,
     nativePrivacyOnCall: true, mintedSignedProductionIdentity: false,
     approvedC6Issuer: false, movieRendered: false, productionAuthorized: false,
