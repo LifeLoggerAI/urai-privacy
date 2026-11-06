@@ -180,6 +180,11 @@ async function emulatorOnlyTransport(input, init) {
     assert.equal(rawClaims.role, 'system');
     assert.equal(rawClaims.consumerId, 'urai-jobs');
     assert.equal(rawClaims.firebase?.sign_in_provider, 'custom');
+    // Firebase Auth emulator omits REST localId for a custom-token sign-in;
+    // recover ONLY the already verified UID in this in-process test adapter.
+    // The original Jobs provider still requires localId and is not modified.
+    assert.equal(json.localId, undefined);
+    json.localId = rawClaims.sub;
     json.idToken = signEphemeralJwt({ alg: 'RS256', typ: 'JWT' }, rawClaims);
     syntheticSignedIdTokenCount++;
     return new Response(JSON.stringify(json), { status: response.status,
