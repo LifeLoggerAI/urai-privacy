@@ -41,7 +41,7 @@ const REQUIRED = Object.freeze({
 const FORBIDDEN = [
   'GITHUB_TOKEN', 'GH_TOKEN', 'RUNPOD_API_KEY', 'GOOGLE_APPLICATION_CREDENTIALS',
   'FIREBASE_TOKEN', 'FIREBASE_CLI_TOKEN', 'GOOGLE_OAUTH_ACCESS_TOKEN',
-  'GOOGLE_CLOUD_ACCESS_TOKEN', 'FIREBASE_CONFIG', 'GCS_BUCKET_NAME',
+  'GOOGLE_CLOUD_ACCESS_TOKEN', 'GCS_BUCKET_NAME',
   'FIREBASE_STORAGE_BUCKET', 'GOOGLE_CLOUD_STORAGE_BUCKET',
 ];
 function git(dir, ...args) {
@@ -58,6 +58,16 @@ function pinOrThrow() {
   assert.equal(git(jobs, 'status', '--porcelain', '--untracked-files=all'), '', 'Jobs source must be clean');
   for (const [name, expected] of Object.entries(REQUIRED)) {
     assert.equal(process.env[name], expected, 'local-only emulator setting ' + name);
+  }
+  // firebase emulators:exec sets FIREBASE_CONFIG itself. Accept only the
+  // generated disposable project/bucket, never inherited production metadata.
+  const firebaseConfig = process.env.FIREBASE_CONFIG;
+  if (firebaseConfig) {
+    const parsed = JSON.parse(firebaseConfig);
+    assert.equal(parsed.projectId, PROJECT, 'Firebase config must be demo project');
+    assert.equal(parsed.storageBucket, PROJECT + '.appspot.com', 'Firebase bucket must be demo');
+    assert.equal(parsed.databaseURL, 'https://' + PROJECT + '.firebaseio.com', 'Firebase database must be demo');
+    assert.deepEqual(Object.keys(parsed).sort(), ['databaseURL', 'projectId', 'storageBucket'].sort());
   }
   for (const key of FORBIDDEN) assert.equal(process.env[key] || '', '', 'forbidden inherited authority: ' + key);
   for (const name of ['GOOGLE_CLOUD_PROJECT', 'GCLOUD_PROJECT', 'FIREBASE_PROJECT_ID']) {
