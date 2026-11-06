@@ -132,6 +132,10 @@ let privacyResponseText = '';
 let emulatorIdTokenShape = null;
 let reviewOnlySignedIdToken = false;
 let syntheticSignedIdTokenCount = 0;
+let responseShapeDiagnostic = null;
+let signedTokenClaimsDiagnostic = null;
+let firstErrorCode = '';
+let secondErrorCode = '';
 let syntheticSignedCustomTokenCount = 0;
 const realFetch = globalThis.fetch.bind(globalThis);
 async function emulatorOnlyTransport(input, init) {
@@ -154,6 +158,17 @@ async function emulatorOnlyTransport(input, init) {
     const segments = rawIdToken.split('.');
     const rawHeader = JSON.parse(Buffer.from(segments[0] || '', 'base64url').toString('utf8'));
     const rawClaims = JSON.parse(Buffer.from(segments[1] || '', 'base64url').toString('utf8'));
+    responseShapeDiagnostic = { status: response.status, contentType: response.headers.get('content-type'),
+      keys: Object.keys(json).sort(), localIdMatches: json.localId === JOBS_UID,
+      expiresInType: typeof json.expiresIn, expiresInValue: String(json.expiresIn || '').slice(0, 12) };
+    signedTokenClaimsDiagnostic = { audienceMatches: rawClaims.aud === PROJECT,
+      issuerMatches: rawClaims.iss === 'https://securetoken.google.com/' + PROJECT,
+      uidMatches: rawClaims.sub === JOBS_UID,
+      claimsPresent: rawClaims.system === true && rawClaims.role === 'system' && rawClaims.consumerId === 'urai-jobs',
+      signInProvider: rawClaims.firebase?.sign_in_provider,
+      issuedAtType: typeof rawClaims.iat, expiryType: typeof rawClaims.exp,
+      lifetimeSeconds: Number(rawClaims.exp) - Number(rawClaims.iat),
+      ageSeconds: Math.floor(Date.now()/1000) - Number(rawClaims.iat) };
     emulatorIdTokenShape = shapeOnly(rawIdToken);
     assert.equal(rawHeader.alg, 'none', 'only unsigned Firebase emulator ID tokens may be adapted');
     assert.equal(segments.length, 3);
@@ -281,9 +296,11 @@ try {
   // NEGATIVE test of the original callable's current grant/identity denial.
   reviewOnlySignedIdToken = true;
   await assert.rejects(() => client(expected), error => {
+    secondErrorCode = String(error?.message || error);
     assert.match(String(error), /life_movie_consent_transport_unavailable|life_movie_consent_decision_denied|life_movie_consent_jobs_identity_unavailable/);
     return true;
   });
+  console.log('[R818 SYNTHETIC_RESPONSE_DIAGNOSTICS]', JSON.stringify({ responseShapeDiagnostic, signedTokenClaimsDiagnostic, secondErrorCode }));
   console.log('[R818 TOKEN_STAGE_COUNTS]', JSON.stringify({ signingAttempts,
     signingSuccesses, identityCalls, privacyCalls, privacyStatus,
     emulatorIdTokenShape, syntheticSignedCustomTokenCount, syntheticSignedIdTokenCount }));
