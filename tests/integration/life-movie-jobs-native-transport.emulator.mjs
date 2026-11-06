@@ -169,15 +169,34 @@ try {
     decisionReceiptId: 'c'.repeat(64),
     renderScope: scope,
   });
+  let signingAttempts = 0;
+  let signingSuccesses = 0;
+  const tracedAdminAuth = {
+    app: adminAuth.app,
+    async createCustomToken(uid, claims) {
+      signingAttempts++;
+      try {
+        const token = await adminAuth.createCustomToken(uid, claims);
+        signingSuccesses++;
+        assert.equal(typeof token, 'string');
+        return token;
+      } catch (error) {
+        console.log('[R818 SIGNING_DIAGNOSTIC]', String(error?.code || error?.name || 'unknown'),
+          String(error?.message || '').slice(0, 140));
+        throw error;
+      }
+    },
+  };
   const client = createAuthenticatedJobsPrivacyConsentClient({
     firebaseProjectId: PROJECT, dedicatedJobsUid: JOBS_UID,
     firebaseWebApiKey: API_KEY, region: 'us-central1',
-  }, { adminAuth, fetchImpl: emulatorOnlyTransport });
+  }, { adminAuth: tracedAdminAuth, fetchImpl: emulatorOnlyTransport });
 
   await assert.rejects(() => client(expected), error => {
     assert.match(String(error), /life_movie_consent_transport_unavailable|life_movie_consent_decision_denied|life_movie_consent_jobs_identity_unavailable/);
     return true;
   });
+  console.log('[R818 TOKEN_STAGE_COUNTS]', JSON.stringify({ signingAttempts, signingSuccesses, identityCalls, privacyCalls }));
   assert.equal(identityCalls, 1, 'original Jobs provider must exchange its custom token via real Auth emulator');
   assert.equal(privacyCalls, 1, 'original Jobs transport must actually reach original Privacy callable');
   assert.equal(privacyStatus, 403, 'Privacy must explicitly reject the unapproved Jobs identity');
