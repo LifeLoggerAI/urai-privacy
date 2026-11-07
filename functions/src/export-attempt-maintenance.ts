@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { FieldPath, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { EXPORT_CLEANUP_MAX_PAGES, EXPORT_CLEANUP_PAGE_SIZE, timestampMillis } from "./export-lifecycle-contract";
 import { exportAttemptPaths } from "./export-processing-authority";
+import { approvedExportCleanupGeneration } from "./export-object-generation-policy";
+import { deleteApprovedExportArtifact } from "./export-generation-cleanup";
 
 const CLEANUP_LEASE_MS = 15 * 60 * 1000;
 
@@ -52,6 +53,17 @@ export async function cleanupExportArtifactAttempts(now: number) {
             });
             return null;
           }
+          const binding = {
+            uid, jobId, exportPath: expectedPaths[0], manifestPath: expectedPaths[1],
+            exportGeneration: attempt.exportGeneration, manifestGeneration: attempt.manifestGeneration
+          };
+          if (paths.some((path) => !approvedExportCleanupGeneration({ ...binding, path }))) {
+            tx.update(document.ref, {
+              status: "cleanup_blocked", cleanupDueAt: FieldValue.delete(),
+              cleanupReason: "MISSING_EXACT_EXPORT_GENERATION", updatedAt: FieldValue.serverTimestamp()
+            });
+            return null;
+          }
           const jobRef = db.collection("exportJobs").doc(jobId);
           const requestRef = db.collection("privacyRequests").doc(requestId);
           const fenceRef = db.collection("privacyDeletionTombstones").doc(uid);
@@ -85,11 +97,11 @@ export async function cleanupExportArtifactAttempts(now: number) {
             status: "artifact_cleanup", cleanupLeaseToken: cleanupToken,
             cleanupLeaseExpiresAt: Timestamp.fromMillis(now + CLEANUP_LEASE_MS), updatedAt: FieldValue.serverTimestamp()
           });
-          return { uid, jobId, requestId, paths: paths as string[] };
+          return { ...binding, requestId, paths: paths as string[] };
         });
         if (!claim) continue;
         const cleanup = await removeExportArtifacts(claim.paths, async (path) => {
-          await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
+          await deleteApprovedExportArtifact({ ...claim, path });
         });
         await db.runTransaction(async (tx) => {
           const fresh = await tx.get(document.ref);

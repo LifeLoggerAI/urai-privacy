@@ -35,6 +35,8 @@ node --experimental-strip-types --test tests/export-processing-claim-policy.test
 node --test tests/export-processing-c7-source-contract.test.mjs
 node --experimental-strip-types --test tests/export-object-generation-policy.test.mjs
 node --test tests/export-object-generation-source-contract.test.mjs
+node --experimental-strip-types --test tests/export-cleanup-generation-policy.test.mjs
+node --test tests/export-cleanup-generation-source-contract.test.mjs
 node scripts/assert-node22-release-workflows.mjs
 
 # Fail closed before installs/builds if private export delivery still issues a

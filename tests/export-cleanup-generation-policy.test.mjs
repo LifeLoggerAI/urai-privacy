@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { approvedExportCleanupGeneration as approve } from '../functions/src/export-object-generation-policy.ts';
+const base='exports/owner1/job1/123e4567-e89b-12d3-a456-426614174000/';
+const job={uid:'owner1',jobId:'job1',exportPath:base+'export.json',manifestPath:base+'manifest.json',exportGeneration:'9007199254740993',manifestGeneration:'9007199254740994'};
+test('export pinned cleanup uses precise generation',()=>assert.equal(approve({...job,path:job.exportPath}),'9007199254740993'));
+test('manifest uses its own generation',()=>assert.equal(approve({...job,path:job.manifestPath}),'9007199254740994'));
+test('wrong owner cannot clean path',()=>assert.equal(approve({...job,uid:'owner2',path:job.exportPath}),null));
+test('wrong job cannot clean path',()=>assert.equal(approve({...job,jobId:'job2',path:job.exportPath}),null));
+test('missing generation blocks',()=>assert.equal(approve({...job,exportGeneration:undefined,path:job.exportPath}),null));
+test('unsafe Number generation blocks',()=>assert.equal(approve({...job,exportGeneration:9007199254740993,path:job.exportPath}),null));
+test('old generation representation blocks',()=>assert.equal(approve({...job,exportGeneration:'009',path:job.exportPath}),null));
+test('does not borrow manifest generation for export',()=>assert.equal(approve({...job,exportGeneration:null,path:job.exportPath}),null));
+test('foreign file outside approved names blocks',()=>assert.equal(approve({...job,path:base+'secret.json'}),null));
+test('path traversal blocks',()=>assert.equal(approve({...job,path:base+'../manifest.json'}),null));
+test('wrong attempt path blocks',()=>assert.equal(approve({...job,path:'exports/owner1/job1/123e4567-e89b-12d3-a456-426614174001/export.json'}),null));
+test('replaced generation is never inferred from current metadata',()=>assert.equal(approve({...job,exportGeneration:null,path:job.exportPath,latestGeneration:'9007199254740995'}),null));
