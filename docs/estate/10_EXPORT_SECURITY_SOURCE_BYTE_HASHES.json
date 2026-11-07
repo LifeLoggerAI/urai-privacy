@@ -1,0 +1,73 @@
+{
+  "schema": "urai-privacy-export-security-2lineages-seven-source-bytes-v1",
+  "date": "2026-11-07",
+  "repo": "LifeLoggerAI/urai-privacy",
+  "source_refs": {
+    "R841": "5daa194148c1f0b157062ca09b8f1b6e629d6d29",
+    "PR160": "809d94ad7fc93322780d13ff3f0bade7612b3ec2"
+  },
+  "method": "GitHub fetch_blob exact Git blob decoded UTF8; independently SHA-256 and byte-length, validated SHA256 abc vector; source-shape assertions only, no runtime or provider test",
+  "files": [
+    {
+      "branch": "R841",
+      "path": "functions/src/export-lifecycle-functions.ts",
+      "git_blob_sha1": "70ba1ce09e25af2e9bc9c2c32e9420bfa4b678ac",
+      "observed_bytes": 18195,
+      "sha256": "73996738c1e224fcbd768a3a442d67a744d26fa40f4aa7a772d35bdae5ea8a42"
+    },
+    {
+      "branch": "R841",
+      "path": "functions/src/functions-entry.ts",
+      "git_blob_sha1": "f81171feb058be606be19134928c4baf9830f664",
+      "observed_bytes": 591,
+      "sha256": "9705bc6ab487e1cf9699f35c4848dd1b14cb6154a36c5ce17656915ee1c199d9"
+    },
+    {
+      "branch": "R841",
+      "path": "storage.rules",
+      "git_blob_sha1": "3e25a6f99d87cbd156f3ed27548770429eacc0c0",
+      "observed_bytes": 2326,
+      "sha256": "2240229bdd94d27273fcb7848f9af45e3b37bfaf062f7ba6321ce34d473ae7de"
+    },
+    {
+      "branch": "PR160",
+      "path": "functions/src/export-lifecycle-functions.ts",
+      "git_blob_sha1": "2b810de902d393994a0500330f7223c7838d60e1",
+      "observed_bytes": 27682,
+      "sha256": "4abc4b8be4037b8dc25ca3fbd7099494fcc0ab814989ed0b14f1c985ad244989"
+    },
+    {
+      "branch": "PR160",
+      "path": "functions/src/functions-entry.ts",
+      "git_blob_sha1": "98aef90e6ba1f86360e840293feeeec8d1eab140",
+      "observed_bytes": 584,
+      "sha256": "2c432560bce2744ab92fa9c7e2c8d09f98b506b5dd4e5b53826bc551187b57b0"
+    },
+    {
+      "branch": "PR160",
+      "path": "storage.rules",
+      "git_blob_sha1": "50e6aae0752913130fc0214a3d63980cdef5f54b",
+      "observed_bytes": 1019,
+      "sha256": "6ec55434ef1c153ace21e6488af75ff69590b8e77693548b2706646cd2565da3"
+    },
+    {
+      "branch": "PR160",
+      "path": "functions/src/privacy-actor-guard.ts",
+      "git_blob_sha1": "bdc0ef7795b8124ad2515442b1eb87b8a1164baa",
+      "observed_bytes": 3362,
+      "sha256": "fc76868939332df88fdd7c500b1b32fd3bfb071afd14332ded1c1f8fb6579ca4"
+    }
+  ],
+  "source_assertions": {
+    "current_signed_url_call": true,
+    "current_export_does_not_call_consent_authority": true,
+    "current_runtime_exports_legacy_url": true,
+    "current_storage_owner_direct_read": true,
+    "donor_authenticated_download_handler": true,
+    "donor_bound_authority_and_chunk": true,
+    "donor_storage_direct_export_denial": true,
+    "donor_runtime_exports_guarded_download": true,
+    "donor_current_auth_guard": true
+  },
+  "release": "HOLD"
+}
