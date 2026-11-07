@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp } from "firebase-admin/app";
-import { FieldPath, FieldValue, getFirestore, type DocumentData } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, getFirestore, type DocumentData, type Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
@@ -57,7 +57,10 @@ const executeDeletionSchema = z.object({
   expectedPlanHash: z.string().regex(/^[0-9a-f]{64}$/).optional()
 });
 const deletionPlanSchema = z.object({
-  version: z.literal("privacy-deletion-plan-v2"),
+  version: z.literal("privacy-deletion-plan-v3"),
+  targetVersions: z.record(z.string(), z.object({
+    seconds: z.number().int().safe(), nanoseconds: z.number().int().min(0).max(999_999_999)
+  })),
   uid: z.string().min(1),
   counts: z.record(z.string(), z.number().int().nonnegative()),
   targets: z.record(z.string(), z.array(z.string())),
@@ -159,7 +162,7 @@ async function writeAudit(args: {
 }
 
 async function listScopedDocuments(collectionName: string, field: "uid" | "targetUid", uid: string) {
-  const documents: Array<{ id: string; data: DocumentData }> = [];
+  const documents: Array<{ id: string; data: DocumentData; updateTime?: Timestamp }> = [];
   let cursor: string | null = null;
   while (true) {
     let query = db.collection(collectionName)
@@ -168,7 +171,7 @@ async function listScopedDocuments(collectionName: string, field: "uid" | "targe
       .limit(QUERY_PAGE_LIMIT);
     if (cursor) query = query.startAfter(cursor);
     const snapshot = await query.get();
-    documents.push(...snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() })));
+    documents.push(...snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data(), updateTime: doc.updateTime })));
     if (snapshot.size < QUERY_PAGE_LIMIT) return documents;
     cursor = snapshot.docs.at(-1)?.id ?? null;
     if (!cursor) return documents;
@@ -215,17 +218,29 @@ async function hasLegalHold(uid: string) {
   return userHold || !holdSnap.empty;
 }
 
-async function listUserScopedIds(collectionName: string, uid: string) {
-  const rows = await listScopedDocuments(collectionName, "uid", uid);
-  return rows.map((row) => row.id).sort();
+function approvedTargetVersion(value: Timestamp | undefined) {
+  if (!value || !Number.isSafeInteger(value.seconds) || !Number.isSafeInteger(value.nanoseconds)
+    || value.nanoseconds < 0 || value.nanoseconds >= 1_000_000_000) {
+    throw new HttpsError("failed-precondition", "The exact deletion document update version is unavailable.");
+  }
+  return { seconds: value.seconds, nanoseconds: value.nanoseconds };
+}
+
+function sameTargetVersion(left: DeletionPlan["targetVersions"][string] | undefined,
+  right: DeletionPlan["targetVersions"][string]) {
+  return !!left && left.seconds === right.seconds && left.nanoseconds === right.nanoseconds;
 }
 
 async function deletionPlan(uid: string): Promise<DeletionPlan> {
   const userDoc = await db.collection("users").doc(uid).get();
   const targets: Record<string, string[]> = { users: userDoc.exists ? [uid] : [] };
+  const targetVersions: DeletionPlan["targetVersions"] = {};
+  if (userDoc.exists) targetVersions[`users/${uid}`] = approvedTargetVersion(userDoc.updateTime);
 
   for (const collectionName of deletableUserCollections) {
-    targets[collectionName] = await listUserScopedIds(collectionName, uid);
+    const rows = await listScopedDocuments(collectionName, "uid", uid);
+    targets[collectionName] = rows.map(row => row.id).sort();
+    for (const row of rows) targetVersions[`${collectionName}/${row.id}`] = approvedTargetVersion(row.updateTime);
   }
 
   const [files] = await bucket.getFiles({ prefix: `exports/${uid}/` });
@@ -246,7 +261,8 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
   counts.storageObjects = storageObjects.length;
 
   return {
-    version: "privacy-deletion-plan-v2",
+    version: "privacy-deletion-plan-v3",
+    targetVersions,
     uid,
     counts,
     targets,
@@ -264,6 +280,7 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
 function normalizedDeletionPlan(plan: DeletionPlan) {
   return {
     version: plan.version,
+    targetVersions: Object.fromEntries(Object.entries(plan.targetVersions).sort(([a], [b]) => a.localeCompare(b))),
     uid: plan.uid,
     counts: Object.fromEntries(Object.entries(plan.counts).sort(([left], [right]) => left.localeCompare(right))),
     targets: Object.fromEntries(
@@ -315,20 +332,43 @@ function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: Deletio
   if (current.uid !== approved.uid || current.legalHold) return false;
   for (const [collectionName, currentIds] of Object.entries(current.targets)) {
     const approvedIds = new Set(approved.targets[collectionName] ?? []);
-    if (currentIds.some((id) => !approvedIds.has(id))) return false;
+    if (currentIds.some((id) => !approvedIds.has(id)
+      || !sameTargetVersion(approved.targetVersions[`${collectionName}/${id}`], current.targetVersions[`${collectionName}/${id}`]))) return false;
   }
   if (!storageGenerationSubsetApproved(current.uid, approved, current)) return false;
   return true;
 }
 
-async function deleteDocumentIds(collectionName: string, ids: string[]) {
+async function deleteDocumentIds(collectionName: string, ids: string[], subjectUid: string,
+  versions: DeletionPlan["targetVersions"]) {
   let deleted = 0;
   for (let start = 0; start < ids.length; start += DELETE_BATCH_LIMIT) {
-    const batch = db.batch();
     const chunk = ids.slice(start, start + DELETE_BATCH_LIMIT);
-    for (const id of chunk) batch.delete(db.collection(collectionName).doc(id));
-    await batch.commit();
-    deleted += chunk.length;
+    // Re-read identity and version within the SAME Firestore transaction that
+    // erases documents. A stale approved ID must never delete a replacement.
+    deleted += await db.runTransaction(async (transaction) => {
+      const references = chunk.map((id) => db.collection(collectionName).doc(id));
+      const snapshots = await Promise.all(references.map(ref => transaction.get(ref)));
+      for (const snapshot of snapshots) {
+        if (!snapshot.exists) continue;
+        const storedOwner = snapshot.data()?.uid;
+        const ownerMatches = collectionName === "users"
+          ? snapshot.id === subjectUid && (storedOwner === undefined || storedOwner === subjectUid)
+          : storedOwner === subjectUid;
+        if (!ownerMatches || !sameTargetVersion(
+          versions[`${collectionName}/${snapshot.id}`], approvedTargetVersion(snapshot.updateTime))) {
+          throw new HttpsError("failed-precondition", "Deletion document owner or update version changed after approval.");
+        }
+      }
+      let count = 0;
+      snapshots.forEach((snapshot, i) => {
+        if (snapshot.exists) {
+          transaction.delete(references[i], { lastUpdateTime: snapshot.updateTime });
+          count += 1;
+        }
+      });
+      return count;
+    });
   }
   return deleted;
 }
@@ -364,10 +404,11 @@ async function executeDeletion(args: {
   });
 
   for (const collectionName of deletableUserCollections) {
-    deleted[collectionName] = await deleteDocumentIds(collectionName, currentPlan.targets[collectionName] ?? []);
+    deleted[collectionName] = await deleteDocumentIds(collectionName,
+      currentPlan.targets[collectionName] ?? [], args.uid, plan.targetVersions);
   }
 
-  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? []);
+  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? [], args.uid, plan.targetVersions);
 
   let deletedStorageObjects = 0;
   for (const objectName of currentPlan.storageObjects) {
