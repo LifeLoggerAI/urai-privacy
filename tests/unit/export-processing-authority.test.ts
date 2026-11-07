@@ -33,6 +33,24 @@ describe("export attempt authority", () => {
     const state = valid(); state.fence.active = true;
     expect(exportPublicationBlockReason(state)).toBe("ACCOUNT_DELETION_FENCED");
   });
+  it("blocks malformed or absent inactive tombstones", () => {
+    for (const active of [undefined, null, "false", 0]) {
+      expect(exportPublicationBlockReason({
+        ...valid(), fence: { ...valid().fence, active }
+      })).toBe("ACCOUNT_DELETION_FENCED");
+    }
+  });
+  it("rejects every deletion-planning lease field even when active is false", () => {
+    for (const key of [
+      "deletionPlanningLeaseToken", "deletionPlanningLeaseUntil",
+      "deletionPlanningLeaseRequestId", "deletionPlanningLeaseOperation",
+      "deletionPlanningLeaseBy"
+    ]) {
+      const state = valid();
+      (state.fence as Record<string, unknown>)[key] = "in-flight";
+      expect(exportPublicationBlockReason(state)).toBe("ACCOUNT_DELETION_FENCED");
+    }
+  });
   it.each(["job", "fence", "attempt"] as const)("rejects %s expiry at the boundary", (kind) => {
     const state = valid();
     if (kind === "job") state.job.processingLeaseExpiresAt = nowMillis;
