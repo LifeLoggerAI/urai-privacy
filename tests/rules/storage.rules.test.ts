@@ -82,14 +82,14 @@ async function seedCompletedExport(uid: string, jobId: string, expiresAt = Date.
 }
 
 describe("Storage export and evidence rules", () => {
-  it("allows owners and both supported admin claim shapes to read user export paths", async ({ skip }) => {
+  it("denies all direct owner and admin reads of export packages", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await seedStorage("exports/user-a/export-1/manifest.json");
     await seedCompletedExport("user-a", "export-1");
 
-    await assertSucceeds(getBytes(ref(storageFor("user-a"), "exports/user-a/export-1/manifest.json")));
-    await assertSucceeds(getBytes(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-1/manifest.json")));
-    await assertSucceeds(getBytes(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("user-a"), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-1/manifest.json")));
   });
 
   it("denies direct owner reads after package expiry", async ({ skip }) => {
@@ -185,13 +185,13 @@ describe("Storage export and evidence rules", () => {
       await assertFails(uploadString(ref(storageFor("claim-admin", { admin: true }), objectPath), "invalid-write"));
     }
 
-    // Only an explicitly inactive tombstone without planning fields permits
-    // a previously valid, still-unexpired export to be read.
+    // Even a verified inactive tombstone must NOT open a direct Storage export path.
+    // A current consent-bound streaming broker is the sole authorized download channel.
     await requireStorageEnv().withSecurityRulesDisabled(async context => {
       await setDoc(doc(context.firestore(), "privacyDeletionTombstones", uid), { active: false });
     });
-    await assertSucceeds(getBytes(ref(storageFor(uid), objectPath)));
-    await assertSucceeds(getBytes(ref(storageFor("claim-admin", { admin: true }), objectPath)));
+    await assertFails(getBytes(ref(storageFor(uid), objectPath)));
+    await assertFails(getBytes(ref(storageFor("claim-admin", { admin: true }), objectPath)));
   });
 
   it("denies other users and anonymous users from reading export paths", async ({ skip }) => {
@@ -202,11 +202,11 @@ describe("Storage export and evidence rules", () => {
     await assertFails(getBytes(ref(anonStorage(), "exports/user-a/export-1/manifest.json")));
   });
 
-  it("allows only either supported admin claim shape to write export and evidence objects", async ({ skip }) => {
+  it("denies all client export writes while retaining admin-only evidence permissions", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await assertFails(uploadString(ref(storageFor("user-a"), "exports/user-a/export-2/manifest.json"), "{}"));
-    await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-2/manifest.json"), "{}"));
-    await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-role-admin/manifest.json"), "{}"));
+    await assertFails(uploadString(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-2/manifest.json"), "{}"));
+    await assertFails(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-role-admin/manifest.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "evidence/release-lock.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "evidence/role-release-lock.json"), "{}"));
     await assertFails(uploadString(ref(storageFor("user-a"), "evidence/release-lock.json"), "{}"));
