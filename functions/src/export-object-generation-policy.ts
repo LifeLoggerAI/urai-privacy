@@ -36,3 +36,19 @@ export function exactExportArtifactPath(uid: string, jobId: string, path: unknow
   if (!path.startsWith(prefix)) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(?:export|manifest)\.json$/.test(path.slice(prefix.length));
 }
+
+/** Only the exact approved owner/job/path and recorded generation may be erased. */
+export function approvedExportCleanupGeneration(args: {
+  uid: string;
+  jobId: string;
+  path: unknown;
+  exportPath: unknown;
+  manifestPath: unknown;
+  exportGeneration: unknown;
+  manifestGeneration: unknown;
+}): string | null {
+  const { uid, jobId, path, exportPath, manifestPath, exportGeneration, manifestGeneration } = args;
+  if (!exactExportArtifactPath(uid, jobId, path)) return null;
+  const approved = path === exportPath ? exportGeneration : path === manifestPath ? manifestGeneration : null;
+  return canonicalGcsGeneration(approved);
+}
