@@ -6,7 +6,7 @@ const runner = readFileSync(new URL('../../scripts/run-r818-native-jobs-privacy-
 const nativeTest = readFileSync(new URL('./life-movie-jobs-native-transport.emulator.mjs', import.meta.url), 'utf8');
 const config = JSON.parse(readFileSync(new URL('../../firebase.emulators.json', import.meta.url), 'utf8'));
 const project = 'demo-urai-privacy-integration-test';
-const jobsSha = '23ea52536ca0fd4fa7e16f814a69c2526c270279';
+const jobsSha = '8baaf008d021eeebe5ba425e4d8308a5cd99c87a';
 
 test('R823 native runner pins fictional demo-only Firebase project', () => {
   assert.match(runner, /^PROJECT=demo-urai-privacy-integration-test$/m);
@@ -27,7 +27,7 @@ test('R823 ephemeral test signing identity belongs to isolated demo project', ()
   assert.match(nativeTest, /mintedSignedProductionIdentity: false/);
 });
 
-test('R823 runner and native transport pin same reviewed R822 Jobs commit', () => {
+test('R834 runner and native transport pin same reviewed R833 Jobs commit', () => {
   assert.match(runner, new RegExp('^JOBS_SHA=' + jobsSha + '$', 'm'));
   assert.match(nativeTest, new RegExp("^const JOBS_SHA = '" + jobsSha + "';$", 'm'));
   assert.match(runner, /git -C "\$JOBS_DIR" rev-parse HEAD/);
