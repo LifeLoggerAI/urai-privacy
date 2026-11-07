@@ -17,7 +17,7 @@ import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 
 const PROJECT = 'demo-urai-privacy-integration-test';
-const JOBS_SHA = '1149d6e182dc487e8f29248e535d7f4d5dfee51f';
+const JOBS_SHA = 'ea8f0165ac74511a4e4196919ddd3109d0c1ff2e';
 const PRIVACY_SHA = process.env.URAI_EXPECTED_PRIVACY_SHA;
 const JOBS_UID = 'synthetic-jobs-verifier-uid';
 const API_KEY = 'R818_Synthetic_Emulator_Key_00000000';
