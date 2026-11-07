@@ -6,7 +6,7 @@ const runner = readFileSync(new URL('../../scripts/run-r818-native-jobs-privacy-
 const nativeTest = readFileSync(new URL('./life-movie-jobs-native-transport.emulator.mjs', import.meta.url), 'utf8');
 const config = JSON.parse(readFileSync(new URL('../../firebase.emulators.json', import.meta.url), 'utf8'));
 const project = 'demo-urai-privacy-integration-test';
-const jobsSha = '1149d6e182dc487e8f29248e535d7f4d5dfee51f';
+const jobsSha = 'ea8f0165ac74511a4e4196919ddd3109d0c1ff2e';
 
 test('R823 native runner pins fictional demo-only Firebase project', () => {
   assert.match(runner, /^PROJECT=demo-urai-privacy-integration-test$/m);
