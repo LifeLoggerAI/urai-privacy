@@ -27,6 +27,15 @@ fi
 
 export URAI_RELEASE_VERIFY=1
 
+# Fail closed before installs/builds if private export delivery still issues a
+# Storage signed URL, exposes direct client Storage access, or omits the broker.
+# This prerequisite is not actual consent, IAM, or private media acceptance.
+printf '\n[verify-release] export broker source admission negatives\n'
+node --test tests/export-broker-boundary.test.mjs
+printf '\n[verify-release] export broker hard HOLD until convergence\n'
+node scripts/assert-export-broker-boundary.mjs
+
+
 printf '\n[verify-release] npm ci\n'
 npm ci
 
