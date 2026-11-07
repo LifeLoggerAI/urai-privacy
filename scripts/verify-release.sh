@@ -34,6 +34,9 @@ printf '\n[verify-release] export broker source admission negatives\n'
 node --test tests/export-broker-boundary.test.mjs
 printf '\n[verify-release] export broker hard HOLD until convergence\n'
 node scripts/assert-export-broker-boundary.mjs
+printf '\n[verify-release] retired legacy export handler and broker-only source admission\n'
+node --test tests/no-legacy-export-callables.test.mjs
+node scripts/assert-no-legacy-export-callables.mjs
 printf '\n[verify-release] deletion generation policy and source admission\n'
 node --experimental-strip-types --test tests/deletion-storage-generation.test.mjs
 node --test tests/deletion-generation-source-contract.test.mjs
