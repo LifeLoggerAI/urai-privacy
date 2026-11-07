@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# R823 review only. Exact R822 Jobs -> original Privacy callable; demo-only.
+# R834 review only. Exact R833 Jobs -> original Privacy callable; demo-only.
 set -Eeuo pipefail
 umask 077
 die() { echo "URAI_R818_HOLD: $*" >&2; exit 1; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 PROJECT=demo-urai-privacy-integration-test
-JOBS_SHA=23ea52536ca0fd4fa7e16f814a69c2526c270279
+JOBS_SHA=1149d6e182dc487e8f29248e535d7f4d5dfee51f
 EXPECTED="${URAI_EXPECTED_PRIVACY_SHA:-}"
 JOBS_DIR="${URAI_JOBS_SOURCE_DIR:-}"
 [[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || die "Pinned Privacy SHA required"
@@ -57,6 +57,7 @@ run_stage privacy_typecheck 600s npm run typecheck --prefix functions
 run_stage privacy_build 600s npm run build --prefix functions
 # Explicit Jobs working directory; original frozen install and original builds.
 run_stage jobs_frozen_install 900s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" pnpm install --frozen-lockfile
+run_stage jobs_original_status_regression 300s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" node --test scripts/life-movies-owner-tenant-transaction.test.mjs
 run_stage jobs_shared_build 600s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" pnpm --filter @urai-jobs/shared-types build
 run_stage jobs_functions_build 600s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" pnpm --filter urai-jobs-functions build
 [[ -f "$JOBS_DIR/functions/lib/functions/privacy/lifeMovieJobsPrivacyClient.js" ]] || die "Jobs compiled bridge missing"
