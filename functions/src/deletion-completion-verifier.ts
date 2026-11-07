@@ -4,7 +4,7 @@ import { FieldPath, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 
 const QUERY_PAGE_LIMIT = 450;
-const DELETABLE_COLLECTIONS = ["privacyRequests", "exportJobs", "consentRecords", "dataAccessEvents"] as const;
+const DELETABLE_COLLECTIONS = ["privacyRequests", "exportJobs", "exportArtifactAttempts", "consentRecords", "dataAccessEvents"] as const;
 
 export type DeletionCompletionResiduals = {
   uid: string;

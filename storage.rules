@@ -40,11 +40,11 @@ service firebase.storage {
         && exportJob(jobId).data.packageExpiresAt > request.time;
     }
 
-    match /exports/{uid}/{jobId}/{fileName} {
-      allow read: if (isOwner(uid) || isAdmin())
-        && fileName in ["export.json", "manifest.json"]
-        && activeExportPackage(uid, jobId);
-      allow write: if isAdmin() && isCreateOrUpdate() && deletionFenceIsInactive(uid);
+    // Always deny direct client export delivery, even for owners and admins.
+    // The authenticated Functions broker must verify current C7 consent,
+    // account incarnation, revocation, deletion and exact job/source authority.
+    match /exports/{uid}/{allPaths=**} {
+      allow read, write: if false;
     }
 
     match /evidence/{allPaths=**} {

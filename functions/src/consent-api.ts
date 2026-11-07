@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import {
@@ -18,6 +18,7 @@ import { evaluateLifeMovieRenderAuthorization } from "./life-movie-render-author
 import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
 import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
 import { crossUserAuthority } from "./cross-user-authority";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
 
 const db = getFirestore();
 
@@ -66,7 +67,9 @@ function consentRecordId(uid: string, purpose: string) {
 }
 
 export const setCanonicalConsent = onCall(async (request) => {
-  const uid = uidFrom(request);
+  // Preserve current token, account-incarnation and disable/revocation checks.
+  const actor = await createPrivacyActorGuard(request);
+  const uid = actor.uid;
   const parsed = setConsentSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
@@ -126,15 +129,36 @@ export const setCanonicalConsent = onCall(async (request) => {
   const auditRef = db.collection("auditLogs").doc();
 
   await db.runTransaction(async (transaction) => {
-    const deletionFence = await transaction.get(db.collection("privacyDeletionTombstones").doc(uid));
+    const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
+    const deletionFence = await transaction.get(deletionFenceRef);
+    if (deletionFence.exists && deletionFence.data()?.uid !== uid) {
+      throw new HttpsError("failed-precondition", "The deletion fence subject does not match the consenting owner.");
+    }
     if (checkedLifeMovieDeletionState(deletionFence) !== false) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent changes are blocked.");
     }
+    // Recheck current Auth authority after the deletion-fence read and before mutation.
+    await actor.requireCurrent();
     transaction.set(recordRef, {
       ...receipt,
       receiptHash,
       serverUpdatedAt: FieldValue.serverTimestamp()
     }, { merge: false });
+    // Atomic projection for the separately governed C7 export broker. The
+    // projection cannot create consent; the canonical receipt remains source
+    // of authority, and deny/revoke/expiry updates must replace older grants.
+    // Set an explicit inactive boolean when creating a projection-only fence;
+    // otherwise future checkedLifeMovieDeletionState reads would fail closed.
+    if (purpose === "data.export") transaction.set(deletionFenceRef, {
+      uid,
+      active: false,
+      exportConsentStatus: parsed.data.status,
+      exportConsentReceiptHash: receiptHash,
+      exportConsentPolicyVersion: CONSENT_DECISION_POLICY_VERSION,
+      exportConsentExpiresAt: effectiveExpiresAt
+        ? Timestamp.fromMillis(Date.parse(effectiveExpiresAt)) : FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
     transaction.set(eventRef, {
       ...receipt,
       consentRecordId: recordId,
@@ -164,6 +188,8 @@ export const setCanonicalConsent = onCall(async (request) => {
     });
   });
 
+  // Never confirm a positive consent write to a now-revoked actor.
+  await actor.requireCurrent();
   return {
     consentId: recordId,
     consentEventId: eventRef.id,
@@ -179,7 +205,8 @@ export const setCanonicalConsent = onCall(async (request) => {
 });
 
 export const evaluateCanonicalConsent = onCall(async (request) => {
-  const actorUid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const actorUid = actor.uid;
   const parsed = decisionSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
@@ -191,10 +218,18 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Life Movie rendering requires the dedicated movie-scoped consent verifier.");
   }
   const targetUid = parsed.data.targetUid ?? actorUid;
-  const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthority(request.auth?.token);
-  if (!authority) {
-    throw new HttpsError("permission-denied", "Owner, administrator, or a consumer-bound trusted system authority is required.");
-  }
+  // Cross-user system and admin rights require BOTH a signed token and current
+  // Firebase account claims. Re-evaluate after each asynchronous boundary.
+  const currentAuthority = async () => {
+    const current = await actor.requireCurrent();
+    const authority = targetUid === actorUid
+      ? { role: "user" as const, consumerId: null }
+      : crossUserAuthority(current.token);
+    if (!authority) throw new HttpsError("permission-denied",
+      "Current owner, administrator, or consumer-bound authority is required.");
+    return authority;
+  };
+  const admitted = await currentAuthority();
 
   const recordId = consentRecordId(targetUid, purpose);
   const recordRef = db.collection("consentRecords").doc(recordId);
@@ -205,10 +240,19 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
       transaction.get(recordRef),
       transaction.get(tombstoneRef)
     ]);
+    if (deletionFence.exists && deletionFence.data()?.uid !== targetUid) {
+      throw new HttpsError("failed-precondition", "The deletion fence subject is invalid.");
+    }
+    if (snapshot.exists && snapshot.data()?.uid !== targetUid) {
+      throw new HttpsError("failed-precondition", "The consent record subject is invalid.");
+    }
     if (checkedLifeMovieDeletionState(deletionFence) !== false) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent decisions are blocked.");
     }
-
+    const authority = await currentAuthority();
+    if (authority.role !== admitted.role || authority.consumerId !== admitted.consumerId) {
+      throw new HttpsError("permission-denied", "Canonical decision actor authority changed during the transaction.");
+    }
     const evaluated = evaluateConsentDecision({
       purpose,
       record: snapshot.exists ? snapshot.data() : null
@@ -241,6 +285,7 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     return evaluated;
   });
 
+  await currentAuthority();
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
 });
 
@@ -291,8 +336,12 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
       transaction.get(recordRef), transaction.get(tombstoneRef)
     ]);
     const record = recordSnapshot.exists ? recordSnapshot.data() : null;
+    // A tombstone stored under the target document ID must also identify that
+    // same subject. Mismatched retained evidence never clears C6 rendering.
+    const deletionActive = tombstone.exists && tombstone.data()?.uid !== subjectUid
+      ? undefined : checkedLifeMovieDeletionState(tombstone);
     const { evaluated, allowed, reason } = evaluateLifeMovieRenderAuthorization({
-      record, deletionActive: checkedLifeMovieDeletionState(tombstone),
+      record, deletionActive,
       subjectUid, tenantId, decisionReceiptId,
       policyVersion, renderScope
     });

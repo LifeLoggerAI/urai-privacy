@@ -26,6 +26,7 @@ function residuals(
       users: [],
       privacyRequests: [],
       exportJobs: [],
+      exportArtifactAttempts: [],
       consentRecords: [],
       dataAccessEvents: []
     },
@@ -48,8 +49,21 @@ describe("deletion completion residual policy", () => {
         users: [],
         privacyRequests: ["new-request"],
         exportJobs: [],
+        exportArtifactAttempts: [],
         consentRecords: [],
         dataAccessEvents: []
+      },
+      totalResidualTargets: 1
+    }))).toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("includes generation-scoped export attempts in deletion residuals and plans", () => {
+    expect(deletionCompletionVerifier).toContain('"exportArtifactAttempts"');
+    expect(privacyFunctions).toContain('const deletableUserCollections = ["privacyRequests", "exportJobs", "exportArtifactAttempts"');
+    expect(deletionCompletionBlockReason(residuals({
+      firestoreTargets: {
+        ...residuals().firestoreTargets,
+        exportArtifactAttempts: ["uncollected-attempt"]
       },
       totalResidualTargets: 1
     }))).toMatchObject({ code: "failed-precondition" });
