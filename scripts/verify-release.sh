@@ -29,6 +29,8 @@ export URAI_RELEASE_VERIFY=1
 
 printf '\n[verify-release] exact Node22 workflow configuration\n'
 node --test tests/node22-release-workflows.test.mjs
+node --experimental-strip-types --test tests/request-admission-policy.test.mjs
+node --test tests/request-admission-source-contract.test.mjs
 node scripts/assert-node22-release-workflows.mjs
 
 # Fail closed before installs/builds if private export delivery still issues a
