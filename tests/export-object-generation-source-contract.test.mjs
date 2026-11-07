@@ -19,12 +19,13 @@ test('broker denies unpinned and legacy export descriptors',()=>{
  assert.match(broker,/identityHash = digest\(\{\s*uid,\s*requestId,\s*path,\s*file,\s*generation,\s*checksum/);
 });
 test('callable checks exact object generation and SHA metadata before issuing descriptor',()=>{
- assert.match(broker,/bucket\.file\(path,\s*\{\s*generation:\s*authority\.generation\s*\}\)/);
+ assert.match(broker,/bucket\.file\(path,\s*\{\s*preconditionOpts:\s*\{\s*ifGenerationMatch:\s*authority\.generation\s*\}\s*\}\)/);
  assert.match(broker,/matchingExportObjectMetadata\(\{\s*generation:\s*authority\.generation,\s*sha256:\s*authority\.checksum\s*\}/);
 });
 test('stream reads only the authorized exact Storage generation',()=>{
- assert.match(broker,/bucket\.file\(authority\.path,\s*\{\s*generation:\s*authority\.generation\s*\}\)/);
+ assert.match(broker,/bucket\.file\(authority\.path,\s*\{\s*preconditionOpts:\s*\{\s*ifGenerationMatch:\s*authority\.generation\s*\}\s*\}\)/);
  assert.match(broker,/const stream = object\.createReadStream\(\)/);
+ assert.doesNotMatch(broker,/bucket\.file\((?:authority\.path|path),\s*\{\s*generation:\s*authority\.generation/);
  assert.match(broker,/for \(let offset = 0; offset < chunk\.length; offset \+= 64 \* 1024\)/);
 });
 test('generation comparisons cannot round large 64-bit identifiers',()=>{
