@@ -40,7 +40,15 @@ export function exportPublicationBlockReason(args: {
   if (request.uid !== authority.uid || request.type !== "export" || request.status !== "processing") {
     return "EXPORT_REQUEST_LINKAGE_CHANGED";
   }
-  if (fence.active === true) return "ACCOUNT_DELETION_FENCED";
+  // An absent/malformed inactive flag or any planning-lease field must
+  // block processing, even before a destructive deletion becomes active.
+  if (fence.active !== false || [
+    "deletionPlanningLeaseToken", "deletionPlanningLeaseUntil",
+    "deletionPlanningLeaseRequestId", "deletionPlanningLeaseOperation",
+    "deletionPlanningLeaseBy"
+  ].some((key) => Object.prototype.hasOwnProperty.call(fence, key))) {
+    return "ACCOUNT_DELETION_FENCED";
+  }
   if (fence.uid !== authority.uid || fence.exportProcessingJobId !== authority.jobId
     || fence.exportProcessingLeaseToken !== authority.token || fence.exportProcessingBy !== authority.actorUid) {
     return "EXPORT_FENCE_AUTHORITY_CHANGED";
