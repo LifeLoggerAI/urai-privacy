@@ -9,6 +9,9 @@ import { crossUserAuthority } from "./cross-user-authority";
 import { approvedStorageGeneration, storageGenerationSubsetApproved } from "./deletion-storage-generation";
 import { sameDeletionDocumentVersion, deletionDocumentBelongsToSubject } from "./deletion-document-version";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
+import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
+import { evaluateConsentDecision, CONSENT_DECISION_POLICY_VERSION } from "./consent-decision";
+import { deletionRequestAdmissionBlockReason, exportRequestAdmissionBlockReason } from "./request-admission-policy";
 import { deletionExecutionAuthorityBlockReason, type DeletionExecutionBinding } from "./deletion-execution-lease-policy";
 
 initializeApp();
@@ -496,18 +499,39 @@ async function executeDeletion(args: {
 }
 
 export const createExportRequest = onCall(async (request) => {
-  const uid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const uid = actor.uid;
   const now = FieldValue.serverTimestamp();
   const reqRef = db.collection("privacyRequests").doc();
   const jobRef = db.collection("exportJobs").doc();
   await db.runTransaction(async (tx) => {
-    const deletionFence = await tx.get(db.collection("privacyDeletionTombstones").doc(uid));
-    if (deletionFence.data()?.active === true) {
-      throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; new export requests are blocked.");
+    const [deletionFence, consentSnapshot] = await Promise.all([
+      tx.get(db.collection("privacyDeletionTombstones").doc(uid)),
+      tx.get(db.collection("consentRecords").doc(`${uid}_data_export`))
+    ]);
+    const consent = consentSnapshot.data() ?? {};
+    const fence = deletionFence.exists ? deletionFence.data() : null;
+    const current = Date.now();
+    const consentExpiresAtMillis = timestampMillis(consent.expiresAt);
+    const projectedExpiresAtMillis = timestampMillis(fence?.exportConsentExpiresAt);
+    const admitted = exportRequestAdmissionBlockReason({
+      uid,
+      deletionState: checkedLifeMovieDeletionState(deletionFence),
+      tombstone: fence,
+      consent,
+      canonicalConsentAllowed: evaluateConsentDecision({ purpose: "data.export", record: consent, now: new Date(current) }).allowed,
+      consentExpiresAtMillis,
+      projectedExpiresAtMillis,
+      nowMillis: current
+    });
+    if (admitted || fence?.exportConsentPolicyVersion !== CONSENT_DECISION_POLICY_VERSION) {
+      throw new HttpsError("failed-precondition", "Current owner export consent and deletion clearance are required.");
     }
+    await actor.requireCurrent();
     tx.set(reqRef, { uid, type: "export", status: "pending", createdAt: now, updatedAt: now });
     tx.set(jobRef, { uid, requestId: reqRef.id, status: "pending", createdAt: now, updatedAt: now, recordCount: 0 });
   });
+  await actor.requireCurrent();
   const auditId = await writeAudit({ actorUid: uid, actorRole: "user", action: "export_request_created", targetUid: uid, requestId: reqRef.id, source: "function" });
   return { requestId: reqRef.id, exportJobId: jobRef.id, auditId, status: "pending" };
 });
@@ -519,14 +543,21 @@ export const createExportRequest = onCall(async (request) => {
 // Never reintroduce or publish a direct Storage signed URL. (R849)
 
 export const createDeletionRequest = onCall(async (request) => {
-  const uid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const uid = actor.uid;
   const { reason } = parseOrThrow(createDeletionSchema, request.data);
   const ref = db.collection("deletionRequests").doc();
   await db.runTransaction(async (tx) => {
     const deletionFence = await tx.get(db.collection("privacyDeletionTombstones").doc(uid));
-    if (deletionFence.data()?.active === true) {
-      throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; new deletion requests are blocked.");
+    const blockReason = deletionRequestAdmissionBlockReason({
+      uid,
+      deletionState: checkedLifeMovieDeletionState(deletionFence),
+      tombstone: deletionFence.exists ? deletionFence.data() : null
+    });
+    if (blockReason) {
+      throw new HttpsError("failed-precondition", "Current owner and deletion clearance are required.");
     }
+    await actor.requireCurrent();
     tx.create(ref, {
       uid,
       status: "pending",
@@ -538,6 +569,7 @@ export const createDeletionRequest = onCall(async (request) => {
       updatedAt: FieldValue.serverTimestamp()
     });
   });
+  await actor.requireCurrent();
   const auditId = await writeAudit({ actorUid: uid, actorRole: "user", action: "deletion_request_created", targetUid: uid, requestId: ref.id, source: "function" });
   return { requestId: ref.id, status: "pending", auditId };
 });
