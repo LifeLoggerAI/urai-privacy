@@ -1,0 +1,16 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { exportProcessingRequestStateBlockReason as check } from '../functions/src/request-admission-policy.ts';
+const state = (requestStatus, jobStatus, priorProcessingLeaseActive=false) => check({requestStatus,jobStatus,priorProcessingLeaseActive});
+test('accepts fresh pending request and pending job', () => assert.equal(state('pending','pending'), null));
+test('accepts approved request pending processing', () => assert.equal(state('approved','pending'), null));
+test('accepts explicit approved retry of failed job', () => assert.equal(state('approved','failed'), null));
+test('accepts expired processing claim only with processing request', () => assert.equal(state('processing','processing',false), null));
+test('refuses active processing claim', () => assert.equal(state('processing','processing',true),'EXPORT_REQUEST_STATE_MISMATCH'));
+test('refuses revoked requests', () => assert.equal(state('revoked','pending'),'EXPORT_REQUEST_STATE_MISMATCH'));
+test('refuses cancelled requests', () => assert.equal(state('cancelled','pending'),'EXPORT_REQUEST_STATE_MISMATCH'));
+test('refuses failed requests even when job pending', () => assert.equal(state('failed','pending'),'EXPORT_REQUEST_STATE_MISMATCH'));
+test('refuses completed requests', () => assert.equal(state('completed','failed'),'EXPORT_REQUEST_STATE_MISMATCH'));
+test('refuses inconsistent job/request processing claims', () => assert.equal(state('pending','processing',false),'EXPORT_REQUEST_STATE_MISMATCH'));
+test('refuses unknown or missing states', () => {for(const status of [undefined,null,'',{},1])assert.equal(state(status,'pending'),'EXPORT_REQUEST_STATE_MISMATCH')});
+test('refuses job marked completed or artifact_cleanup', () => {for (const status of ['completed','artifact_cleanup'])assert.equal(state('approved',status),'EXPORT_REQUEST_STATE_MISMATCH')});
