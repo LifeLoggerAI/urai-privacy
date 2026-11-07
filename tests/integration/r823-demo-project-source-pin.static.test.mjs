@@ -51,3 +51,29 @@ test('R823 retains credential and inherited project/host refusals', () => {
     assert.ok(runner.includes(name), name + ' pre-existing overrides must remain refused');
   }
 });
+
+const issuerTest = readFileSync(new URL('./life-movie-review-issuer-firestore.emulator.mjs', import.meta.url), 'utf8');
+const issuerAdapter = readFileSync(new URL('../../functions/src/life-movie-scoped-issuer-firestore-emulator.ts', import.meta.url), 'utf8');
+const issuer = readFileSync(new URL('../../functions/src/life-movie-scoped-issuer-review.ts', import.meta.url), 'utf8');
+const packageJson = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+
+test('R825 original scoped C6 issuer and Jobs denial test share disposable demo project', () => {
+  assert.match(issuerTest, /^const PROJECT = "demo-urai-privacy-integration-test";$/m);
+  assert.match(issuerAdapter, /^const PROJECT = "demo-urai-privacy-integration-test";$/m);
+  assert.ok(issuerTest.includes('synthetic-verifier@demo-urai-privacy-integration-test.iam.gserviceaccount.com'));
+  assert.equal(packageJson.scripts['test:life-movie:review:firestore:emulated'].includes('--project demo-urai-privacy-integration-test'), true);
+  assert.equal(packageJson.scripts['test:life-movie:review:firestore:emulated'].includes('URAI_EMULATOR_PROJECT=demo-urai-privacy-integration-test'), true);
+  assert.doesNotMatch(issuerTest, /["']urai-privacy-integration-test["']/);
+  assert.doesNotMatch(issuerAdapter, /["']urai-privacy-integration-test["']/);
+});
+
+test('R825 composite four-emulator gate retains both originals and never admits production C6', () => {
+  assert.match(runner, /--only auth,firestore,functions,storage/);
+  assert.match(runner, /node tests\/integration\/life-movie-jobs-native-transport\.emulator\.mjs && node tests\/integration\/life-movie-review-issuer-firestore\.emulator\.mjs/);
+  assert.match(runner, /productionGrant=false render=false/);
+  assert.match(issuerTest, /reviewOnlyEmulator, true/);
+  assert.match(issuerTest, /productionAuthorized, false/);
+  assert.match(issuer, /productionAuthorized: false/);
+  assert.match(issuer, /optionalOwnerLifecycleFenceClear\(record, "disabled"\)/);
+  assert.match(issuer, /optionalOwnerLifecycleFenceClear\(record, "dataRightsDeletionPendingCentralPrivacy"\)/);
+});
