@@ -77,8 +77,8 @@ const storageChecks = [
 
 // A permit on any overlapping /exports path would override broker-only
 // delivery; deny ALL Storage SDK export reads and writes, including admins.
-const exportMatches = [...storage.matchAll(/match\\s+\\/exports\\//g)];
-if (exportMatches.length !== 1 || !/match\\s+\\/exports\\/\\{uid\\}\\/\\{allPaths=\\*\\*\\}\\s*\\{\\s*allow\\s+read\\s*,\\s*write\\s*:\\s*if\\s+false\\s*;\\s*\\}/.test(storage)) {
+const exportMatches = [...storage.matchAll(/match\s+\/exports\//g)];
+if (exportMatches.length !== 1 || !/match\s+\/exports\/\{uid\}\/\{allPaths=\*\*\}\s*\{\s*allow\s+read\s*,\s*write\s*:\s*if\s+false\s*;\s*\}/.test(storage)) {
   failures.push("export Storage paths must have exactly one catch-all direct read/write DENY rule");
 }
 
