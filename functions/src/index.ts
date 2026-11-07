@@ -7,6 +7,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { crossUserAuthority } from "./cross-user-authority";
 import { approvedStorageGeneration, storageGenerationSubsetApproved } from "./deletion-storage-generation";
+import { sameDeletionDocumentVersion, deletionDocumentBelongsToSubject } from "./deletion-document-version";
 
 initializeApp();
 const db = getFirestore();
@@ -226,11 +227,6 @@ function approvedTargetVersion(value: Timestamp | undefined) {
   return { seconds: value.seconds, nanoseconds: value.nanoseconds };
 }
 
-function sameTargetVersion(left: DeletionPlan["targetVersions"][string] | undefined,
-  right: DeletionPlan["targetVersions"][string]) {
-  return !!left && left.seconds === right.seconds && left.nanoseconds === right.nanoseconds;
-}
-
 async function deletionPlan(uid: string): Promise<DeletionPlan> {
   const userDoc = await db.collection("users").doc(uid).get();
   const targets: Record<string, string[]> = { users: userDoc.exists ? [uid] : [] };
@@ -333,7 +329,7 @@ function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: Deletio
   for (const [collectionName, currentIds] of Object.entries(current.targets)) {
     const approvedIds = new Set(approved.targets[collectionName] ?? []);
     if (currentIds.some((id) => !approvedIds.has(id)
-      || !sameTargetVersion(approved.targetVersions[`${collectionName}/${id}`], current.targetVersions[`${collectionName}/${id}`]))) return false;
+      || !sameDeletionDocumentVersion(approved.targetVersions[`${collectionName}/${id}`], current.targetVersions[`${collectionName}/${id}`]))) return false;
   }
   if (!storageGenerationSubsetApproved(current.uid, approved, current)) return false;
   return true;
@@ -352,10 +348,9 @@ async function deleteDocumentIds(collectionName: string, ids: string[], subjectU
       for (const snapshot of snapshots) {
         if (!snapshot.exists) continue;
         const storedOwner = snapshot.data()?.uid;
-        const ownerMatches = collectionName === "users"
-          ? snapshot.id === subjectUid && (storedOwner === undefined || storedOwner === subjectUid)
-          : storedOwner === subjectUid;
-        if (!ownerMatches || !sameTargetVersion(
+        const ownerMatches = deletionDocumentBelongsToSubject(
+          collectionName, snapshot.id, subjectUid, storedOwner);
+        if (!ownerMatches || !sameDeletionDocumentVersion(
           versions[`${collectionName}/${snapshot.id}`], approvedTargetVersion(snapshot.updateTime))) {
           throw new HttpsError("failed-precondition", "Deletion document owner or update version changed after approval.");
         }
