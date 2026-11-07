@@ -6,7 +6,7 @@ const runner = readFileSync(new URL('../../scripts/run-r818-native-jobs-privacy-
 const nativeTest = readFileSync(new URL('./life-movie-jobs-native-transport.emulator.mjs', import.meta.url), 'utf8');
 const config = JSON.parse(readFileSync(new URL('../../firebase.emulators.json', import.meta.url), 'utf8'));
 const project = 'demo-urai-privacy-integration-test';
-const jobsSha = '6a42de467d949871ae1c7da9c8d079ea7150ee5f';
+const jobsSha = '23ea52536ca0fd4fa7e16f814a69c2526c270279';
 
 test('R823 native runner pins fictional demo-only Firebase project', () => {
   assert.match(runner, /^PROJECT=demo-urai-privacy-integration-test$/m);
@@ -50,4 +50,52 @@ test('R823 retains credential and inherited project/host refusals', () => {
   for (const name of ['GCLOUD_PROJECT','GOOGLE_CLOUD_PROJECT','FIREBASE_PROJECT_ID','FIRESTORE_EMULATOR_HOST','FIREBASE_AUTH_EMULATOR_HOST','FIREBASE_STORAGE_EMULATOR_HOST']) {
     assert.ok(runner.includes(name), name + ' pre-existing overrides must remain refused');
   }
+});
+
+const issuerTest = readFileSync(new URL('./life-movie-review-issuer-firestore.emulator.mjs', import.meta.url), 'utf8');
+const issuerAdapter = readFileSync(new URL('../../functions/src/life-movie-scoped-issuer-firestore-emulator.ts', import.meta.url), 'utf8');
+const issuer = readFileSync(new URL('../../functions/src/life-movie-scoped-issuer-review.ts', import.meta.url), 'utf8');
+const packageJson = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+
+test('R825 original scoped C6 issuer and Jobs denial test share disposable demo project', () => {
+  assert.match(issuerTest, /^const PROJECT = "demo-urai-privacy-integration-test";$/m);
+  assert.match(issuerAdapter, /^const PROJECT = "demo-urai-privacy-integration-test";$/m);
+  assert.ok(issuerTest.includes('synthetic-verifier@demo-urai-privacy-integration-test.iam.gserviceaccount.com'));
+  assert.equal(packageJson.scripts['test:life-movie:review:firestore:emulated'].includes('--project demo-urai-privacy-integration-test'), true);
+  assert.equal(packageJson.scripts['test:life-movie:review:firestore:emulated'].includes('URAI_EMULATOR_PROJECT=demo-urai-privacy-integration-test'), true);
+  assert.doesNotMatch(issuerTest, /["']urai-privacy-integration-test["']/);
+  assert.doesNotMatch(issuerAdapter, /["']urai-privacy-integration-test["']/);
+});
+
+test('R825 composite four-emulator gate retains both originals and never admits production C6', () => {
+  assert.match(runner, /--only auth,firestore,functions,storage/);
+  assert.match(runner, /node tests\/integration\/life-movie-jobs-native-transport\.emulator\.mjs && node tests\/integration\/life-movie-review-issuer-firestore\.emulator\.mjs/);
+  assert.match(runner, /productionGrant=false render=false/);
+  assert.match(issuerTest, /reviewOnlyEmulator, true/);
+  assert.match(issuerTest, /productionAuthorized, false/);
+  assert.match(issuer, /productionAuthorized: false/);
+  assert.match(issuer, /optionalOwnerLifecycleFenceClear\(record, "disabled"\)/);
+  assert.match(issuer, /optionalOwnerLifecycleFenceClear\(record, "dataRightsDeletionPendingCentralPrivacy"\)/);
+});
+
+test('R826 bounded original native gates retain fatal failure and source-pinned receipts', () => {
+  // Literal command comparisons avoid regex-escape ambiguity for Bash $vars.
+  for (const command of [
+    'timeout -k 30s "$limit" "$@" > "$OUT/$name.log" 2>&1 || code=$?',
+    'sha256sum "$OUT/$name.log"',
+    'die "Native stage $name failed; production HOLD',
+    'run_stage privacy_four_emulators 900s npx --no-install firebase --project "$PROJECT" emulators:exec',
+    '--only auth,firestore,functions,storage',
+    'node tests/integration/life-movie-jobs-native-transport.emulator.mjs && node tests/integration/life-movie-review-issuer-firestore.emulator.mjs',
+    'productionGrant=false render=false',
+  ]) assert.ok(runner.includes(command), 'required native acceptance contract missing: ' + command);
+  for (const marker of ['URAI_PRIVACY_NATIVE_STAGE_FAIL', 'URAI_PRIVACY_NATIVE_STAGE_PASS']) {
+    assert.ok(runner.includes(marker), 'missing original stage evidence marker ' + marker);
+  }
+  for (const stage of [
+    'static_source_pin', 'privacy_frozen_install', 'privacy_functions_frozen_install',
+    'privacy_typecheck', 'privacy_build', 'jobs_frozen_install',
+    'jobs_shared_build', 'jobs_functions_build', 'privacy_four_emulators',
+  ]) assert.ok(runner.includes('run_stage ' + stage + ' '), 'missing mandatory original stage: ' + stage);
+  assert.doesNotMatch(runner, /firebase deploy|gcloud storage|productionGrant=true|render=true/);
 });

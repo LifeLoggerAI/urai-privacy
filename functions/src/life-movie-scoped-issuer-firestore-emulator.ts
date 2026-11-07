@@ -17,7 +17,7 @@ import type {
  * The intentionally strict local environment guard prevents using this
  * adapter against production Firestore, even if someone imports it later.
  */
-const PROJECT = "urai-privacy-integration-test";
+const PROJECT = "demo-urai-privacy-integration-test";
 const DENIED = "life_movie_review_only_emulator_authority_unavailable";
 const LOCAL = {
   URAI_EMULATOR_PROJECT: PROJECT,
