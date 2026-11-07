@@ -45,5 +45,5 @@ export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.
 export FIREBASE_FUNCTIONS_EMULATOR_HOST=127.0.0.1:5001 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
 npx --no-install firebase --project "$PROJECT" emulators:exec \
   --config firebase.emulators.json --only auth,firestore,functions,storage \
-  'node tests/integration/life-movie-jobs-native-transport.emulator.mjs'
-printf 'URAI_R818_NATIVE_JOBS_PRIVACY_BOUNDARY_PASS privacy=%s jobs=%s positiveGrant=false render=false\n' "$EXPECTED" "$JOBS_SHA"
+  'node tests/integration/life-movie-jobs-native-transport.emulator.mjs && node tests/integration/life-movie-review-issuer-firestore.emulator.mjs'
+printf 'URAI_R825_NATIVE_JOBS_PRIVACY_NEGATIVE_AND_REVIEW_ONLY_ISSUER_PASS privacy=%s jobs=%s productionGrant=false render=false\n' "$EXPECTED" "$JOBS_SHA"
