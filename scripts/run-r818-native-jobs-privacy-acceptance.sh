@@ -75,6 +75,13 @@ run_stage jobs_full_build 900s bash -c 'cd "$1" && shift && exec "$@"' bash "$JO
 export URAI_EMULATOR_PROJECT="$PROJECT" URAI_PRIVACY_JOBS_VERIFIER_UID=synthetic-jobs-verifier-uid
 export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 export FIREBASE_FUNCTIONS_EMULATOR_HOST=127.0.0.1:5001 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
+# R838: Firebase CLI uses HTTP(S) proxy agents even for 127.0.0.1 on some
+# runners. Preserve proxy settings for frozen installs/builds above, then
+# remove them ONLY for the disposable, local four-emulator proof below.
+# Never modify production network/config, and never follow a remote fallback.
+for proxy_name in HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy; do
+  unset "$proxy_name"
+done
 run_stage privacy_four_emulators 900s npx --no-install firebase --project "$PROJECT" emulators:exec \
   --config firebase.emulators.json --only auth,firestore,functions,storage \
   'node tests/integration/life-movie-jobs-native-transport.emulator.mjs && node tests/integration/life-movie-review-issuer-firestore.emulator.mjs'
