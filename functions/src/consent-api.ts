@@ -131,6 +131,9 @@ export const setCanonicalConsent = onCall(async (request) => {
   await db.runTransaction(async (transaction) => {
     const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
     const deletionFence = await transaction.get(deletionFenceRef);
+    if (deletionFence.exists && deletionFence.data()?.uid !== uid) {
+      throw new HttpsError("failed-precondition", "The deletion fence subject does not match the consenting owner.");
+    }
     if (checkedLifeMovieDeletionState(deletionFence) !== false) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent changes are blocked.");
     }
@@ -237,6 +240,12 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
       transaction.get(recordRef),
       transaction.get(tombstoneRef)
     ]);
+    if (deletionFence.exists && deletionFence.data()?.uid !== targetUid) {
+      throw new HttpsError("failed-precondition", "The deletion fence subject is invalid.");
+    }
+    if (snapshot.exists && snapshot.data()?.uid !== targetUid) {
+      throw new HttpsError("failed-precondition", "The consent record subject is invalid.");
+    }
     if (checkedLifeMovieDeletionState(deletionFence) !== false) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent decisions are blocked.");
     }
