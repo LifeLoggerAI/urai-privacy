@@ -195,6 +195,35 @@ try {
     writeReviewOnlyScopedGrantCandidate(disabled.req, disabled.backend));
   await noGrant(disabled.uid);
 
+  // Profile-level disabled/deletion authority is independent of Firebase Auth.
+  // These records are read inside the same Firestore transaction as the grant.
+  for (const [label, field, value] of [
+    ["disabled-profile", "disabled", true],
+    ["malformed-disabled-profile", "disabled", "false"],
+    ["central-deletion-pending", "dataRightsDeletionPendingCentralPrivacy", true],
+    ["malformed-central-deletion", "dataRightsDeletionPendingCentralPrivacy", "false"],
+  ]) {
+    const candidate = await createOwner(label);
+    await adminDb.collection("users").doc(candidate.uid).update({ [field]: value });
+    const oldCount = await auditCount(candidate.uid);
+    await expectDeny(label + "-denied", () =>
+      writeReviewOnlyScopedGrantCandidate(candidate.req, candidate.backend));
+    await noGrant(candidate.uid);
+    assert.equal(await auditCount(candidate.uid), oldCount,
+      "denied lifecycle state must not write audit or C6 grant");
+  }
+
+  // Legacy absence is tolerated, while explicit false is the only allowed
+  // present value. Both are still marked review-only/nonproduction.
+  const clearProfile = await createOwner("optional-clear");
+  await adminDb.collection("users").doc(clearProfile.uid)
+    .update({ disabled: false, dataRightsDeletionPendingCentralPrivacy: false });
+  const clearResult = await writeReviewOnlyScopedGrantCandidate(clearProfile.req, clearProfile.backend);
+  const clearStored = await adminDb.collection("consentRecords").doc(clearResult.recordId).get();
+  assert.equal(clearStored.data()?.reviewOnlyEmulator, true);
+  assert.equal(clearStored.data()?.productionAuthorized, false);
+  checks.push("literal-false-profile-flags-review-only-not-production");
+
   // Actual client SDK, real Firestore rules, not an Admin SDK simulation.
   const firestore = getFirestore(first.app);
   connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
