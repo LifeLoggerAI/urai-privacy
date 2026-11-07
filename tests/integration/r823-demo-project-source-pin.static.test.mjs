@@ -6,7 +6,7 @@ const runner = readFileSync(new URL('../../scripts/run-r818-native-jobs-privacy-
 const nativeTest = readFileSync(new URL('./life-movie-jobs-native-transport.emulator.mjs', import.meta.url), 'utf8');
 const config = JSON.parse(readFileSync(new URL('../../firebase.emulators.json', import.meta.url), 'utf8'));
 const project = 'demo-urai-privacy-integration-test';
-const jobsSha = '4c5f4823a9f7f469a1798671b0dca97b88bf3dae';
+const jobsSha = 'ea8f0165ac74511a4e4196919ddd3109d0c1ff2e';
 
 test('R823 native runner pins fictional demo-only Firebase project', () => {
   assert.match(runner, /^PROJECT=demo-urai-privacy-integration-test$/m);
@@ -87,8 +87,8 @@ test('R835 runs original Jobs atomic owner/status test and entire workspace buil
   assert.ok(typecheck > owner && fullBuild > typecheck && emulator > fullBuild,
     'actual original Jobs test/full build must precede native HTTP');
   assert.match(runner, /node --test scripts\/life-movies-owner-tenant-transaction\.test\.mjs/);
-  assert.match(runner, /"$JOBS_DIR" pnpm typecheck/);
-  assert.match(runner, /"$JOBS_DIR" pnpm build/);
+  assert.ok(runner.includes('"$JOBS_DIR" pnpm typecheck'));
+  assert.ok(runner.includes('"$JOBS_DIR" pnpm build'));
 });
 
 test('R826 bounded original native gates retain fatal failure and source-pinned receipts', () => {
