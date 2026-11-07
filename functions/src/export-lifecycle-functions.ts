@@ -27,6 +27,7 @@ import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { cleanupExportArtifactAttempts } from "./export-attempt-maintenance";
 import { evaluateConsentDecision, CONSENT_DECISION_POLICY_VERSION } from "./consent-decision";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
+import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
 
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
@@ -97,7 +98,7 @@ async function readExportDownloadAuthority(transaction: FirebaseFirestore.Transa
   const consentExpiresAt = timestampMillis(consent.expiresAt);
   const packageExpiresAt = resolveExportPackageExpiry(job);
   const now = Date.now();
-  if (fence.active === true || fence.uid !== uid
+  if (checkedLifeMovieDeletionState(fenceSnap) !== false || fence.uid !== uid
     || requestSnap.data()?.uid !== uid || requestSnap.data()?.type !== "export" || requestSnap.data()?.status !== "completed"
     || consent.uid !== uid || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed
     || !/^[0-9a-f]{64}$/.test(text(job.consentReceiptHash)) || consent.receiptHash !== job.consentReceiptHash
