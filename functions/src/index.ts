@@ -6,6 +6,7 @@ import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { crossUserAuthority } from "./cross-user-authority";
+import { approvedStorageGeneration, storageGenerationSubsetApproved } from "./deletion-storage-generation";
 
 initializeApp();
 const db = getFirestore();
@@ -56,10 +57,12 @@ const executeDeletionSchema = z.object({
   expectedPlanHash: z.string().regex(/^[0-9a-f]{64}$/).optional()
 });
 const deletionPlanSchema = z.object({
+  version: z.literal("privacy-deletion-plan-v2"),
   uid: z.string().min(1),
   counts: z.record(z.string(), z.number().int().nonnegative()),
   targets: z.record(z.string(), z.array(z.string())),
   storageObjects: z.array(z.string()),
+  storageObjectGenerations: z.record(z.string(), z.string().regex(/^[0-9]+$/)),
   retainedData: z.array(z.string()),
   generatedAt: z.string().datetime(),
   mode: z.literal("safe-plan"),
@@ -227,14 +230,28 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
 
   const [files] = await bucket.getFiles({ prefix: `exports/${uid}/` });
   const storageObjects = files.map((file) => file.name).sort();
+  const storageObjectGenerations: Record<string, string> = {};
+  for (const file of files) {
+    if (!file.name.startsWith(`exports/${uid}/`) || file.name.includes("..")) {
+      throw new HttpsError("failed-precondition", "Unscoped export object encountered during deletion planning.");
+    }
+    const metadata = file.metadata.generation === undefined ? (await file.getMetadata())[0] : file.metadata;
+    const generation = String(metadata.generation ?? "");
+    if (!/^[0-9]+$/.test(generation)) {
+      throw new HttpsError("failed-precondition", "The approved export object generation is missing.");
+    }
+    storageObjectGenerations[file.name] = generation;
+  }
   const counts = Object.fromEntries(Object.entries(targets).map(([name, ids]) => [name, ids.length]));
   counts.storageObjects = storageObjects.length;
 
   return {
+    version: "privacy-deletion-plan-v2",
     uid,
     counts,
     targets,
     storageObjects,
+    storageObjectGenerations,
     retainedData: [...retainedDeletionCollections],
     generatedAt: new Date().toISOString(),
     mode: "safe-plan",
@@ -246,6 +263,7 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
 
 function normalizedDeletionPlan(plan: DeletionPlan) {
   return {
+    version: plan.version,
     uid: plan.uid,
     counts: Object.fromEntries(Object.entries(plan.counts).sort(([left], [right]) => left.localeCompare(right))),
     targets: Object.fromEntries(
@@ -254,6 +272,7 @@ function normalizedDeletionPlan(plan: DeletionPlan) {
         .map(([name, ids]) => [name, [...ids].sort()])
     ),
     storageObjects: [...plan.storageObjects].sort(),
+    storageObjectGenerations: Object.fromEntries(Object.entries(plan.storageObjectGenerations).sort(([a], [b]) => a.localeCompare(b))),
     retainedData: [...plan.retainedData].sort(),
     mode: plan.mode,
     legalHold: plan.legalHold,
@@ -298,8 +317,7 @@ function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: Deletio
     const approvedIds = new Set(approved.targets[collectionName] ?? []);
     if (currentIds.some((id) => !approvedIds.has(id))) return false;
   }
-  const approvedStorageObjects = new Set(approved.storageObjects);
-  if (current.storageObjects.some((name) => !approvedStorageObjects.has(name))) return false;
+  if (!storageGenerationSubsetApproved(current.uid, approved, current)) return false;
   return true;
 }
 
@@ -353,7 +371,20 @@ async function executeDeletion(args: {
 
   let deletedStorageObjects = 0;
   for (const objectName of currentPlan.storageObjects) {
-    await bucket.file(objectName).delete({ ignoreNotFound: true });
+    // A previously approved name is not permission to delete a replacement.
+    // The provider must enforce the precise generation at deletion time.
+    const generation = approvedStorageGeneration(args.uid, objectName, plan, currentPlan);
+    if (generation === null) {
+      throw new HttpsError("failed-precondition", "Export object generation changed after deletion approval.");
+    }
+    try {
+      await bucket.file(objectName).delete({ ignoreNotFound: true, ifGenerationMatch: generation });
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "code" in error && Number(error.code) === 412) {
+        throw new HttpsError("failed-precondition", "A replacement export generation was encountered during deletion.");
+      }
+      throw error;
+    }
     deletedStorageObjects += 1;
   }
   deleted.storageObjects = deletedStorageObjects;
