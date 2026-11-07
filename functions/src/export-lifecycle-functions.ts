@@ -147,7 +147,7 @@ export const getExportDownloadUrl = onCall(async (request) => {
   const authority = await db.runTransaction((transaction) => readExportDownloadAuthority(transaction, initialAuth, jobId, file));
   const { uid, requestId, path, packageExpiresAt, consentExpiresAt } = authority;
   await actor.requireCurrent(uid);
-  const object = bucket.file(path, { generation: authority.generation });
+  const object = bucket.file(path, { preconditionOpts: { ifGenerationMatch: authority.generation } });
   const [objectMetadata] = await object.getMetadata();
   if (!matchingExportObjectMetadata({ generation: authority.generation, sha256: authority.checksum }, objectMetadata)) {
     throw new HttpsError("failed-precondition", "The requested export object generation or checksum changed.");
@@ -218,9 +218,10 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
       || expiresAt > Math.min(Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS, authority.packageExpiresAt, authority.consentExpiresAt)) {
       throw new HttpsError("failed-precondition", "Export download authority has expired or changed.");
     }
-    // The SDK scopes both metadata lookup and streaming read to this immutable
-    // GCS generation. A replaced name cannot change which bytes are delivered.
-    const object = bucket.file(authority.path, { generation: authority.generation });
+    // A literal ifGenerationMatch precondition is applied to the metadata and
+    // streaming requests. Do not use FileOptions.generation: the pinned SDK
+    // converts generation strings through Number and may round 64-bit IDs.
+    const object = bucket.file(authority.path, { preconditionOpts: { ifGenerationMatch: authority.generation } });
     const [objectMetadata] = await object.getMetadata();
     if (!matchingExportObjectMetadata({ generation: authority.generation, sha256: authority.checksum }, objectMetadata)) {
       throw new HttpsError("failed-precondition", "The export object's generation or checksum changed.");
