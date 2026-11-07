@@ -27,6 +27,10 @@ fi
 
 export URAI_RELEASE_VERIFY=1
 
+printf '\n[verify-release] exact Node22 workflow configuration\n'
+node --test tests/node22-release-workflows.test.mjs
+node scripts/assert-node22-release-workflows.mjs
+
 # Fail closed before installs/builds if private export delivery still issues a
 # Storage signed URL, exposes direct client Storage access, or omits the broker.
 # This prerequisite is not actual consent, IAM, or private media acceptance.
