@@ -9,6 +9,7 @@ import { EXPORT_PACKAGE_TTL_MS, timestampMillis } from "./export-lifecycle-contr
 import { exportAttemptPaths, exportPublicationBlockReason, ownsExportAttempt } from "./export-processing-authority";
 import { evaluateConsentDecision } from "./consent-decision";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
+import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
 import { timestampIso } from "./export-contract";
 
 const exportCollections = [
@@ -231,7 +232,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       throw new HttpsError("failed-precondition", "Current export consent is required before processing.");
     }
     const consentExpiresAt = Timestamp.fromMillis(timestampMillis(consent.expiresAt)!);
-    if (deletionFence.data()?.active === true) {
+    if (checkedLifeMovieDeletionState(deletionFence) !== false) {
       throw new HttpsError("failed-precondition", "Account deletion is fenced; export processing is blocked.");
     }
     if (
