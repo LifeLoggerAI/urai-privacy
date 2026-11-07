@@ -123,3 +123,35 @@ test('R836 fails early if this OS cannot create a native Firebase Functions work
   assert.ok(runner.indexOf('run_stage static_source_pin ') < runner.indexOf('run_stage native_worker_socket_preflight '));
   assert.ok(runner.indexOf('run_stage native_worker_socket_preflight ') < runner.indexOf('run_stage privacy_frozen_install '));
 });
+
+
+test('R839 combines all source/build gates, early worker socket preflight and local-only proxy isolation', () => {
+  const ordered = [
+    'run_stage static_source_pin 60s',
+    'run_stage native_worker_socket_preflight 20s',
+    'run_stage privacy_frozen_install 900s',
+    'run_stage privacy_functions_frozen_install 900s',
+    'run_stage privacy_typecheck 600s',
+    'run_stage privacy_build 600s',
+    'run_stage privacy_frontend_build 900s',
+    'run_stage privacy_root_typecheck 600s',
+    'run_stage jobs_frozen_install 900s',
+    'run_stage jobs_owner_status_contract 300s',
+    'run_stage jobs_full_verify 900s',
+    'run_stage jobs_full_typecheck 900s',
+    'run_stage jobs_full_build 900s',
+    'run_stage privacy_four_emulators 900s',
+  ];
+  const indexes = ordered.map(stage => runner.indexOf(stage));
+  indexes.forEach((at, i) => {
+    assert.ok(at >= 0, 'missing source/native acceptance stage: ' + ordered[i]);
+    if (i > 0) assert.ok(at > indexes[i - 1], 'stage out of order: ' + ordered[i]);
+  });
+  assert.ok(runner.includes('pnpm urai-jobs:verify'));
+  const proxyBlock = runner.indexOf('for proxy_name in HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy; do');
+  const proxyUnset = runner.indexOf('  unset "$proxy_name"');
+  assert.ok(proxyBlock > indexes[12] && proxyUnset > proxyBlock && proxyUnset < indexes[13],
+    'proxy variables must only be removed after frozen builds and before disposable emulators');
+  assert.ok(runner.includes('PROJECT=demo-urai-privacy-integration-test'));
+  assert.doesNotMatch(runner, /firebase deploy|gcloud storage|productionGrant=true|render=true/);
+});

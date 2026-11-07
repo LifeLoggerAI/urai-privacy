@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# R835 review only. Exact Jobs #320 atomic status -> Privacy callable; demo-only.
+# R837 review only. Exact Jobs #320 atomic status -> Privacy callable; demo-only.
 set -Eeuo pipefail
 umask 077
 die() { echo "URAI_R818_HOLD: $*" >&2; exit 1; }
@@ -27,7 +27,7 @@ done
 for name in FIREBASE_AUTH_EMULATOR_HOST FIRESTORE_EMULATOR_HOST FIREBASE_FUNCTIONS_EMULATOR_HOST FIREBASE_STORAGE_EMULATOR_HOST FUNCTIONS_EMULATOR_HOST; do
   [[ -z "${!name:-}" ]] || die "Preexisting emulator override: $name"
 done
-echo "URAI_R835_SOURCE_PINS privacy=$EXPECTED jobs=$JOBS_SHA"
+echo "URAI_R837_SOURCE_PINS privacy=$EXPECTED jobs=$JOBS_SHA"
 # Preserve original full-source and native test commands. Bound each stage to
 # prevent a stalled install/emulator from consuming compute indefinitely.
 # Stage SHA256 receipts stay in stdout even if disposable runner files vanish.
@@ -51,13 +51,16 @@ run_stage() {
   printf 'URAI_PRIVACY_NATIVE_STAGE_PASS stage=%s sha256=%s\n' "$name" "$hash"
 }
 run_stage static_source_pin 60s node --test tests/integration/r823-demo-project-source-pin.static.test.mjs
-# A missing Unix socket permission makes Firebase Functions registration impossible.
-# Fail with an explicit native-capability receipt before costly frozen installs.
+# R839: fail closed before installs if Firebase Functions cannot bind a local Unix worker socket.
 run_stage native_worker_socket_preflight 20s node scripts/native-worker-socket-probe.mjs
 run_stage privacy_frozen_install 900s npm ci --no-audit --no-fund
 run_stage privacy_functions_frozen_install 900s npm ci --prefix functions --no-audit --no-fund
 run_stage privacy_typecheck 600s npm run typecheck --prefix functions
 run_stage privacy_build 600s npm run build --prefix functions
+# R837: certify the actual consumer-facing Privacy Next.js source on this exact pair.
+# Build first so generated .next/types referenced by next-env.d.ts exist for tsc.
+run_stage privacy_frontend_build 900s npm run build
+run_stage privacy_root_typecheck 600s npm run typecheck
 # Explicit Jobs working directory; original frozen install and original builds.
 run_stage jobs_frozen_install 900s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" pnpm install --frozen-lockfile
 # Run the actual original Jobs owner/tenant + transactional long-form tests,
@@ -65,14 +68,24 @@ run_stage jobs_frozen_install 900s bash -c 'cd "$1" && shift && exec "$@"' bash 
 # This prevents a native cross-repository pass from certifying a source head
 # whose transactional consent/child status regressions were never executed.
 run_stage jobs_owner_status_contract 300s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" node --test scripts/life-movies-owner-tenant-transaction.test.mjs
+# R837: the 695-case original workspace verify must also PASS at this exact Jobs SHA;
+# a focused owner/status test plus successful build alone is not full Jobs acceptance.
+run_stage jobs_full_verify 900s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" pnpm urai-jobs:verify
 run_stage jobs_full_typecheck 900s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" pnpm typecheck
 run_stage jobs_full_build 900s bash -c 'cd "$1" && shift && exec "$@"' bash "$JOBS_DIR" pnpm build
 [[ -f "$JOBS_DIR/functions/lib/functions/privacy/lifeMovieJobsPrivacyClient.js" ]] || die "Jobs compiled bridge missing"
 export URAI_EMULATOR_PROJECT="$PROJECT" URAI_PRIVACY_JOBS_VERIFIER_UID=synthetic-jobs-verifier-uid
 export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 export FIREBASE_FUNCTIONS_EMULATOR_HOST=127.0.0.1:5001 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
+# R838: Firebase CLI uses HTTP(S) proxy agents even for 127.0.0.1 on some
+# runners. Preserve proxy settings for frozen installs/builds above, then
+# remove them ONLY for the disposable, local four-emulator proof below.
+# Never modify production network/config, and never follow a remote fallback.
+for proxy_name in HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy; do
+  unset "$proxy_name"
+done
 run_stage privacy_four_emulators 900s npx --no-install firebase --project "$PROJECT" emulators:exec \
   --config firebase.emulators.json --only auth,firestore,functions,storage \
   'node tests/integration/life-movie-jobs-native-transport.emulator.mjs && node tests/integration/life-movie-review-issuer-firestore.emulator.mjs'
-printf 'URAI_R835_NATIVE_JOBS_PRIVACY_NEGATIVE_AND_REVIEW_ONLY_ISSUER_PASS privacy=%s jobs=%s productionGrant=false render=false\n' "$EXPECTED" "$JOBS_SHA"
+printf 'URAI_R837_NATIVE_JOBS_PRIVACY_NEGATIVE_AND_REVIEW_ONLY_ISSUER_PASS privacy=%s jobs=%s productionGrant=false render=false\n' "$EXPECTED" "$JOBS_SHA"
 printf 'URAI_PRIVACY_NATIVE_STAGE_REPORT %s\n' "$OUT/stages.tsv"
