@@ -37,6 +37,9 @@ node scripts/assert-export-broker-boundary.mjs
 printf '\n[verify-release] deletion generation policy and source admission\n'
 node --experimental-strip-types --test tests/deletion-storage-generation.test.mjs
 node --test tests/deletion-generation-source-contract.test.mjs
+printf '\n[verify-release] Firestore owner/updateTime deletion policy\n'
+node --experimental-strip-types --test tests/deletion-document-version.test.mjs
+node --test tests/deletion-document-source-contract.test.mjs
 
 
 printf '\n[verify-release] npm ci\n'
