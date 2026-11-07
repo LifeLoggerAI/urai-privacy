@@ -27,7 +27,8 @@ done
 for name in FIREBASE_AUTH_EMULATOR_HOST FIRESTORE_EMULATOR_HOST FIREBASE_FUNCTIONS_EMULATOR_HOST FIREBASE_STORAGE_EMULATOR_HOST FUNCTIONS_EMULATOR_HOST; do
   [[ -z "${!name:-}" ]] || die "Preexisting emulator override: $name"
 done
-echo "URAI_R818_SOURCE_PINS privacy=$EXPECTED jobs=$JOBS_SHA"
+echo "URAI_R823_SOURCE_PINS privacy=$EXPECTED jobs=$JOBS_SHA"
+node --test tests/integration/r823-demo-project-source-pin.static.test.mjs
 npm ci --no-audit --no-fund
 npm ci --prefix functions --no-audit --no-fund
 npm run typecheck --prefix functions
