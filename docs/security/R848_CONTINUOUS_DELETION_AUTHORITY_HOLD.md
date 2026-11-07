@@ -1,0 +1,21 @@
+# R848 — Continuous deletion authority and attempt lease source convergence (RELEASE HOLD)
+
+Date: 2026-11-07. Source parent: R847 Privacy draft PR #242 `163cf64882303d30e5461f659d07f8ac9c4ce7df`. Historical donor: unmerged PR #160 `809d94ad7fc93322780d13ff3f0bade7612b3ec2`. R848 is a **separate review branch**, not production or a merge of prior worker PRs.
+
+## Source changes committed
+
+- `functions/src/deletion-execution-lease-policy.ts`, exact Git blob `ebdeb38a87721c60cc63279396fe816940a20ac8`: pure, fail-closed check binding the destructive execution to subject UID, deletion request, admin UID, approved plan hash and path, execution attempt token, exact lease expiry, mutation lease owner/token/operation, active subject tombstone and absence of legal hold.
+- `tests/deletion-execution-lease-policy.test.mjs`, exact Git blob `db843339fc1e292d46e8e9811dcc5962f6927bcb`: **19/19 PASS locally under Node 22.16.0**, with expired/replaced execution lease, expired mutation lease, changed approved plan/path, stale worker token, wrong subject, status, active hold, malformed lease and other denials. Both blobs verified independently with `git hash-object` against the committed GitHub readback. Pure-policy `tsc --noEmit` also passed. No Firebase live service was invoked.
+- `functions/src/index.ts`, Git blob `56629f17e11dca7b0210b2ebe6bc0d73d033d65b`: adds guarded `createPrivacyActorGuard(request,true)` current signed bearer/current Auth account/claims for destructive execution; mandatory `privacy-deletion-plan-v4`, hashing the subject Firebase Auth creation incarnation in addition to R847 exact Firestore update versions and R846 exact GCS object generations.
+- A new per-execution random attempt token is stored in the deletion request and active tombstone with exact execution lease expiry. It requires a current mutation lease acquired by the existing R841/R847 wrapper, not merely a name or role. The current-actor verification and transactionally read request/tombstone/legal hold/lease occur before each document transaction, GCS deletion and account removal, with rechecks after asynchronous boundaries; the final state update is guarded in its own transaction. A stale failed worker is forbidden to overwrite a different attempt's state.
+- `tests/deletion-execution-authority-source-contract.test.mjs`, exact Git blob `3f59f47b3d4ab6df0b58ad8f4af18f783a9cae2e`: seven newly authored source-contract tests wired into `scripts/verify-release.sh`, Git blob `c316ded1bed6945075427032412d6b470f99244d`. **These seven tests were not executed on a complete repo checkout.** GitHub readback independently confirms 14/14 static source admission conditions (the source contract is not runtime evidence).
+- R847 Firestore `lastUpdateTime` conditional transactional delete, R846 `ifGenerationMatch` GCS delete, R845 authenticated streaming export/C7, R841 scoped C6 Jobs verifier, and eight-contributor global deletion-completion blocker remain source-preserved.
+
+## Certification limits and release blockers
+
+1. **NO R848 complete pinned root/Functions build or four-emulator acceptance.** Local workspace lacks repository checkout/installed dependencies and GitHub DNS, while connected GitHub supports reviewing/committing exact source. Never certify source-pattern checks or the 19 pure-policy tests as protected private-media runtime acceptance.
+2. Continuous checks reduce, but cannot make external Auth/GCS effects atomic across providers. Independently test administrator-revocation during streaming/Firestore/GCS/Auth, lease expiry, same-ID document replacement, object-generation 412 and new legal hold before effect in disposable authorized provider data.
+3. Current signed **positive** C6 owner consent, signed issuer authority, Studio→Jobs→Replay protected rendering, real provider-effective IAM and user/device acceptance remain unproven. The original eight downstream deletion contributors still need actual authenticated subject-scoped ACKs.
+4. Existing review branches #160, #236, #239, #240, #241, #242 remain unmodified. No production deployment, IAM change, real deletion, private media, cloud spend or merge was performed.
+
+**Review decision: DRAFT ONLY. GENESIS PRODUCTION RELEASE HOLD.**
