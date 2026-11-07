@@ -202,7 +202,8 @@ export const setCanonicalConsent = onCall(async (request) => {
 });
 
 export const evaluateCanonicalConsent = onCall(async (request) => {
-  const actorUid = uidFrom(request);
+  const actor = await createPrivacyActorGuard(request);
+  const actorUid = actor.uid;
   const parsed = decisionSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
@@ -214,10 +215,18 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Life Movie rendering requires the dedicated movie-scoped consent verifier.");
   }
   const targetUid = parsed.data.targetUid ?? actorUid;
-  const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthority(request.auth?.token);
-  if (!authority) {
-    throw new HttpsError("permission-denied", "Owner, administrator, or a consumer-bound trusted system authority is required.");
-  }
+  // Cross-user system and admin rights require BOTH a signed token and current
+  // Firebase account claims. Re-evaluate after each asynchronous boundary.
+  const currentAuthority = async () => {
+    const current = await actor.requireCurrent();
+    const authority = targetUid === actorUid
+      ? { role: "user" as const, consumerId: null }
+      : crossUserAuthority(current.token);
+    if (!authority) throw new HttpsError("permission-denied",
+      "Current owner, administrator, or consumer-bound authority is required.");
+    return authority;
+  };
+  const admitted = await currentAuthority();
 
   const recordId = consentRecordId(targetUid, purpose);
   const recordRef = db.collection("consentRecords").doc(recordId);
@@ -231,7 +240,10 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     if (checkedLifeMovieDeletionState(deletionFence) !== false) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent decisions are blocked.");
     }
-
+    const authority = await currentAuthority();
+    if (authority.role !== admitted.role || authority.consumerId !== admitted.consumerId) {
+      throw new HttpsError("permission-denied", "Canonical decision actor authority changed during the transaction.");
+    }
     const evaluated = evaluateConsentDecision({
       purpose,
       record: snapshot.exists ? snapshot.data() : null
@@ -264,6 +276,7 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     return evaluated;
   });
 
+  await currentAuthority();
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
 });
 
