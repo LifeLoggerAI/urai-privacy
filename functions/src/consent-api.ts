@@ -336,8 +336,12 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
       transaction.get(recordRef), transaction.get(tombstoneRef)
     ]);
     const record = recordSnapshot.exists ? recordSnapshot.data() : null;
+    // A tombstone stored under the target document ID must also identify that
+    // same subject. Mismatched retained evidence never clears C6 rendering.
+    const deletionActive = tombstone.exists && tombstone.data()?.uid !== subjectUid
+      ? undefined : checkedLifeMovieDeletionState(tombstone);
     const { evaluated, allowed, reason } = evaluateLifeMovieRenderAuthorization({
-      record, deletionActive: checkedLifeMovieDeletionState(tombstone),
+      record, deletionActive,
       subjectUid, tenantId, decisionReceiptId,
       policyVersion, renderScope
     });
