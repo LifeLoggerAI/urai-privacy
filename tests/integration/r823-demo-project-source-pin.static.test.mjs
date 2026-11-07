@@ -6,7 +6,7 @@ const runner = readFileSync(new URL('../../scripts/run-r818-native-jobs-privacy-
 const nativeTest = readFileSync(new URL('./life-movie-jobs-native-transport.emulator.mjs', import.meta.url), 'utf8');
 const config = JSON.parse(readFileSync(new URL('../../firebase.emulators.json', import.meta.url), 'utf8'));
 const project = 'demo-urai-privacy-integration-test';
-const jobsSha = '1149d6e182dc487e8f29248e535d7f4d5dfee51f';
+const jobsSha = 'ea8f0165ac74511a4e4196919ddd3109d0c1ff2e';
 
 test('R823 native runner pins fictional demo-only Firebase project', () => {
   assert.match(runner, /^PROJECT=demo-urai-privacy-integration-test$/m);
@@ -27,7 +27,7 @@ test('R823 ephemeral test signing identity belongs to isolated demo project', ()
   assert.match(nativeTest, /mintedSignedProductionIdentity: false/);
 });
 
-test('R834 runner and native transport pin same reviewed R833 Jobs commit', () => {
+test('R835 runner and native transport pin same reviewed Jobs #320 commit', () => {
   assert.match(runner, new RegExp('^JOBS_SHA=' + jobsSha + '$', 'm'));
   assert.match(nativeTest, new RegExp("^const JOBS_SHA = '" + jobsSha + "';$", 'm'));
   assert.match(runner, /git -C "\$JOBS_DIR" rev-parse HEAD/);
@@ -78,6 +78,19 @@ test('R825 composite four-emulator gate retains both originals and never admits 
   assert.match(issuer, /optionalOwnerLifecycleFenceClear\(record, "dataRightsDeletionPendingCentralPrivacy"\)/);
 });
 
+test('R835 runs original Jobs atomic owner/status test and entire workspace build before native Privacy', () => {
+  const owner = runner.indexOf('run_stage jobs_owner_status_contract 300s');
+  const typecheck = runner.indexOf('run_stage jobs_full_typecheck 900s');
+  const fullBuild = runner.indexOf('run_stage jobs_full_build 900s');
+  const emulator = runner.indexOf('run_stage privacy_four_emulators 900s');
+  assert.ok(owner > runner.indexOf('run_stage jobs_frozen_install 900s'));
+  assert.ok(typecheck > owner && fullBuild > typecheck && emulator > fullBuild,
+    'actual original Jobs test/full build must precede native HTTP');
+  assert.match(runner, /node --test scripts\/life-movies-owner-tenant-transaction\.test\.mjs/);
+  assert.ok(runner.includes('"$JOBS_DIR" pnpm typecheck'));
+  assert.ok(runner.includes('"$JOBS_DIR" pnpm build'));
+});
+
 test('R826 bounded original native gates retain fatal failure and source-pinned receipts', () => {
   // Literal command comparisons avoid regex-escape ambiguity for Bash $vars.
   for (const command of [
@@ -95,13 +108,7 @@ test('R826 bounded original native gates retain fatal failure and source-pinned 
   for (const stage of [
     'static_source_pin', 'privacy_frozen_install', 'privacy_functions_frozen_install',
     'privacy_typecheck', 'privacy_build', 'jobs_frozen_install',
-    'jobs_original_status_regression', 'jobs_shared_build', 'jobs_functions_build', 'privacy_four_emulators',
+    'jobs_owner_status_contract', 'jobs_full_typecheck', 'jobs_full_build', 'privacy_four_emulators',
   ]) assert.ok(runner.includes('run_stage ' + stage + ' '), 'missing mandatory original stage: ' + stage);
-  assert.match(runner, /node --test scripts\/life-movies-owner-tenant-transaction\.test\.mjs/,
-    'original source-bound Jobs status regression must execute before native callable acceptance');
-  assert.ok(runner.indexOf('run_stage jobs_frozen_install ') <
-    runner.indexOf('run_stage jobs_original_status_regression '));
-  assert.ok(runner.indexOf('run_stage jobs_original_status_regression ') <
-    runner.indexOf('run_stage privacy_four_emulators '));
   assert.doesNotMatch(runner, /firebase deploy|gcloud storage|productionGrant=true|render=true/);
 });
