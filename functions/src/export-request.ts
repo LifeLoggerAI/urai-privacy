@@ -4,6 +4,7 @@ import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
+import { deleteApprovedExportArtifact } from "./export-generation-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 import { EXPORT_PACKAGE_TTL_MS, timestampMillis } from "./export-lifecycle-contract";
 import { exportAttemptPaths, exportPublicationBlockReason, ownsExportAttempt } from "./export-processing-authority";
@@ -196,10 +197,6 @@ async function writeJson(path: string, value: unknown) {
   return { path, generation, sha256: checksum, bytes: Buffer.byteLength(body, "utf8") };
 }
 
-async function deleteExportArtifact(path: string) {
-  await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
-}
-
 export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
   const db = getFirestore();
   const actor = await createPrivacyActorGuard(request, true);
@@ -328,10 +325,23 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     await actor.requireCurrent();
   };
 
+  const createdGenerations: Record<string, string> = Object.create(null);
+  const recordGeneration = async (field: "exportGeneration" | "manifestGeneration", generation: string) => {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(attemptRef);
+      if (!snap.exists || snap.data()?.uid !== claim.uid || snap.data()?.token !== token
+        || snap.data()?.status !== "processing") {
+        throw new HttpsError("aborted", "Export generation ledger authority changed.");
+      }
+      tx.update(attemptRef, { [field]: generation, updatedAt: FieldValue.serverTimestamp() });
+    });
+  };
   try {
     const exportData = await collectUserExport(claim.uid, requireCurrent);
     await requireCurrent();
     const exportFile = await writeJson(exportPath, { uid: claim.uid, requestId: claim.requestId, jobId, generatedAt: new Date().toISOString(), data: exportData.collections });
+    createdGenerations[exportPath] = exportFile.generation;
+    await recordGeneration("exportGeneration", exportFile.generation);
     await requireCurrent();
     const manifestFile = await writeJson(manifestPath, {
       uid: claim.uid,
@@ -342,6 +352,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       files: [exportFile],
       excludedFieldMarkers: [...sensitiveFieldMarkers]
     });
+    createdGenerations[manifestPath] = manifestFile.generation;
+    await recordGeneration("manifestGeneration", manifestFile.generation);
     await requireCurrent();
 
     const auditRef = db.collection("auditLogs").doc();
@@ -458,7 +470,13 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     if (!cleanupClaim) {
       throw new HttpsError("unavailable", "Export publication completed; retry the job status later.");
     }
-    const cleanup = await removeExportArtifacts([exportPath, manifestPath], deleteExportArtifact);
+    const cleanup = await removeExportArtifacts([exportPath, manifestPath], async (path) => {
+      await deleteApprovedExportArtifact({
+        uid: claim.uid, jobId, path, exportPath, manifestPath,
+        exportGeneration: createdGenerations[exportPath],
+        manifestGeneration: createdGenerations[manifestPath]
+      });
+    });
     const cleanupStatus = cleanup.pendingPaths.length > 0 ? "incomplete" : "completed";
 
     const auditRef = db.collection("auditLogs").doc();
@@ -490,6 +508,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         processingLeaseExpiresAt: FieldValue.delete(),
         exportManifestPath: manifestPath,
         exportPackagePath: exportPath,
+        exportGeneration: createdGenerations[exportPath] ?? FieldValue.delete(),
+        manifestGeneration: createdGenerations[manifestPath] ?? FieldValue.delete(),
         artifactCleanupStatus: cleanupStatus,
         artifactCleanupTargetCount: cleanup.targetCount,
         artifactCleanupFailureCount: cleanup.pendingPaths.length,
