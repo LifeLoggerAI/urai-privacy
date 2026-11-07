@@ -53,6 +53,8 @@ run_stage() {
 run_stage static_source_pin 60s node --test tests/integration/r823-demo-project-source-pin.static.test.mjs
 # R839: fail closed before installs if Firebase Functions cannot bind a local Unix worker socket.
 run_stage native_worker_socket_preflight 20s node scripts/native-worker-socket-probe.mjs
+run_stage native_host_capability_contract 60s node --test tests/integration/r841-native-host-capability-preflight.test.mjs
+run_stage native_host_capability_preflight 20s node scripts/native-host-capability-preflight.mjs
 run_stage privacy_frozen_install 900s npm ci --no-audit --no-fund
 run_stage privacy_functions_frozen_install 900s npm ci --prefix functions --no-audit --no-fund
 run_stage privacy_typecheck 600s npm run typecheck --prefix functions
