@@ -11,6 +11,7 @@ import { evaluateConsentDecision } from "./consent-decision";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
 import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
 import { timestampIso } from "./export-contract";
+import { exportRequestAdmissionBlockReason, exportProcessingRequestStateBlockReason } from "./request-admission-policy";
 
 const exportCollections = [
   "users",
@@ -203,16 +204,6 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     const requestId = String(job.requestId ?? "");
     if (!uid || !requestId) throw new HttpsError("failed-precondition", "Export job is missing uid or requestId.");
 
-    const status = String(job.status ?? "");
-    if (status === "completed") {
-      throw new HttpsError("failed-precondition", "Export job is already complete.");
-    }
-    if (status === "artifact_cleanup") {
-      throw new HttpsError("failed-precondition", "Export artifacts are being cleaned up; retry after cleanup completes.");
-    }
-    if (status === "processing" && processingLeaseIsActive(job.processingLeaseExpiresAt)) {
-      throw new HttpsError("failed-precondition", "Export job is already processing under an active lease.");
-    }
 
     const requestRef = db.collection("privacyRequests").doc(requestId);
     const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
@@ -225,16 +216,31 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     if (!requestSnap.exists || requestSnap.data()?.uid !== uid || requestSnap.data()?.type !== "export") {
       throw new HttpsError("failed-precondition", "Export request linkage is invalid.");
     }
+    const requestStatus = requestSnap.data()?.status;
+    const stateBlocked = exportProcessingRequestStateBlockReason({
+      requestStatus, jobStatus: job.status,
+      priorProcessingLeaseActive: processingLeaseIsActive(job.processingLeaseExpiresAt)
+    });
+    if (stateBlocked) {
+      throw new HttpsError("failed-precondition", "Export request is cancelled, complete, or not eligible for processing.");
+    }
     const consent = consentSnap.data() ?? {};
     const consentReceiptHash = consent.receiptHash;
-    if (consent.uid !== uid || !/^[0-9a-f]{64}$/.test(String(consentReceiptHash ?? ""))
-      || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed) {
-      throw new HttpsError("failed-precondition", "Current export consent is required before processing.");
+    const fence = deletionFence.exists ? deletionFence.data() : null;
+    const now = Date.now();
+    const consentExpiresAtMillis = timestampMillis(consent.expiresAt);
+    const projectedExpiresAtMillis = timestampMillis(fence?.exportConsentExpiresAt);
+    const admission = exportRequestAdmissionBlockReason({
+      uid, deletionState: checkedLifeMovieDeletionState(deletionFence), tombstone: fence,
+      consent, canonicalConsentAllowed: evaluateConsentDecision({
+        purpose: "data.export", record: consent, now: new Date(now)
+      }).allowed, consentExpiresAtMillis: consentExpiresAtMillis ?? Number.NaN,
+      projectedExpiresAtMillis: projectedExpiresAtMillis ?? Number.NaN, nowMillis: now
+    });
+    if (admission) {
+      throw new HttpsError("failed-precondition", "Current canonical C7 receipt and deletion clearance are required.");
     }
-    const consentExpiresAt = Timestamp.fromMillis(timestampMillis(consent.expiresAt)!);
-    if (checkedLifeMovieDeletionState(deletionFence) !== false) {
-      throw new HttpsError("failed-precondition", "Account deletion is fenced; export processing is blocked.");
-    }
+    const consentExpiresAt = Timestamp.fromMillis(consentExpiresAtMillis!);
     if (
       deletionFence.data()?.exportProcessingJobId !== jobId &&
       processingLeaseIsActive(deletionFence.data()?.exportProcessingLeaseExpiresAt)
@@ -251,10 +257,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       exportProcessingLeaseToken: token,
       exportProcessingLeaseExpiresAt: processingLeaseExpiresAt,
       exportProcessingBy: adminUid,
-      exportConsentStatus: "granted",
-      exportConsentReceiptHash: consentReceiptHash,
-      exportConsentPolicyVersion: consent.policyVersion,
-      exportConsentExpiresAt: consentExpiresAt,
+      // Never mint or repair C7 projection in a privileged export worker.
+      // The canonical consent issuer is its sole positive authority.
       updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
     tx.update(jobRef, {
@@ -291,10 +295,20 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         tx.get(claim.requestRef), tx.get(claim.consentRef)
       ]);
       const consent = consentSnapshot.data() ?? {};
+      const tombstone = fence.exists ? fence.data() : null;
+      const now = Date.now();
+      const c7Admission = exportRequestAdmissionBlockReason({
+        uid: claim.uid, deletionState: checkedLifeMovieDeletionState(fence), tombstone,
+        consent, canonicalConsentAllowed: evaluateConsentDecision({
+          purpose: "data.export", record: consent, now: new Date(now)
+        }).allowed,
+        consentExpiresAtMillis: timestampMillis(consent.expiresAt) ?? Number.NaN,
+        projectedExpiresAtMillis: timestampMillis(tombstone?.exportConsentExpiresAt) ?? Number.NaN,
+        nowMillis: now
+      });
       if (exportPublicationBlockReason({ job: job.data() ?? {}, fence: fence.data() ?? {},
-        attempt: attempt.data() ?? {}, request: privacyRequest.data() ?? {}, authority, nowMillis: Date.now() })
-        || consent.uid !== claim.uid || consent.receiptHash !== claim.consentReceiptHash
-        || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed) {
+        attempt: attempt.data() ?? {}, request: privacyRequest.data() ?? {}, authority, nowMillis: now })
+        || c7Admission || consent.receiptHash !== claim.consentReceiptHash) {
         throw new HttpsError("aborted", "Current export processing authority changed.");
       }
     });
@@ -332,8 +346,18 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         throw new HttpsError("aborted", "Export processing lost its deletion-fence lease before publication.");
       }
       const consent = consentSnap.data() ?? {};
-      if (consent.uid !== claim.uid || consent.receiptHash !== claim.consentReceiptHash
-        || !evaluateConsentDecision({ purpose: "data.export", record: consent }).allowed) {
+      const tombstone = deletionFence.exists ? deletionFence.data() : null;
+      const now = Date.now();
+      const c7Admission = exportRequestAdmissionBlockReason({
+        uid: claim.uid, deletionState: checkedLifeMovieDeletionState(deletionFence), tombstone,
+        consent, canonicalConsentAllowed: evaluateConsentDecision({
+          purpose: "data.export", record: consent, now: new Date(now)
+        }).allowed,
+        consentExpiresAtMillis: timestampMillis(consent.expiresAt) ?? Number.NaN,
+        projectedExpiresAtMillis: timestampMillis(tombstone?.exportConsentExpiresAt) ?? Number.NaN,
+        nowMillis: now
+      });
+      if (c7Admission || consent.receiptHash !== claim.consentReceiptHash) {
         throw new HttpsError("aborted", "Export consent changed before publication.");
       }
       await actor.requireCurrent();

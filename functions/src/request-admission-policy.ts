@@ -70,3 +70,17 @@ export function exportRequestAdmissionBlockReason(input: ExportRequestAdmissionI
   }
   return null;
 }
+
+/** Only a fresh request or an explicitly expired, matching processing lease may be claimed. */
+export function exportProcessingRequestStateBlockReason(args: {
+  requestStatus: unknown;
+  jobStatus: unknown;
+  priorProcessingLeaseActive: boolean;
+}): string | null {
+  if (!args || typeof args !== 'object') return 'EXPORT_REQUEST_STATE_MISMATCH';
+  if ((args.requestStatus === 'pending' || args.requestStatus === 'approved')
+    && (args.jobStatus === 'pending' || args.jobStatus === 'failed')) return null;
+  if (args.requestStatus === 'processing' && args.jobStatus === 'processing'
+    && args.priorProcessingLeaseActive === false) return null;
+  return 'EXPORT_REQUEST_STATE_MISMATCH';
+}
