@@ -78,13 +78,29 @@ function verifiedRequest(value: unknown): ReviewOnlyMovieGrantRequest {
   return Object.freeze(pinned) as unknown as ReviewOnlyMovieGrantRequest;
 }
 
+/**
+ * Optional legacy profile flags are clear only when absent or literal false.
+ * An inherited/accessor-backed, malformed or active lifecycle flag is never
+ * permission to issue even a synthetic review-only scoped C6 record.
+ */
+function optionalOwnerLifecycleFenceClear(record: unknown, key: "disabled" | "dataRightsDeletionPendingCentralPrivacy"): boolean {
+  try {
+    if (!record || typeof record !== "object" || Array.isArray(record)) return false;
+    return !Reflect.has(record, key) || ownLiteral(record, key) === false;
+  } catch {
+    return false;
+  }
+}
+
 function currentOwnerProfile(record: unknown, ownerUid: string, tenantId: string): boolean {
   try {
     return ownLiteral(record, "uid") === ownerUid &&
       ownLiteral(record, "tenantId") === tenantId &&
       ownLiteral(record, "accountStatus") === "active" &&
       ownLiteral(record, "deleted") === false &&
-      ownLiteral(record, "markedForDeletion") === false;
+      ownLiteral(record, "markedForDeletion") === false &&
+      optionalOwnerLifecycleFenceClear(record, "disabled") &&
+      optionalOwnerLifecycleFenceClear(record, "dataRightsDeletionPendingCentralPrivacy");
   } catch {
     return false;
   }
