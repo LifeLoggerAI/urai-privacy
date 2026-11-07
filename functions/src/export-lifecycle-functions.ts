@@ -25,7 +25,8 @@ import {
 } from "./export-lifecycle-contract";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { cleanupExportArtifactAttempts } from "./export-attempt-maintenance";
-import { canonicalGcsGeneration, matchingExportObjectMetadata, exactExportArtifactPath } from "./export-object-generation-policy";
+import { canonicalGcsGeneration, matchingExportObjectMetadata, exactExportArtifactPath, approvedExportCleanupGeneration } from "./export-object-generation-policy";
+import { deleteApprovedExportArtifact } from "./export-generation-cleanup";
 import { evaluateConsentDecision, CONSENT_DECISION_POLICY_VERSION } from "./consent-decision";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
 import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
@@ -308,8 +309,20 @@ async function cleanupJob(document: QueryDocumentSnapshot<DocumentData>, now: nu
     return false;
   }
 
+  const binding = {
+    uid, jobId, exportPath: job.exportPackagePath, manifestPath: job.exportManifestPath,
+    exportGeneration: job.exportGeneration, manifestGeneration: job.manifestGeneration
+  };
+  if ((paths as string[]).some((path) => !approvedExportCleanupGeneration({ ...binding, path }))) {
+    await document.ref.update({
+      status: "cleanup_blocked", complete: false, cleanupStatus: "failed",
+      cleanupReason: "MISSING_EXACT_EXPORT_GENERATION",
+      cleanupUpdatedAt: FieldValue.serverTimestamp()
+    });
+    return false;
+  }
   for (const path of paths as string[]) {
-    await bucket.file(path).delete({ ignoreNotFound: true });
+    await deleteApprovedExportArtifact({ ...binding, path });
   }
 
   await db.runTransaction(async (tx) => {
@@ -346,7 +359,13 @@ async function cleanupFailedJob(document: QueryDocumentSnapshot<DocumentData>) {
     const pendingPaths = Array.isArray(job.artifactCleanupPendingPaths)
       ? job.artifactCleanupPendingPaths.filter((path): path is string => typeof path === "string")
       : [];
-    if (!uid || !requestId || pendingPaths.length === 0 || !pendingPaths.every((path) => validExportObjectPath({ uid, jobId: document.id, path }))) {
+    const binding = {
+      uid, jobId: document.id, exportPath: job.exportPackagePath, manifestPath: job.exportManifestPath,
+      exportGeneration: job.exportGeneration, manifestGeneration: job.manifestGeneration
+    };
+    if (!uid || !requestId || pendingPaths.length === 0
+      || !pendingPaths.every((path) => validExportObjectPath({ uid, jobId: document.id, path }))
+      || pendingPaths.some((path) => !approvedExportCleanupGeneration({ ...binding, path }))) {
       tx.update(document.ref, {
         artifactCleanupStatus: "blocked",
         artifactCleanupFailureCount: pendingPaths.length,
@@ -361,12 +380,12 @@ async function cleanupFailedJob(document: QueryDocumentSnapshot<DocumentData>) {
       artifactCleanupLeaseExpiresAt: Timestamp.fromMillis(Date.now() + FAILED_ARTIFACT_CLEANUP_LEASE_MS),
       artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
     });
-    return {uid, requestId, pendingPaths};
+    return { ...binding, requestId, pendingPaths };
   });
   if (!claim) return false;
 
   const cleanup = await removeExportArtifacts(claim.pendingPaths, async (path) => {
-    await bucket.file(path).delete({ ignoreNotFound: true });
+    await deleteApprovedExportArtifact({ ...claim, path });
   });
   await db.runTransaction(async (tx) => {
     const fresh = await tx.get(document.ref);
