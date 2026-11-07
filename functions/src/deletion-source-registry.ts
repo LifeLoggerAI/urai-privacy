@@ -1,6 +1,7 @@
 export const DELETION_FIRESTORE_SOURCES = [
   { collection: "privacyRequests", subjectField: "uid" },
   { collection: "exportJobs", subjectField: "uid" },
+  { collection: "exportArtifactAttempts", subjectField: "uid" },
   { collection: "consentRecords", subjectField: "uid" },
   { collection: "dataAccessEvents", subjectField: "uid" }
 ] as const;
