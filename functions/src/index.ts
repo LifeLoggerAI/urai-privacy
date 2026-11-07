@@ -1,13 +1,15 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp } from "firebase-admin/app";
-import { FieldPath, FieldValue, getFirestore, type DocumentData, type Timestamp } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, getFirestore, type DocumentData, type Transaction, type Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { crossUserAuthority } from "./cross-user-authority";
 import { approvedStorageGeneration, storageGenerationSubsetApproved } from "./deletion-storage-generation";
 import { sameDeletionDocumentVersion, deletionDocumentBelongsToSubject } from "./deletion-document-version";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
+import { deletionExecutionAuthorityBlockReason, type DeletionExecutionBinding } from "./deletion-execution-lease-policy";
 
 initializeApp();
 const db = getFirestore();
@@ -58,7 +60,8 @@ const executeDeletionSchema = z.object({
   expectedPlanHash: z.string().regex(/^[0-9a-f]{64}$/).optional()
 });
 const deletionPlanSchema = z.object({
-  version: z.literal("privacy-deletion-plan-v3"),
+  version: z.literal("privacy-deletion-plan-v4"),
+  authAccountCreatedAt: z.string().datetime().nullable(),
   targetVersions: z.record(z.string(), z.object({
     seconds: z.number().int().safe(), nanoseconds: z.number().int().min(0).max(999_999_999)
   })),
@@ -219,6 +222,54 @@ async function hasLegalHold(uid: string) {
   return userHold || !holdSnap.empty;
 }
 
+async function deletionAuthAccountCreatedAt(uid: string): Promise<string | null> {
+  try {
+    const account = await auth.getUser(uid);
+    const millis = Date.parse(account.metadata.creationTime);
+    if (account.uid !== uid || !Number.isFinite(millis)) {
+      throw new HttpsError("failed-precondition", "Deletion subject Auth incarnation cannot be established.");
+    }
+    return new Date(millis).toISOString();
+  } catch (error) {
+    const code = typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code ?? "") : "";
+    if (code === "auth/user-not-found") return null;
+    throw error;
+  }
+}
+
+type CurrentDeletionAuthority = {
+  binding: DeletionExecutionBinding;
+  actor: Awaited<ReturnType<typeof createPrivacyActorGuard>>;
+};
+
+async function requireCurrentDeletionExecution(authority: CurrentDeletionAuthority, tx?: Transaction): Promise<void> {
+  await authority.actor.requireCurrent();
+  const verify = async (transaction: Transaction) => {
+    const b = authority.binding;
+    // Every read must precede the caller's first transaction write.
+    const [operation, fence, user, legalHolds] = await Promise.all([
+      transaction.get(db.collection("deletionRequests").doc(b.requestId)),
+      transaction.get(db.collection("privacyDeletionTombstones").doc(b.uid)),
+      transaction.get(db.collection("users").doc(b.uid)),
+      transaction.get(db.collection("legalHoldRecords").where("uid", "==", b.uid).where("status", "==", "active").limit(1))
+    ]);
+    const reason = deletionExecutionAuthorityBlockReason({
+      binding: b,
+      operation: operation.data() ?? {},
+      fence: fence.data() ?? {},
+      executionLeaseUntilMillis: timestampMillis(operation.data()?.deletionExecutionLeaseUntil),
+      mutationLeaseUntilMillis: timestampMillis(operation.data()?.deletionMutationLeaseUntil),
+      nowMillis: Date.now(),
+      legalHold: (user.exists && user.data()?.legalHold === true) || !legalHolds.empty
+    });
+    if (reason) throw new HttpsError("failed-precondition", "Deletion authority changed: " + reason);
+    await authority.actor.requireCurrent();
+  };
+  if (tx) await verify(tx);
+  else await db.runTransaction(verify);
+}
+
 function approvedTargetVersion(value: Timestamp | undefined) {
   if (!value || !Number.isSafeInteger(value.seconds) || !Number.isSafeInteger(value.nanoseconds)
     || value.nanoseconds < 0 || value.nanoseconds >= 1_000_000_000) {
@@ -257,7 +308,8 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
   counts.storageObjects = storageObjects.length;
 
   return {
-    version: "privacy-deletion-plan-v3",
+    version: "privacy-deletion-plan-v4",
+    authAccountCreatedAt: await deletionAuthAccountCreatedAt(uid),
     targetVersions,
     uid,
     counts,
@@ -276,6 +328,7 @@ async function deletionPlan(uid: string): Promise<DeletionPlan> {
 function normalizedDeletionPlan(plan: DeletionPlan) {
   return {
     version: plan.version,
+    authAccountCreatedAt: plan.authAccountCreatedAt,
     targetVersions: Object.fromEntries(Object.entries(plan.targetVersions).sort(([a], [b]) => a.localeCompare(b))),
     uid: plan.uid,
     counts: Object.fromEntries(Object.entries(plan.counts).sort(([left], [right]) => left.localeCompare(right))),
@@ -325,7 +378,8 @@ async function readDeletionPlanArtifact(uid: string, requestId: string, planHash
 }
 
 function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: DeletionPlan) {
-  if (current.uid !== approved.uid || current.legalHold) return false;
+  if (current.uid !== approved.uid || current.legalHold
+    || current.authAccountCreatedAt !== approved.authAccountCreatedAt) return false;
   for (const [collectionName, currentIds] of Object.entries(current.targets)) {
     const approvedIds = new Set(approved.targets[collectionName] ?? []);
     if (currentIds.some((id) => !approvedIds.has(id)
@@ -336,13 +390,14 @@ function deletionPlanIsSubsetOfApproved(current: DeletionPlan, approved: Deletio
 }
 
 async function deleteDocumentIds(collectionName: string, ids: string[], subjectUid: string,
-  versions: DeletionPlan["targetVersions"]) {
+  versions: DeletionPlan["targetVersions"], authority: CurrentDeletionAuthority) {
   let deleted = 0;
   for (let start = 0; start < ids.length; start += DELETE_BATCH_LIMIT) {
     const chunk = ids.slice(start, start + DELETE_BATCH_LIMIT);
     // Re-read identity and version within the SAME Firestore transaction that
     // erases documents. A stale approved ID must never delete a replacement.
     deleted += await db.runTransaction(async (transaction) => {
+      await requireCurrentDeletionExecution(authority, transaction);
       const references = chunk.map((id) => db.collection(collectionName).doc(id));
       const snapshots = await Promise.all(references.map(ref => transaction.get(ref)));
       for (const snapshot of snapshots) {
@@ -355,6 +410,7 @@ async function deleteDocumentIds(collectionName: string, ids: string[], subjectU
           throw new HttpsError("failed-precondition", "Deletion document owner or update version changed after approval.");
         }
       }
+      await authority.actor.requireCurrent();
       let count = 0;
       snapshots.forEach((snapshot, i) => {
         if (snapshot.exists) {
@@ -375,8 +431,9 @@ async function executeDeletion(args: {
   plan: DeletionPlan;
   currentPlan: DeletionPlan;
   planHash: string;
+  authority: CurrentDeletionAuthority;
 }) {
-  const { plan, currentPlan, planHash } = args;
+  const { plan, currentPlan, planHash, authority } = args;
   if (plan.uid !== args.uid) {
     throw new HttpsError("failed-precondition", "Deletion plan subject does not match the requested account.");
   }
@@ -388,6 +445,7 @@ async function executeDeletion(args: {
   }
 
   const deleted: Record<string, number> = {};
+  await requireCurrentDeletionExecution(authority);
   await writeAudit({
     actorUid: args.adminUid,
     actorRole: "admin",
@@ -400,10 +458,10 @@ async function executeDeletion(args: {
 
   for (const collectionName of deletableUserCollections) {
     deleted[collectionName] = await deleteDocumentIds(collectionName,
-      currentPlan.targets[collectionName] ?? [], args.uid, plan.targetVersions);
+      currentPlan.targets[collectionName] ?? [], args.uid, plan.targetVersions, authority);
   }
 
-  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? [], args.uid, plan.targetVersions);
+  deleted.users = await deleteDocumentIds("users", currentPlan.targets.users ?? [], args.uid, plan.targetVersions, authority);
 
   let deletedStorageObjects = 0;
   for (const objectName of currentPlan.storageObjects) {
@@ -414,6 +472,7 @@ async function executeDeletion(args: {
       throw new HttpsError("failed-precondition", "Export object generation changed after deletion approval.");
     }
     try {
+      await requireCurrentDeletionExecution(authority);
       await bucket.file(objectName).delete({ ignoreNotFound: true, ifGenerationMatch: generation });
     } catch (error) {
       if (typeof error === "object" && error !== null && "code" in error && Number(error.code) === 412) {
@@ -421,12 +480,19 @@ async function executeDeletion(args: {
       }
       throw error;
     }
+    await requireCurrentDeletionExecution(authority);
     deletedStorageObjects += 1;
   }
   deleted.storageObjects = deletedStorageObjects;
 
   try {
+    await requireCurrentDeletionExecution(authority);
+    if (await deletionAuthAccountCreatedAt(args.uid) !== plan.authAccountCreatedAt) {
+      throw new HttpsError("failed-precondition", "Deletion subject Auth incarnation changed after approval.");
+    }
+    await requireCurrentDeletionExecution(authority);
     await auth.deleteUser(args.uid);
+    await requireCurrentDeletionExecution(authority);
     deleted.authUsers = 1;
   } catch (error) {
     const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
