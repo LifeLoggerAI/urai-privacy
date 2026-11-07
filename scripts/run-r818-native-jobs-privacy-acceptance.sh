@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# R818 review only. Exact original Jobs -> original Privacy callable.
+# R823 review only. Exact R822 Jobs -> original Privacy callable; demo-only.
 set -Eeuo pipefail
 umask 077
 die() { echo "URAI_R818_HOLD: $*" >&2; exit 1; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-PROJECT=urai-privacy-integration-test
-JOBS_SHA=14c7c0482833a915ed6b33da7836b536d4585f18
+PROJECT=demo-urai-privacy-integration-test
+JOBS_SHA=6a42de467d949871ae1c7da9c8d079ea7150ee5f
 EXPECTED="${URAI_EXPECTED_PRIVACY_SHA:-}"
 JOBS_DIR="${URAI_JOBS_SOURCE_DIR:-}"
 [[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || die "Pinned Privacy SHA required"
@@ -27,7 +27,8 @@ done
 for name in FIREBASE_AUTH_EMULATOR_HOST FIRESTORE_EMULATOR_HOST FIREBASE_FUNCTIONS_EMULATOR_HOST FIREBASE_STORAGE_EMULATOR_HOST FUNCTIONS_EMULATOR_HOST; do
   [[ -z "${!name:-}" ]] || die "Preexisting emulator override: $name"
 done
-echo "URAI_R818_SOURCE_PINS privacy=$EXPECTED jobs=$JOBS_SHA"
+echo "URAI_R823_SOURCE_PINS privacy=$EXPECTED jobs=$JOBS_SHA"
+node --test tests/integration/r823-demo-project-source-pin.static.test.mjs
 npm ci --no-audit --no-fund
 npm ci --prefix functions --no-audit --no-fund
 npm run typecheck --prefix functions
