@@ -724,7 +724,8 @@ export const processDeletionRequest = onCall(async (request) => {
 });
 
 export const executeDeletionRequest = onCall(async (request) => {
-  const adminUid = await requireAdmin(request);
+  const actor = await createPrivacyActorGuard(request, true);
+  const adminUid = actor.uid;
   const { requestId, mode, expectedPlanHash } = parseOrThrow(executeDeletionSchema, request.data);
   const ref = db.collection("deletionRequests").doc(requestId);
   const snap = await ref.get();
@@ -852,6 +853,24 @@ export const executeDeletionRequest = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Deletion plan changed. Re-run dry run and retry with the latest plan hash.", { auditId });
   }
 
+  const mutationToken = typeof deletion.deletionMutationLeaseToken === "string"
+    ? deletion.deletionMutationLeaseToken.trim() : "";
+  if (!mutationToken || deletion.deletionMutationLeaseOperation !== "execute"
+    || deletion.deletionMutationLeaseBy !== adminUid
+    || timestampMillis(deletion.deletionMutationLeaseUntil) <= Date.now()) {
+    throw new HttpsError("failed-precondition", "Current deletion mutation lease is required.");
+  }
+  const authority: CurrentDeletionAuthority = {
+    actor,
+    binding: {
+      uid, requestId, adminUid, planHash: approvedPlanHash,
+      planPath: String(deletion.approvedDeletionPlanPath),
+      token: randomUUID(),
+      expiresAt: Date.now() + DELETION_EXECUTION_LEASE_MS,
+      mutationToken
+    }
+  };
+  await actor.requireCurrent();
   await db.runTransaction(async (tx) => {
     const tombstoneRef = db.collection("privacyDeletionTombstones").doc(uid);
     const [current, tombstone] = await Promise.all([
@@ -861,6 +880,15 @@ export const executeDeletionRequest = onCall(async (request) => {
     if (!current.exists) throw new HttpsError("not-found", "Deletion request not found.");
     const state = current.data() ?? {};
     const tombstoneState = tombstone.data() ?? {};
+    if (state.uid !== uid || state.scope !== "account"
+      || state.approvedDeletionPlanPath !== authority.binding.planPath
+      || (tombstone.exists && tombstoneState.uid !== uid)
+      || state.deletionMutationLeaseToken !== mutationToken
+      || state.deletionMutationLeaseOperation !== "execute"
+      || state.deletionMutationLeaseBy !== adminUid
+      || timestampMillis(state.deletionMutationLeaseUntil) <= Date.now()) {
+      throw new HttpsError("failed-precondition", "Subject or deletion mutation authority changed before execution.");
+    }
     if (tombstoneState.active === true && tombstoneState.requestId !== requestId) {
       throw new HttpsError("failed-precondition", "Account deletion is already fenced by another deletion request.");
     }
@@ -889,12 +917,14 @@ export const executeDeletionRequest = onCall(async (request) => {
     if (String(state.approvedPlanHash ?? "") !== approvedPlanHash) {
       throw new HttpsError("failed-precondition", "Deletion approval changed before execution.");
     }
+    await actor.requireCurrent();
     tx.update(ref, {
       deletionExecutionState: "executing",
+      deletionExecutionAttemptToken: authority.binding.token,
       deletionExecutionStartedAt: FieldValue.serverTimestamp(),
       deletionExecutionStartedBy: adminUid,
       deletionExecutionPlanHash: approvedPlanHash,
-      deletionExecutionLeaseUntil: new Date(Date.now() + DELETION_EXECUTION_LEASE_MS),
+      deletionExecutionLeaseUntil: new Date(authority.binding.expiresAt),
       updatedAt: FieldValue.serverTimestamp()
     });
     tx.set(tombstoneRef, {
@@ -902,13 +932,16 @@ export const executeDeletionRequest = onCall(async (request) => {
       requestId,
       active: true,
       status: "deletion_in_progress",
+      deletionExecutionAttemptToken: authority.binding.token,
       fencedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
   });
 
   try {
+    await requireCurrentDeletionExecution(authority);
     const currentPlan = await deletionPlan(uid);
+    await requireCurrentDeletionExecution(authority);
     const currentPlanHash = deletionPlanHash(currentPlan);
     if (currentPlan.legalHold) {
       throw new HttpsError("failed-precondition", "Deletion is blocked by active legal hold.");
@@ -918,23 +951,27 @@ export const executeDeletionRequest = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "Deletion targets changed after dry run. Re-run dry run before execution.");
     }
 
-    const result = await executeDeletion({ adminUid, uid, requestId, plan: approvedPlan, currentPlan, planHash: approvedPlanHash });
-    await ref.update({
-      status: "processing",
-      updatedAt: FieldValue.serverTimestamp(),
-      deletionPlanCounts: result.plan.counts,
-      planHash: result.planHash,
-      deletedCounts: result.deleted,
-      retainedData: [...retainedDeletionCollections],
-      destructiveDeletionBlocked: false,
-      destructiveDeletionReady: false,
-      destructiveDeletionMutationCompletedAt: FieldValue.serverTimestamp(),
-      destructiveDeletionCompletedAt: FieldValue.delete(),
-      deletionExecutionState: "verification_required",
-      deletionCompletionVerificationRequired: true,
-      deletionCompletionVerified: false,
-      deletionCompletionVerificationStatus: "pending",
-      deletionExecutionLeaseUntil: FieldValue.delete()
+    const result = await executeDeletion({ adminUid, uid, requestId, plan: approvedPlan,
+      currentPlan, planHash: approvedPlanHash, authority });
+    await db.runTransaction(async (tx) => {
+      await requireCurrentDeletionExecution(authority, tx);
+      tx.update(ref, {
+        status: "processing",
+        updatedAt: FieldValue.serverTimestamp(),
+        deletionPlanCounts: result.plan.counts,
+        planHash: result.planHash,
+        deletedCounts: result.deleted,
+        retainedData: [...retainedDeletionCollections],
+        destructiveDeletionBlocked: false,
+        destructiveDeletionReady: false,
+        destructiveDeletionMutationCompletedAt: FieldValue.serverTimestamp(),
+        destructiveDeletionCompletedAt: FieldValue.delete(),
+        deletionExecutionState: "verification_required",
+        deletionCompletionVerificationRequired: true,
+        deletionCompletionVerified: false,
+        deletionCompletionVerificationStatus: "pending",
+        deletionExecutionLeaseUntil: FieldValue.delete()
+      });
     });
     const auditId = await writeAudit({
       actorUid: adminUid,
@@ -948,14 +985,21 @@ export const executeDeletionRequest = onCall(async (request) => {
     return { requestId, status: "processing", mode, auditId, planCounts: result.plan.counts, planHash: result.planHash, deletedCounts: result.deleted, verificationRequired: true };
   } catch (error) {
     const isPrecondition = error instanceof HttpsError && error.code === "failed-precondition";
-    await ref.update({
-      status: "processing",
-      updatedAt: FieldValue.serverTimestamp(),
-      destructiveDeletionBlocked: true,
-      destructiveDeletionReady: false,
-      destructiveDeletionReason: error instanceof Error ? error.message : "Deletion execution failed.",
-      deletionExecutionState: isPrecondition ? "blocked" : "retry_required",
-      deletionExecutionLeaseUntil: FieldValue.delete()
+    // A stale worker must not alter another worker's newer state or lease.
+    await db.runTransaction(async (tx) => {
+      const current = await tx.get(ref);
+      if (!current.exists || current.data()?.uid !== uid || current.data()?.status !== "processing"
+        || current.data()?.deletionExecutionAttemptToken !== authority.binding.token
+        || current.data()?.deletionExecutionState !== "executing") return;
+      tx.update(ref, {
+        status: "processing",
+        updatedAt: FieldValue.serverTimestamp(),
+        destructiveDeletionBlocked: true,
+        destructiveDeletionReady: false,
+        destructiveDeletionReason: error instanceof Error ? error.message : "Deletion execution failed.",
+        deletionExecutionState: isPrecondition ? "blocked" : "retry_required",
+        deletionExecutionLeaseUntil: FieldValue.delete()
+      });
     });
     const auditId = await writeAudit({
       actorUid: adminUid,
