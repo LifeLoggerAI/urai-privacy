@@ -16,3 +16,8 @@
 - No paid compute, Firebase deployment, bucket mutation, consent issuance, real private media access or merges performed.
 
 **GENESIS RELEASE HOLD until independently proven real consent and private media enforcement, full deletion safety and signed authorization.**
+
+
+### R853 exact-string precondition erratum — previous source selector SUPERSEDED
+
+The original R853 download code passed `{generation:authority.generation}` to the Cloud Storage SDK File constructor. Source-level SDK inspection showed the selector may pass a 64-bit string through JavaScript `Number` and silently round large generations. **That earlier revision is not safe to deploy.** The current R853 draft branch corrects both URL descriptor and HTTP streaming metadata/read operations to `{preconditionOpts:{ifGenerationMatch:authority.generation}}` with an exact decimal-string match. It rejects replaced current objects, rather than trying to retrieve older versions by generation. Corrected broker Git blob `ef05546cc579275bdb7cb65b33f92603bd93d959`; corrected contract test blob `3d62babdda083e37c18b85009c26f1397fb1b8be`. Previous broker blob `602fbf8aa189884e5a2bcdb4c8eaedecdf28152e` is **superseded**. The local 16/16 generation-policy result is unchanged but does not establish actual provider precondition behavior. Production remains HOLD until real GCS replacement/412 denial and complete build/emulator acceptance.
