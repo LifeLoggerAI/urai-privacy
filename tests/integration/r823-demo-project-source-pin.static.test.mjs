@@ -112,3 +112,14 @@ test('R826 bounded original native gates retain fatal failure and source-pinned 
   ]) assert.ok(runner.includes('run_stage ' + stage + ' '), 'missing mandatory original stage: ' + stage);
   assert.doesNotMatch(runner, /firebase deploy|gcloud storage|productionGrant=true|render=true/);
 });
+
+test('R836 fails early if this OS cannot create a native Firebase Functions worker socket', () => {
+  const probe = readFileSync(new URL('../../scripts/native-worker-socket-probe.mjs', import.meta.url), 'utf8');
+  assert.match(probe, /createServer\(\)/);
+  assert.match(probe, /URAI_NATIVE_WORKER_SOCKET_BLOCKED/);
+  assert.match(probe, /process\.exitCode = 1/);
+  assert.match(probe, /rmSync\(directory/);
+  assert.ok(runner.includes('run_stage native_worker_socket_preflight 20s node scripts/native-worker-socket-probe.mjs'));
+  assert.ok(runner.indexOf('run_stage static_source_pin ') < runner.indexOf('run_stage native_worker_socket_preflight '));
+  assert.ok(runner.indexOf('run_stage native_worker_socket_preflight ') < runner.indexOf('run_stage privacy_frozen_install '));
+});

@@ -51,6 +51,9 @@ run_stage() {
   printf 'URAI_PRIVACY_NATIVE_STAGE_PASS stage=%s sha256=%s\n' "$name" "$hash"
 }
 run_stage static_source_pin 60s node --test tests/integration/r823-demo-project-source-pin.static.test.mjs
+# A missing Unix socket permission makes Firebase Functions registration impossible.
+# Fail with an explicit native-capability receipt before costly frozen installs.
+run_stage native_worker_socket_preflight 20s node scripts/native-worker-socket-probe.mjs
 run_stage privacy_frozen_install 900s npm ci --no-audit --no-fund
 run_stage privacy_functions_frozen_install 900s npm ci --prefix functions --no-audit --no-fund
 run_stage privacy_typecheck 600s npm run typecheck --prefix functions
