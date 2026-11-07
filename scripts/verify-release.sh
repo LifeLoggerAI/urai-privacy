@@ -40,6 +40,9 @@ node --test tests/deletion-generation-source-contract.test.mjs
 printf '\n[verify-release] Firestore owner/updateTime deletion policy\n'
 node --experimental-strip-types --test tests/deletion-document-version.test.mjs
 node --test tests/deletion-document-source-contract.test.mjs
+printf '\n[verify-release] current deletion actor and attempt lease authority\n'
+node --experimental-strip-types --test tests/deletion-execution-lease-policy.test.mjs
+node --test tests/deletion-execution-authority-source-contract.test.mjs
 
 
 printf '\n[verify-release] npm ci\n'
