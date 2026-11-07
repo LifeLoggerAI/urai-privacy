@@ -48,6 +48,10 @@ require_pattern "storage.rules" "request\.auth\.token\.role == 'admin'" "Storage
 reject_pattern "firestore.rules" 'function isRoleAdmin|documents/users/.+data\.role.+admin' "user-document-derived admin authority"
 reject_pattern "functions/src/index.ts" 'snap\.data\(\)\?\.role === "admin"' "callable user-document-derived admin authority"
 
+echo "[security-gate] Enforcing private export broker source admission"
+node --test tests/export-broker-boundary.test.mjs
+node scripts/assert-export-broker-boundary.mjs
+
 echo "[security-gate] Checking server-mediated privacy evidence rules"
 require_pattern "firestore.rules" 'match /auditLogs/[{]id[}]' "Audit log match"
 require_pattern "firestore.rules" 'allow (create, )?update, delete: if false|allow update: if false' "Audit log update deny"
