@@ -61,6 +61,8 @@ node --experimental-strip-types --test tests/export-processing-claim-policy.test
 node --test tests/export-processing-c7-source-contract.test.mjs
 node --experimental-strip-types --test tests/export-object-generation-policy.test.mjs
 node --test tests/export-object-generation-source-contract.test.mjs
+node --experimental-strip-types --test tests/export-cleanup-generation-policy.test.mjs
+node --test tests/export-cleanup-generation-source-contract.test.mjs
 
 echo "[security-gate] Checking server-mediated privacy evidence rules"
 require_pattern "firestore.rules" 'match /auditLogs/[{]id[}]' "Audit log match"
