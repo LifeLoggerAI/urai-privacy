@@ -1,5 +1,5 @@
 /**
- * R834 — native Jobs R833 identity/transport -> actual Privacy callable.
+ * R835 — native Jobs #320 identity/transport -> actual Privacy callable.
  * This is a *denial* acceptance against disposable Firebase emulators.
  * The imported Jobs source and Privacy Functions source are not modified,
  * mocked or granted production privileges.
@@ -17,7 +17,7 @@ import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 
 const PROJECT = 'demo-urai-privacy-integration-test';
-const JOBS_SHA = '8baaf008d021eeebe5ba425e4d8308a5cd99c87a';
+const JOBS_SHA = '4c5f4823a9f7f469a1798671b0dca97b88bf3dae';
 const PRIVACY_SHA = process.env.URAI_EXPECTED_PRIVACY_SHA;
 const JOBS_UID = 'synthetic-jobs-verifier-uid';
 const API_KEY = 'R818_Synthetic_Emulator_Key_00000000';
