@@ -79,19 +79,23 @@ test('R825 composite four-emulator gate retains both originals and never admits 
 });
 
 test('R826 bounded original native gates retain fatal failure and source-pinned receipts', () => {
-  assert.match(runner, /timeout -k 30s "\\$limit" "\\$@" > "\\$OUT\\/\\$name\\.log" 2>&1 \\|\\| code=\\$\\?/);
-  assert.match(runner, /sha256sum "\\$OUT\\/\\$name\\.log"/);
-  assert.match(runner, /URAI_PRIVACY_NATIVE_STAGE_FAIL/);
-  assert.match(runner, /URAI_PRIVACY_NATIVE_STAGE_PASS/);
-  assert.match(runner, /die "Native stage \\$name failed; production HOLD/);
+  // Literal command comparisons avoid regex-escape ambiguity for Bash $vars.
+  for (const command of [
+    'timeout -k 30s "$limit" "$@" > "$OUT/$name.log" 2>&1 || code=$?',
+    'sha256sum "$OUT/$name.log"',
+    'die "Native stage $name failed; production HOLD',
+    'run_stage privacy_four_emulators 900s npx --no-install firebase --project "$PROJECT" emulators:exec',
+    '--only auth,firestore,functions,storage',
+    'node tests/integration/life-movie-jobs-native-transport.emulator.mjs && node tests/integration/life-movie-review-issuer-firestore.emulator.mjs',
+    'productionGrant=false render=false',
+  ]) assert.ok(runner.includes(command), 'required native acceptance contract missing: ' + command);
+  for (const marker of ['URAI_PRIVACY_NATIVE_STAGE_FAIL', 'URAI_PRIVACY_NATIVE_STAGE_PASS']) {
+    assert.ok(runner.includes(marker), 'missing original stage evidence marker ' + marker);
+  }
   for (const stage of [
     'static_source_pin', 'privacy_frozen_install', 'privacy_functions_frozen_install',
     'privacy_typecheck', 'privacy_build', 'jobs_frozen_install',
     'jobs_shared_build', 'jobs_functions_build', 'privacy_four_emulators',
   ]) assert.ok(runner.includes('run_stage ' + stage + ' '), 'missing mandatory original stage: ' + stage);
-  assert.match(runner, /run_stage privacy_four_emulators 900s npx --no-install firebase --project "\\$PROJECT" emulators:exec/);
-  assert.match(runner, /--only auth,firestore,functions,storage/);
-  assert.match(runner, /node tests\\/integration\\/life-movie-jobs-native-transport\\.emulator\\.mjs && node tests\\/integration\\/life-movie-review-issuer-firestore\\.emulator\\.mjs/);
-  assert.match(runner, /productionGrant=false render=false/);
   assert.doesNotMatch(runner, /firebase deploy|gcloud storage|productionGrant=true|render=true/);
 });
