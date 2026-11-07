@@ -68,13 +68,19 @@ if (!storageFence.includes("!firestore.exists(tombstone)") ||
 }
 
 const storageChecks = [
-  "match /exports/{uid}/{jobId}/{fileName}",
-  "activeExportPackage(uid, jobId)",
-  "packageExpiresAt > request.time",
+  "match /exports/{uid}/{allPaths=**}",
+  "allow read, write: if false",
   "match /evidence/{allPaths=**}",
   "request.auth.token.admin == true",
   "request.auth.token.role == 'admin'"
 ];
+
+// A permit on any overlapping /exports path would override broker-only
+// delivery; deny ALL Storage SDK export reads and writes, including admins.
+const exportMatches = [...storage.matchAll(/match\\s+\\/exports\\//g)];
+if (exportMatches.length !== 1 || !/match\\s+\\/exports\\/\\{uid\\}\\/\\{allPaths=\\*\\*\\}\\s*\\{\\s*allow\\s+read\\s*,\\s*write\\s*:\\s*if\\s+false\\s*;\\s*\\}/.test(storage)) {
+  failures.push("export Storage paths must have exactly one catch-all direct read/write DENY rule");
+}
 
 for (const check of firestoreChecks) if (!firestore.includes(check)) failures.push(`firestore missing ${check}`);
 for (const check of storageChecks) if (!storage.includes(check)) failures.push(`storage missing ${check}`);
