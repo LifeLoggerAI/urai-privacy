@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# R823 review only. Exact R822 Jobs -> original Privacy callable; demo-only.
+# R834 review only. Exact R833 Jobs -> original Privacy callable; demo-only.
 set -Eeuo pipefail
 umask 077
 die() { echo "URAI_R818_HOLD: $*" >&2; exit 1; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 PROJECT=demo-urai-privacy-integration-test
-JOBS_SHA=23ea52536ca0fd4fa7e16f814a69c2526c270279
+JOBS_SHA=8baaf008d021eeebe5ba425e4d8308a5cd99c87a
 EXPECTED="${URAI_EXPECTED_PRIVACY_SHA:-}"
 JOBS_DIR="${URAI_JOBS_SOURCE_DIR:-}"
 [[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || die "Pinned Privacy SHA required"
