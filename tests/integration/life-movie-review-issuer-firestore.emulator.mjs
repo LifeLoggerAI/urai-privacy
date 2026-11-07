@@ -19,7 +19,7 @@ import { createEmulatorOnlyReviewMovieGrantBackend } from "../../functions/lib/l
 import { writeReviewOnlyScopedGrantCandidate } from "../../functions/lib/life-movie-scoped-issuer-review.js";
 import { evaluateLifeMovieRenderAuthorization } from "../../functions/lib/life-movie-render-authorization.js";
 
-const PROJECT = "urai-privacy-integration-test";
+const PROJECT = "demo-urai-privacy-integration-test";
 const EXPECTED = {
   URAI_EMULATOR_PROJECT: PROJECT,
   FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
@@ -49,7 +49,7 @@ const key = generateKeyPairSync("rsa", { modulusLength: 2048,
 });
 const adminApp = initializeAdminApp({ projectId: PROJECT, credential: cert({
   projectId: PROJECT,
-  clientEmail: "synthetic-verifier@urai-privacy-integration-test.iam.gserviceaccount.com",
+  clientEmail: "synthetic-verifier@demo-urai-privacy-integration-test.iam.gserviceaccount.com",
   privateKey: key.privateKey,
 }) }, "review-issuer-admin");
 const adminDb = getAdminFirestore(adminApp);
