@@ -25,6 +25,7 @@ import {
 } from "./export-lifecycle-contract";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { cleanupExportArtifactAttempts } from "./export-attempt-maintenance";
+import { canonicalGcsGeneration, matchingExportObjectMetadata, exactExportArtifactPath } from "./export-object-generation-policy";
 import { evaluateConsentDecision, CONSENT_DECISION_POLICY_VERSION } from "./consent-decision";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
 import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
@@ -110,12 +111,16 @@ async function readExportDownloadAuthority(transaction: FirebaseFirestore.Transa
     throw new HttpsError("failed-precondition", "Current export authority is unavailable. Create a new export after granting current consent.");
   }
   const path = file === "manifest" ? job.exportManifestPath : job.exportPackagePath;
-  if (!validExportObjectPath({ uid, jobId, path })) {
-    throw new HttpsError("failed-precondition", "Export package path is invalid.");
+  const generation = canonicalGcsGeneration(file === "manifest" ? job.manifestGeneration : job.exportGeneration);
+  const checksum = file === "manifest" ? job.manifestSha256 : job.exportSha256;
+  if (!exactExportArtifactPath(uid, jobId, path)
+    || !generation || typeof checksum !== "string" || !/^[0-9a-f]{64}$/.test(checksum)) {
+    // Legacy packages without a recorded object generation are deliberately unavailable.
+    throw new HttpsError("failed-precondition", "Export package object identity is missing or invalid.");
   }
-  const identityHash = digest({ uid, requestId, path, file, packageExpiresAt, consentExpiresAt,
+  const identityHash = digest({ uid, requestId, path, file, generation, checksum, packageExpiresAt, consentExpiresAt,
     receiptHash: job.consentReceiptHash, exportHash: job.exportSha256 ?? null, manifestHash: job.manifestSha256 ?? null });
-  return { uid, requestId, path: path as string, actor, packageExpiresAt, consentExpiresAt, identityHash };
+  return { uid, requestId, path, generation, checksum, actor, packageExpiresAt, consentExpiresAt, identityHash };
 }
 
 function exportDownloadEndpoint(rawHost: string | undefined) {
@@ -142,9 +147,12 @@ export const getExportDownloadUrl = onCall(async (request) => {
   const authority = await db.runTransaction((transaction) => readExportDownloadAuthority(transaction, initialAuth, jobId, file));
   const { uid, requestId, path, packageExpiresAt, consentExpiresAt } = authority;
   await actor.requireCurrent(uid);
-  const [exists] = await bucket.file(path).exists();
+  const object = bucket.file(path, { preconditionOpts: { ifGenerationMatch: authority.generation } });
+  const [objectMetadata] = await object.getMetadata();
+  if (!matchingExportObjectMetadata({ generation: authority.generation, sha256: authority.checksum }, objectMetadata)) {
+    throw new HttpsError("failed-precondition", "The requested export object generation or checksum changed.");
+  }
   await actor.requireCurrent(uid);
-  if (!exists) throw new HttpsError("not-found", "Export package file is missing.");
   const downloadExpiresAt = Math.min(Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS, packageExpiresAt, consentExpiresAt);
   const url = new URL(exportDownloadEndpoint(request.rawRequest?.get("host")));
   url.searchParams.set("jobId", jobId);
@@ -210,10 +218,15 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
       || expiresAt > Math.min(Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS, authority.packageExpiresAt, authority.consentExpiresAt)) {
       throw new HttpsError("failed-precondition", "Export download authority has expired or changed.");
     }
-    const object = bucket.file(authority.path);
-    const [exists] = await object.exists();
+    // A literal ifGenerationMatch precondition is applied to the metadata and
+    // streaming requests. Do not use FileOptions.generation: the pinned SDK
+    // converts generation strings through Number and may round 64-bit IDs.
+    const object = bucket.file(authority.path, { preconditionOpts: { ifGenerationMatch: authority.generation } });
+    const [objectMetadata] = await object.getMetadata();
+    if (!matchingExportObjectMetadata({ generation: authority.generation, sha256: authority.checksum }, objectMetadata)) {
+      throw new HttpsError("failed-precondition", "The export object's generation or checksum changed.");
+    }
     await requireCurrentDownloadAuthentication(authority.uid);
-    if (!exists) throw new HttpsError("not-found", "Export package file is missing.");
     const auditRef = db.collection("auditLogs").doc();
     await db.runTransaction(async (transaction) => {
       const current = await readExportDownloadAuthority(transaction, actorAuth, jobId, file);
