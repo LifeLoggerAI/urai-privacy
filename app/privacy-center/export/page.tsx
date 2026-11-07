@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { AuthGate } from "@/components/AuthGate";
-import { createExportRequest, getExportDownloadUrl, subscribeUserCollection } from "@/lib/firebase-privacy-client";
+import { createExportRequest, downloadExportPackage, subscribeUserCollection } from "@/lib/firebase-privacy-client";
 
 export default function ExportPage() {
   return (
     <section>
       <div className="eyebrow">Data export</div>
       <h1>Request a copy of your privacy data</h1>
-      <p className="lede">Authenticated users can create a live export request. Completed packages are retrieved through short-lived, owner-authorized download links instead of public Storage paths.</p>
+      <p className="lede">Authenticated users can create an export request. Each completed-package download checks your current consent and account authority.</p>
       <AuthGate>{(user) => <ExportRequestPanel user={user} />}</AuthGate>
     </section>
   );
@@ -41,11 +41,8 @@ function ExportRequestPanel({ user }: { user: User }) {
     setDownloadBusyId(`${jobId}:${file}`);
     setMessage("");
     try {
-      const result = await getExportDownloadUrl({ jobId, file });
-      const url = String(result.url ?? "");
-      if (!url) throw new Error("Signed download URL was not returned.");
-      window.open(url, "_blank", "noopener,noreferrer");
-      setMessage(`${file === "manifest" ? "Manifest" : "Export"} link opened. This link expires in ${String(result.expiresInSeconds ?? 900)} seconds.`);
+      await downloadExportPackage({ jobId, file });
+      setMessage(`${file === "manifest" ? "Manifest" : "Export"} downloaded.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Export download failed");
     } finally {
