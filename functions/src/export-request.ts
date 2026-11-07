@@ -7,6 +7,7 @@ import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 import { EXPORT_PACKAGE_TTL_MS, timestampMillis } from "./export-lifecycle-contract";
 import { exportAttemptPaths, exportPublicationBlockReason, ownsExportAttempt } from "./export-processing-authority";
+import { matchingExportObjectMetadata } from "./export-object-generation-policy";
 import { evaluateConsentDecision } from "./consent-decision";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
 import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
@@ -175,12 +176,24 @@ async function collectUserExport(uid: string, requireCurrent: () => Promise<unkn
 async function writeJson(path: string, value: unknown) {
   const bucket = getStorage().bucket();
   const body = JSON.stringify(value, null, 2);
-  await bucket.file(path).save(body, {
+  const checksum = sha256(body);
+  const object = bucket.file(path);
+  // Never overwrite a newer/foreign generation at the same path.
+  await object.save(body, {
     resumable: false,
+    preconditionOpts: { ifGenerationMatch: 0 },
     contentType: "application/json",
-    metadata: { cacheControl: "private, max-age=0, no-store", metadata: { sha256: sha256(body) } }
+    metadata: { cacheControl: "private, max-age=0, no-store", metadata: { sha256: checksum } }
   });
-  return { path, sha256: sha256(body), bytes: Buffer.byteLength(body, "utf8") };
+  const [metadata] = await object.getMetadata();
+  const generation = matchingExportObjectMetadata(
+    { generation: metadata.generation, sha256: checksum },
+    { generation: metadata.generation, metadata: metadata.metadata }
+  );
+  if (!generation) {
+    throw new HttpsError("failed-precondition", "The new export artifact's exact generation and checksum are unavailable.");
+  }
+  return { path, generation, sha256: checksum, bytes: Buffer.byteLength(body, "utf8") };
 }
 
 async function deleteExportArtifact(path: string) {
@@ -378,6 +391,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         recordCount: exportData.recordCount,
         manifestSha256: manifestFile.sha256,
         exportSha256: exportFile.sha256,
+        exportGeneration: exportFile.generation,
+        manifestGeneration: manifestFile.generation,
         artifactCleanupStatus: FieldValue.delete(),
         artifactCleanupTargetCount: FieldValue.delete(),
         artifactCleanupFailureCount: FieldValue.delete(),
