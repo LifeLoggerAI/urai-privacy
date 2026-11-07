@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import {
@@ -18,6 +18,7 @@ import { evaluateLifeMovieRenderAuthorization } from "./life-movie-render-author
 import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
 import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
 import { crossUserAuthority } from "./cross-user-authority";
+import { createPrivacyActorGuard } from "./privacy-actor-guard";
 
 const db = getFirestore();
 
@@ -66,7 +67,9 @@ function consentRecordId(uid: string, purpose: string) {
 }
 
 export const setCanonicalConsent = onCall(async (request) => {
-  const uid = uidFrom(request);
+  // Preserve current token, account-incarnation and disable/revocation checks.
+  const actor = await createPrivacyActorGuard(request);
+  const uid = actor.uid;
   const parsed = setConsentSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", parsed.error.issues.map((issue) => issue.message).join("; "));
 
@@ -126,15 +129,33 @@ export const setCanonicalConsent = onCall(async (request) => {
   const auditRef = db.collection("auditLogs").doc();
 
   await db.runTransaction(async (transaction) => {
-    const deletionFence = await transaction.get(db.collection("privacyDeletionTombstones").doc(uid));
+    const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
+    const deletionFence = await transaction.get(deletionFenceRef);
     if (checkedLifeMovieDeletionState(deletionFence) !== false) {
       throw new HttpsError("failed-precondition", "Account deletion is in progress or completed; consent changes are blocked.");
     }
+    // Recheck current Auth authority after the deletion-fence read and before mutation.
+    await actor.requireCurrent();
     transaction.set(recordRef, {
       ...receipt,
       receiptHash,
       serverUpdatedAt: FieldValue.serverTimestamp()
     }, { merge: false });
+    // Atomic projection for the separately governed C7 export broker. The
+    // projection cannot create consent; the canonical receipt remains source
+    // of authority, and deny/revoke/expiry updates must replace older grants.
+    // Set an explicit inactive boolean when creating a projection-only fence;
+    // otherwise future checkedLifeMovieDeletionState reads would fail closed.
+    if (purpose === "data.export") transaction.set(deletionFenceRef, {
+      uid,
+      active: false,
+      exportConsentStatus: parsed.data.status,
+      exportConsentReceiptHash: receiptHash,
+      exportConsentPolicyVersion: CONSENT_DECISION_POLICY_VERSION,
+      exportConsentExpiresAt: effectiveExpiresAt
+        ? Timestamp.fromMillis(Date.parse(effectiveExpiresAt)) : FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
     transaction.set(eventRef, {
       ...receipt,
       consentRecordId: recordId,
@@ -164,6 +185,8 @@ export const setCanonicalConsent = onCall(async (request) => {
     });
   });
 
+  // Never confirm a positive consent write to a now-revoked actor.
+  await actor.requireCurrent();
   return {
     consentId: recordId,
     consentEventId: eventRef.id,
