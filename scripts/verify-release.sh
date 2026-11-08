@@ -39,6 +39,8 @@ node --experimental-strip-types --test tests/export-cleanup-generation-policy.te
 node --test tests/export-cleanup-generation-source-contract.test.mjs
 node --experimental-strip-types --test tests/export-cleanup-state-policy.test.mjs
 node --test tests/export-cleanup-state-source-contract.test.mjs
+node --experimental-strip-types --test tests/export-attempt-cleanup-finalization.test.mjs
+node --test tests/export-attempt-cleanup-finalization-source.test.mjs
 node scripts/assert-node22-release-workflows.mjs
 
 # Fail closed before installs/builds if private export delivery still issues a
