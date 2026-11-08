@@ -1,26 +1,12 @@
-# One UrAi Genesis — repository continuity entrypoint
+# ONE URAI GENESIS — Privacy forensic continuity pack
 
-**Repository:** `LifeLoggerAI/urai-privacy`  
-**Registry bootstrap date:** 2026-11-06 (America/Chicago)  
-**Status:** STARTER ONLY — no exhaustive file/byte/history audit or release certification is claimed.
+**Verified snapshot:** 2026-11-07. Privacy main 1163d6f32a123ef9a6638e092a3eee5ec4a3b317; review #236 5daa194148c1f0b157062ca09b8f1b6e629d6d29. All claims in this pack are SOURCE-REVIEW or explicitly labeled historical test receipts. None authorizes production, private media access, consent issuance, or deployment.
 
-This repository is in scope for the One UrAi 2024–present shared evidence and history reconciliation initiative. The provisional private central registry is maintained in `LifeLoggerAI/urai-labs-llc`, `docs/estate/`, proposed in draft PR [#262](https://github.com/LifeLoggerAI/urai-labs-llc/pull/262). Only authorized workers can access that private registry.
+This extends the earlier starter draft PR #237 without replacing it. The latest tested implementation surface is an UNMERGED stacked review branch, not main; the master registry is an UNMERGED private PR #262. Do not conflate documentation acceptance, test acceptance, and production authorization.
 
-## Required continuation
+**Source:** LifeLoggerAI/urai-privacy; main 1163d6f32a123ef9a6638e092a3eee5ec4a3b317; R841 #236 5daa194148c1f0b157062ca09b8f1b6e629d6d29; Jobs exact reviewed dependency ea8f0165ac74511a4e4196919ddd3109d0c1ff2e. GitHub snapshots: 301 blobs on main; 373 on R841.
 
-1. Read the central `docs/estate/README.md`, `WORKER_PROTOCOL.md`, `EVIDENCE_STANDARD.md`, and `WORKER_HANDOFF_TEMPLATE.md` and review existing repository documentation and all other active workers' changes.
-2. Compare the current default branch and open PRs against the latest master snapshot. Establish exact immutable commit SHAs and scope.
-3. Inventory every accessible ref/path/file/asset; hash actual bytes where accessible, including separately accounting for binary objects, LFS, historical commits, workflow evidence and missing/inaccessible data.
-4. Reconstruct original LifeLogger/LifeOS/UrAi/RuAi history, architecture, cross-system interfaces, verification evidence and release constraints as relevant to **this** repo.
-5. Produce the complete nine-document `docs/estate/` knowledge pack and a machine-readable manifest per the central protocol. Mark omissions explicitly.
-6. Submit reviewed changes, conflicts, dependencies, exact test provenance and next-worker handoff to the central registry through a separate review PR.
+## Read in this order
+00_START_HERE, 01_COMPLETE_INVENTORY, 02_HISTORY_AND_PROVENANCE, 03_ARCHITECTURE_AND_CONNECTIONS, 04_IMPLEMENTED_CAPABILITIES (security matrix), 05_VERIFICATION_AND_EVIDENCE (deduplicated proof ledger), 06_GAPS_CONFLICTS_AND_BLOCKERS, 07_WORKER_RECONCILIATION, 08_NEXT_WORKER_HANDOFF, 09_COVERAGE_AND_LIMITATIONS, MANIFEST.json.
 
-## Safety / authority boundaries
-
-This entrypoint is **documentation only**. It does not modify runtime code, lift any release HOLD, create a deployment, authorize paid compute, inspect protected user media, or change production access.
-
-Previously verified functionality remains real; historical “LOCKED” or “DONE” claims are not automatically current integrated production proof. Preserve all source history and earlier worker contributions.
-
-
-
-**Next worker:** Start with the current repository README and active PRs, then update this entrypoint with actual source-pinned findings, not guessed certification.
+**Master:** https://github.com/LifeLoggerAI/urai-labs-llc/pull/262 ; existing repository handoff https://github.com/LifeLoggerAI/urai-privacy/pull/237 . **Source-only, review-only, HOLD.** No private media, production credentials, app code, rules, deployment or IAM was changed.

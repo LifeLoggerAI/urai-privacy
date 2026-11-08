@@ -1,0 +1,2055 @@
+{
+  "schema": "urai-privacy-export-security-pr160-tracked-git-manifest-v1",
+  "date": "2026-11-07",
+  "repository": "LifeLoggerAI/urai-privacy",
+  "commit_sha": "809d94ad7fc93322780d13ff3f0bade7612b3ec2",
+  "git_recursive_tree_ref": "809d94ad7fc93322780d13ff3f0bade7612b3ec2",
+  "truncated": false,
+  "tracked_file_count": 339,
+  "tracked_directory_count": 75,
+  "tracked_bytes": 1957311,
+  "content_claim": "Git API tracked metadata only; NO complete independent raw byte SHA256; SHA-1 identifiers are Git object IDs.",
+  "not_in_scope": [
+    "unreachable historical objects",
+    "Git LFS remote bytes",
+    "untracked outputs",
+    "private media and deployed provider state"
+  ],
+  "other": [],
+  "files": [
+    {
+      "path": ".env.example",
+      "bytes": 687,
+      "blob_sha1": "334cb915df0685581618625d25f092aa1da7166f",
+      "mode": "100644"
+    },
+    {
+      "path": ".eslintrc.cjs",
+      "bytes": 613,
+      "blob_sha1": "2f8ad635a6396f78877635c44ba044b690b861b6",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "bytes": 619,
+      "blob_sha1": "6ad3a33363aac7cccf73b779e98ec972030b5d6c",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "bytes": 458,
+      "blob_sha1": "3957e7039747581d0b2556ebef7737ebbfa14cdb",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/adoption_rollout.md",
+      "bytes": 767,
+      "blob_sha1": "f50c679888fb8981f98752a3da406897a73afa8a",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/dpia_review.md",
+      "bytes": 881,
+      "blob_sha1": "bb8f779644670dcbf6f6430fbe8c6083372783e4",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/legal_review.md",
+      "bytes": 1095,
+      "blob_sha1": "064aeba922e618ebb5fc5bf9f8d8cb0f65f918ce",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/privacy_gap.md",
+      "bytes": 771,
+      "blob_sha1": "1ef54293edd7bfebb87a7b97100062d3328e6484",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/release_tracking.md",
+      "bytes": 789,
+      "blob_sha1": "0f0f93dc7c2668df3b7ac5597e8077c4b0ddba1a",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/vendor_review.md",
+      "bytes": 908,
+      "blob_sha1": "89d0945d61756b3dcb1d3e5a26e0e78b14bf1862",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "bytes": 1111,
+      "blob_sha1": "c06641b465de551fd9afe1e64e8517623d4bd9f8",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/consent-decision-branch-validation.yml",
+      "bytes": 3355,
+      "blob_sha1": "83edd98a5b6992962c77ffecdc3eb374dc9bce26",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/dependency-remediation-candidate.yml",
+      "bytes": 7747,
+      "blob_sha1": "ee52189704886207aff9739cbae2f104a1b486c8",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/pages.yml",
+      "bytes": 997,
+      "blob_sha1": "3f5e01cf73390611123e35fdfb2dbf3940a11885",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/privacy-package.yml",
+      "bytes": 2858,
+      "blob_sha1": "f32e69c14a97892729907e800dc559665e0c88d3",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/privacy-reconstruction-diagnostic.yml",
+      "bytes": 5541,
+      "blob_sha1": "2787719264ad76815efbecff39c62fa4bf14952e",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/privacy-release-verification.yml",
+      "bytes": 3414,
+      "blob_sha1": "4233e04af093535f1d2b916aab185d63295dc229",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/privacy-visual-proof.yml",
+      "bytes": 4203,
+      "blob_sha1": "6bc8c21703aaa50536395b83318d02cc8acb2d7b",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/release-verification.yml",
+      "bytes": 1608,
+      "blob_sha1": "7aee57df53065bd54a35dd61dba759dfe4468c44",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/release-verify.yml",
+      "bytes": 1848,
+      "blob_sha1": "56bc6e5a3fb9d3a664841b30f99140e73050670d",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/urai-production-verify.yml",
+      "bytes": 4172,
+      "blob_sha1": "3cca0d7d65834bd2337fb137d5fc23124f72267a",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/website.yml",
+      "bytes": 2297,
+      "blob_sha1": "cfbb58b79ac386b11581f25addabe2d84c7d4b44",
+      "mode": "100644"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 728,
+      "blob_sha1": "9016f7b4d0391da8efc3fffb2de91f4e327041df",
+      "mode": "100644"
+    },
+    {
+      "path": ".idx/dev.nix",
+      "bytes": 98,
+      "blob_sha1": "7621e282b7967a1513000cac7d15fbc364f1c164",
+      "mode": "100644"
+    },
+    {
+      "path": ".npmrc",
+      "bytes": 19,
+      "blob_sha1": "c7d351733b3be766847fabaa08cad86a2e746c5c",
+      "mode": "100644"
+    },
+    {
+      "path": ".nvmrc",
+      "bytes": 8,
+      "blob_sha1": "de889f8c2e71ed4bdfc48f042e6265f8f67f6356",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/ADOPTION_GUIDE.md",
+      "bytes": 1817,
+      "blob_sha1": "63fd0fd4e0807c160307266ea8b3dcf8ff5ed350",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/ci/privacy-adoption-workflow.yml",
+      "bytes": 525,
+      "blob_sha1": "cc10f1e672310512ac0d8b7578948c664c4635ef",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/ci/README.md",
+      "bytes": 1556,
+      "blob_sha1": "c2d5daddc738cc9c3e579b65296b4d04467aa5be",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/ci/sample-privacy-folder/data-inventory.yaml",
+      "bytes": 897,
+      "blob_sha1": "1352a0942ad82263dc7ce727da76cf7e40a2c1cf",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/ci/sample-privacy-folder/feature-manifests/mood-weather.privacy.yaml",
+      "bytes": 1331,
+      "blob_sha1": "f23b970e146cdf33dabb6b661653f2a98536ce13",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/ci/sample-privacy-folder/PRIVACY_VERSION.md",
+      "bytes": 173,
+      "blob_sha1": "3f4642b339e621da0544d13d60a0f0270fb4b259",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/ci/validate_repo_privacy.py",
+      "bytes": 7745,
+      "blob_sha1": "fd1cd801d46920c11e182eeb24ecab58bbe3deae",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/REPO_ROLLOUT_PLAN.md",
+      "bytes": 1987,
+      "blob_sha1": "607aa02b306fc0da82804501ed27aa5ee2ef1d97",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/templates/data-inventory.yaml",
+      "bytes": 658,
+      "blob_sha1": "e7c32a9807af5cb1f97a0e0ae7fa89d69903f3b4",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/templates/feature.privacy.yaml",
+      "bytes": 1638,
+      "blob_sha1": "66c11d56b99729d41bf98dc80f800e9b695a6b6f",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/templates/PRIVACY_VERSION.md",
+      "bytes": 504,
+      "blob_sha1": "b6f8508f3b11f69f13563876876e9d2a687c370d",
+      "mode": "100644"
+    },
+    {
+      "path": "adoption/templates/privacy-review-record.md",
+      "bytes": 1427,
+      "blob_sha1": "7079f465214fb15f77566765a8e848128b3cb7ed",
+      "mode": "100644"
+    },
+    {
+      "path": "api/privacy-api.yaml",
+      "bytes": 2088,
+      "blob_sha1": "af30de7582954c543d9fcff27aca47df6cca6e88",
+      "mode": "100644"
+    },
+    {
+      "path": "app/_components/PrivacyPage.tsx",
+      "bytes": 2025,
+      "blob_sha1": "d204a4789a0b310b31ce6c4285a9ebf46a164b48",
+      "mode": "100644"
+    },
+    {
+      "path": "app/admin/audit-log/page.tsx",
+      "bytes": 1467,
+      "blob_sha1": "aea9cbe167cc9c317084e343ffe00a292a57afc2",
+      "mode": "100644"
+    },
+    {
+      "path": "app/admin/layout.tsx",
+      "bytes": 388,
+      "blob_sha1": "6921a9e6cf8f86655ca86c487572599f9bb99211",
+      "mode": "100644"
+    },
+    {
+      "path": "app/admin/page.tsx",
+      "bytes": 1675,
+      "blob_sha1": "0646ef36d82bc7653563956e506fa43e1d12d7e9",
+      "mode": "100644"
+    },
+    {
+      "path": "app/admin/policies/page.tsx",
+      "bytes": 929,
+      "blob_sha1": "c52943d4ea8142d6ec897b270c46574c2e2a78f5",
+      "mode": "100644"
+    },
+    {
+      "path": "app/admin/privacy-requests/page.tsx",
+      "bytes": 7080,
+      "blob_sha1": "5a8baa6b710f3c6caa0470d1fb1e7f8ee2a5f8de",
+      "mode": "100644"
+    },
+    {
+      "path": "app/admin/retention/page.tsx",
+      "bytes": 765,
+      "blob_sha1": "ca0a436c4195cac20563cc5115923b5a7126a08f",
+      "mode": "100644"
+    },
+    {
+      "path": "app/consent/page.tsx",
+      "bytes": 1167,
+      "blob_sha1": "13f851970f1848e271b69a46cdf0733240339120",
+      "mode": "100644"
+    },
+    {
+      "path": "app/data-controls/page.tsx",
+      "bytes": 1110,
+      "blob_sha1": "6cbdbc9376d150154304cb7213d47600acf81452",
+      "mode": "100644"
+    },
+    {
+      "path": "app/delete-export/page.tsx",
+      "bytes": 1291,
+      "blob_sha1": "6687bd05adabfd9b6e819d87f8ee0f73b331e430",
+      "mode": "100644"
+    },
+    {
+      "path": "app/globals.css",
+      "bytes": 5514,
+      "blob_sha1": "3a7c93ee10a4fbc769b8a81b34201b51f8d5c813",
+      "mode": "100644"
+    },
+    {
+      "path": "app/layout.tsx",
+      "bytes": 2152,
+      "blob_sha1": "3cf016081d0152f76c33d7ecb3a8b8f4255194ff",
+      "mode": "100644"
+    },
+    {
+      "path": "app/page.tsx",
+      "bytes": 2901,
+      "blob_sha1": "87cbb3b1c583438de109cffca7f4e2461a4f0911",
+      "mode": "100644"
+    },
+    {
+      "path": "app/passport/page.tsx",
+      "bytes": 1207,
+      "blob_sha1": "029b1132dfa932d5acbd69a6136f25c556353f4e",
+      "mode": "100644"
+    },
+    {
+      "path": "app/privacy-center/audit-log/page.tsx",
+      "bytes": 1525,
+      "blob_sha1": "afb2df98c308b7d4f0c71fe724c00bba9a36a3bc",
+      "mode": "100644"
+    },
+    {
+      "path": "app/privacy-center/consent/page.tsx",
+      "bytes": 4372,
+      "blob_sha1": "a6f0a268dbabf5e39b741c79801e67fbee08a5b3",
+      "mode": "100644"
+    },
+    {
+      "path": "app/privacy-center/delete/page.tsx",
+      "bytes": 3660,
+      "blob_sha1": "4683940cb6dbba048873720aef26f1a4ccdde74c",
+      "mode": "100644"
+    },
+    {
+      "path": "app/privacy-center/export/page.tsx",
+      "bytes": 3554,
+      "blob_sha1": "3dd4073ae5122ca8d0e3fa2440fd210269e6916b",
+      "mode": "100644"
+    },
+    {
+      "path": "app/privacy-center/layout.tsx",
+      "bytes": 319,
+      "blob_sha1": "118092efff3f462b627417392b656fa1aa3a8b7a",
+      "mode": "100644"
+    },
+    {
+      "path": "app/privacy-center/page.tsx",
+      "bytes": 822,
+      "blob_sha1": "7d35956923f8a6fd2de1f99c506526819bfa4b3d",
+      "mode": "100644"
+    },
+    {
+      "path": "app/privacy-center/retention/page.tsx",
+      "bytes": 852,
+      "blob_sha1": "bd0fb168e832177dfc16adf7a631024567078305",
+      "mode": "100644"
+    },
+    {
+      "path": "app/privacy/page.tsx",
+      "bytes": 1125,
+      "blob_sha1": "d331c1b7c44a0b47d53f85a21af52c7df772e6c6",
+      "mode": "100644"
+    },
+    {
+      "path": "app/providers.tsx",
+      "bytes": 803,
+      "blob_sha1": "e34b8dc3591289c6a7b26a99a957f54c9b00d674",
+      "mode": "100644"
+    },
+    {
+      "path": "app/responsible-ai/page.tsx",
+      "bytes": 1163,
+      "blob_sha1": "c45baeb6b0c94cc26907c4bea538e218dbc383c4",
+      "mode": "100644"
+    },
+    {
+      "path": "app/safety/page.tsx",
+      "bytes": 1198,
+      "blob_sha1": "8cd0e9ebdfea611a6138db156910ebdd942ea40e",
+      "mode": "100644"
+    },
+    {
+      "path": "app/what-urai-does-not-do/page.tsx",
+      "bytes": 1132,
+      "blob_sha1": "aacd6f46f03c3a096e381ae3f34cfceeda09b6c4",
+      "mode": "100644"
+    },
+    {
+      "path": "architecture/ANONYMIZATION_DATA_SHARING_LIFECYCLE.md",
+      "bytes": 1488,
+      "blob_sha1": "474786742e84e0a46d69c07e0e54e3aca2dbbd9f",
+      "mode": "100644"
+    },
+    {
+      "path": "architecture/AUDIT_LIFECYCLE.md",
+      "bytes": 1491,
+      "blob_sha1": "3e5ccdf9b856f6bb6cdcc52641e69e8c999ee358",
+      "mode": "100644"
+    },
+    {
+      "path": "architecture/CONSENT_LIFECYCLE.md",
+      "bytes": 1296,
+      "blob_sha1": "21005aafd58224d9bb38f290f4b0a6edb94dab96",
+      "mode": "100644"
+    },
+    {
+      "path": "architecture/DELETION_LIFECYCLE.md",
+      "bytes": 1357,
+      "blob_sha1": "39876a17f53f1082f2042736efe4f0a31abe99e2",
+      "mode": "100644"
+    },
+    {
+      "path": "architecture/EXPORT_LIFECYCLE.md",
+      "bytes": 1423,
+      "blob_sha1": "973d1d788bff36451be7365a7cb4e42d81e295fe",
+      "mode": "100644"
+    },
+    {
+      "path": "architecture/INCIDENT_RESPONSE_LIFECYCLE.md",
+      "bytes": 1507,
+      "blob_sha1": "d21e4ae6fd800216a11f7dc855a33bf7f1423ca1",
+      "mode": "100644"
+    },
+    {
+      "path": "architecture/README.md",
+      "bytes": 959,
+      "blob_sha1": "123a537c66c1e9fcf7595138cd3adb6231700f93",
+      "mode": "100644"
+    },
+    {
+      "path": "CANONICAL_PRODUCT_ADOPTION.md",
+      "bytes": 1827,
+      "blob_sha1": "dd8c4919f0ae656e5e52fec009a5ec1ce6ff8f15",
+      "mode": "100644"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 791,
+      "blob_sha1": "4038e2cea7c26c33dabd5b64dc094c72b8f135bd",
+      "mode": "100644"
+    },
+    {
+      "path": "CNAME",
+      "bytes": 16,
+      "blob_sha1": "1dbb8a3c370600b0df63aa4065cc9e146048908d",
+      "mode": "100644"
+    },
+    {
+      "path": "components/AdminGate.tsx",
+      "bytes": 222,
+      "blob_sha1": "36ad3f4561d38bac066dc6e8c9d2f7e24b8cbe17",
+      "mode": "100644"
+    },
+    {
+      "path": "components/AuthGate.tsx",
+      "bytes": 7075,
+      "blob_sha1": "39425b0c9daa11ac785c5afd7aa312e5f5c15776",
+      "mode": "100644"
+    },
+    {
+      "path": "components/legal.tsx",
+      "bytes": 1676,
+      "blob_sha1": "52f8dac22dc4c2b4506d751abad6722148db9f43",
+      "mode": "100644"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 3571,
+      "blob_sha1": "bd03a3fdfd25e6ca7daa8c97fa8b49cb15913018",
+      "mode": "100644"
+    },
+    {
+      "path": "dev.nix",
+      "bytes": 98,
+      "blob_sha1": "a86e5de3ef8d3ec3968e921a7cebf61cdd17c60b",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/ANONYMIZATION_STANDARD.md",
+      "bytes": 2068,
+      "blob_sha1": "18c84785f84fdceef93fa7775b8775985f22a81e",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/AUDIT_LOGGING_STANDARD.md",
+      "bytes": 1637,
+      "blob_sha1": "050f338410a5805c727def6522a295308da46e60",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/audits/AAA_PRIVACY_PRODUCTION_AUDIT_2026-05-19.md",
+      "bytes": 5640,
+      "blob_sha1": "e62b3a965e6f264218d476587be4dc9dd6b42470",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/audits/PR58_VERIFICATION_2026-05-19.md",
+      "bytes": 2422,
+      "blob_sha1": "7ae9d6107ec5a9515cf15b2f9e1ef50dd303469c",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/AUTHENTICATED_LIVE_WORKFLOW_PROOF.md",
+      "bytes": 5586,
+      "blob_sha1": "4b1e6ce3b69866c6cf8af1957a70a95da5fce6bf",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/CONSENT_DECISION_SERVICE.md",
+      "bytes": 4004,
+      "blob_sha1": "2a639eb9bc49c5f56686ca7098733eac9a194dc6",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/CONSENT_TIERS.md",
+      "bytes": 2738,
+      "blob_sha1": "c53b7dd193b2dcbeabf480bb3e17df1f3d0e03e8",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/CROSS_SYSTEM_CANON_AUTHORITY.md",
+      "bytes": 4265,
+      "blob_sha1": "9cfdd4be3d6db0f98a10e155ee98d061c094d96b",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/DATA_CLASSIFICATION.md",
+      "bytes": 1892,
+      "blob_sha1": "c7ae9dd6a3d387ed196803fa56bb3cdda57148b4",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/DATA_COLLECTION_BOUNDARIES.md",
+      "bytes": 2446,
+      "blob_sha1": "19aca3209a93bebd1aae5f7555daf982d1b71ce9",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/DATA_EXPORT_STANDARD.md",
+      "bytes": 1521,
+      "blob_sha1": "71686989edcf1a5c1e65aeaaadabbcf5bb1141ea",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/DELETION_ORCHESTRATION.md",
+      "bytes": 3384,
+      "blob_sha1": "227ee0529f58a9b0ab2ae6e63e52dc987c43a4ae",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/DEPENDENCY_SECURITY_POLICY.md",
+      "bytes": 2007,
+      "blob_sha1": "a14acc553e6584b022b00bda2495188b84982ad1",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/DPIA_TEMPLATE.md",
+      "bytes": 1597,
+      "blob_sha1": "be1c51f96b1bd4e8e1b98d809c5113c3ac7477cf",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/EVIDENCE_STATUS.md",
+      "bytes": 232,
+      "blob_sha1": "89b946bf2f7844e6241a4dfeead357d079ee0f6f",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/evidence/deletion-version-execution-authority-20261008.md",
+      "bytes": 2710,
+      "blob_sha1": "aacf9d56c076a3aca2286e01856d3a95e4319b90",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/evidence/export-post-await-auth-20261007.md",
+      "bytes": 3057,
+      "blob_sha1": "a34204a42ed67f79b7681227329c022901f600ec",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/evidence/NEXT_PRIMARY_ADVISORY_SOURCE_REMEDIATION_20261007.md",
+      "bytes": 2126,
+      "blob_sha1": "28ffe24ae4205766c2f672f30113c7bd2d0c84b9",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/evidence/privacy-root-dependency-repair-20261007.md",
+      "bytes": 4543,
+      "blob_sha1": "89b6b52c08a881e8fa3e6b128bb4977efb1e691d",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/evidence/urai-spatial-xr-privacy-gate.md",
+      "bytes": 2658,
+      "blob_sha1": "c2a11d983825087f7640b160d4840d3d634187d5",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/EXPORT_CONTRIBUTOR_REGISTRY.md",
+      "bytes": 7374,
+      "blob_sha1": "372ec198b8e633b81d46dab352ce3ffaf020d953",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/EXPORT_DOWNLOAD_CONSENT_FENCE_20261007.md",
+      "bytes": 4514,
+      "blob_sha1": "99ba35de930f1ba04c21e817fba1c91cceb82ff6",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/FINAL_SYSTEM_OF_SYSTEMS_COMPLETION_LOCK.md",
+      "bytes": 4595,
+      "blob_sha1": "06a7cb8a6fc994ac4df5eb871411f0b3598b372a",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/FOUNDATION_INTEGRATION.md",
+      "bytes": 1632,
+      "blob_sha1": "982c8e7e435070f61759cf1232a5827ba1aa1c2d",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/GOVERNANCE_INDEX.md",
+      "bytes": 1617,
+      "blob_sha1": "85398ff755d21dd2b6f3d6272846d5f6c7d473e4",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/IMPLEMENTATION_PLAN.md",
+      "bytes": 5980,
+      "blob_sha1": "e168060809d1ea426ad0bd3a23ad14048c7f8e3d",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/INCIDENT_RESPONSE.md",
+      "bytes": 1759,
+      "blob_sha1": "9794265e27d022afc1fe398d319b295506346750",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/INTEGRATION_BACKLOG.md",
+      "bytes": 4588,
+      "blob_sha1": "4dc6d891835fea815a44891673da837bd96a85d7",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/JACOB_OPERATIONS_PACKAGE.md",
+      "bytes": 1797,
+      "blob_sha1": "8c7adee3cb5f675ea927f1c09240d4a0ce5f27e8",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/launch/WAVE1_PRIVACY_LAUNCH_LOCK_EVIDENCE.md",
+      "bytes": 2125,
+      "blob_sha1": "21378205baea18a8285fca643313e993b49d0361",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/LAW_ENFORCEMENT_REQUEST_POLICY.md",
+      "bytes": 1538,
+      "blob_sha1": "f51fd66e231f1f1ed2943d5ed8c1b54e73618ffc",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/LOCK.md",
+      "bytes": 6062,
+      "blob_sha1": "1de9747990d0668615e4710aee73b6604ee848f5",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/ops/MONITORING_INCIDENT_ROLLBACK.md",
+      "bytes": 4827,
+      "blob_sha1": "6fac76588c345689c66b93b15af5adfb38bdbfc3",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/ops/NPM_AUDIT_DISPOSITION.md",
+      "bytes": 1977,
+      "blob_sha1": "7c32a0a84eed717db6d2a9dd292c1e169751ae36",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/PRIVACY_REVIEW_CHECKLIST.md",
+      "bytes": 2289,
+      "blob_sha1": "4fc06c8eeed14fd047e0e469a366b24ab3a49a52",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/PRIVACY_WORKFLOWS.md",
+      "bytes": 6274,
+      "blob_sha1": "4c85f8561d90155a692631650fcba55fb53b4d1c",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/PRODUCT_BOUNDARY.md",
+      "bytes": 1382,
+      "blob_sha1": "5bcd0dca727da57bd56e2f043e0b00da34242e26",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/PRODUCTION_READINESS.md",
+      "bytes": 6789,
+      "blob_sha1": "d4e4f933db6482e7c20b5b2bf4b7c39e04f364fa",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/PUBLIC_TRUST_LANGUAGE.md",
+      "bytes": 953,
+      "blob_sha1": "05271f663aeaa42245a83de41e77e03a450d06d5",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/REGULATORY_ALIGNMENT.md",
+      "bytes": 2352,
+      "blob_sha1": "21806ba4891c1f4c12c9c03fd0d765d2296bfdff",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/RELEASE_BLOCKERS.md",
+      "bytes": 1490,
+      "blob_sha1": "6ae7c33d2d2efec1d3a1d43458e1e312c2289834",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/RELEASE_CHECKLIST.md",
+      "bytes": 5471,
+      "blob_sha1": "b56e202f441f1dddfdbc656d80d4f5347a12f135",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/RELEASE_SIGNOFF.md",
+      "bytes": 9724,
+      "blob_sha1": "c91326f7698614bfaa14c21f40f66f18e0366ca6",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/release-evidence/NARROW_LAUNCH_PRIVACY_GATE_2026-06-16.md",
+      "bytes": 3609,
+      "blob_sha1": "847396727e6f0edecae3747fc8da1c57f8eb5cf4",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/release-evidence/PR117_AUDITED_LOCK_REFRESH_20260804.md",
+      "bytes": 1456,
+      "blob_sha1": "5ecee6261dc1bc891af2e7921c6a3f10f4c12a24",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/release-gates/USER_DATA_RIGHTS_AND_LIFECYCLE.md",
+      "bytes": 6273,
+      "blob_sha1": "be579f4062edbfe2054e259ffd86c0480d537ceb",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/release-gates/V1_PRIVACY_RELEASE_GATE.md",
+      "bytes": 5358,
+      "blob_sha1": "ed1418df923c0e87cecba3bb2f84462f69fd8db2",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/RETENTION_AND_DELETION.md",
+      "bytes": 2082,
+      "blob_sha1": "4ac73c4ac8f3be0beb6f02ccd0b6f67e04d58430",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/SECURITY_PRIVACY_REVIEW.md",
+      "bytes": 1323,
+      "blob_sha1": "bc116268a434d8ccbde8ce57c0befd9e7f8faaaa",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/SYSTEM_OF_SYSTEMS_PRIVACY_CONTRACT.md",
+      "bytes": 4907,
+      "blob_sha1": "aae597abcf6398b241122e68b0442897b8b2a5db",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/system-of-systems/URAI_PRIVACY_MATRIX.md",
+      "bytes": 11662,
+      "blob_sha1": "a5f0d37406d80209dbb966805ecde844e7320ceb",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/URAI_EVIDENCE_BOUNDARY_2026-07-06.md",
+      "bytes": 1224,
+      "blob_sha1": "75a92388fbd13031e14ad027ce2313c28c4aa799",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/URAI_GENESIS_PRIVACY_ALIGNMENT.md",
+      "bytes": 3045,
+      "blob_sha1": "c914988ad398b09969dae76b664808a7e301b1e3",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/URAI_PRIVACY_WAVE1_POLISH_STATUS.md",
+      "bytes": 3524,
+      "blob_sha1": "85cd6dc4e883afc87c2f01fef1627b8b3e25b329",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/URAI_WAVE1_SHARED_FOUNDATION_ADOPTION.md",
+      "bytes": 3566,
+      "blob_sha1": "3524a5ef4c47a5b87f199e8c3181e22b58344b6a",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/USER_RIGHTS_INTAKE_SPEC.md",
+      "bytes": 6181,
+      "blob_sha1": "84fad59f2af46fb396b57685255260ab85fe34ef",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/VENDOR_AND_PROCESSOR_REVIEW.md",
+      "bytes": 1743,
+      "blob_sha1": "5b16e04d18babf099064568fecf9da6a2bb4731e",
+      "mode": "100644"
+    },
+    {
+      "path": "DONE_STATUS_REPORT.md",
+      "bytes": 6648,
+      "blob_sha1": "eab0032e19a069b5c714bf3a871d0f11279baad2",
+      "mode": "100644"
+    },
+    {
+      "path": "ECOSYSTEM_COORDINATOR_HANDOFF.md",
+      "bytes": 3071,
+      "blob_sha1": "b6502ece8c004a77a8291421de9f4c4c1b1830b3",
+      "mode": "100644"
+    },
+    {
+      "path": "examples/valid-feature.privacy.yaml",
+      "bytes": 1358,
+      "blob_sha1": "3102342f6b9157023ac89de0749a9ea0b961ac3d",
+      "mode": "100644"
+    },
+    {
+      "path": "firebase.emulator.json",
+      "bytes": 697,
+      "blob_sha1": "952cd84f80173f9385eb8ebb27d5d0ddec8ed8cb",
+      "mode": "100644"
+    },
+    {
+      "path": "firebase.emulators.json",
+      "bytes": 697,
+      "blob_sha1": "952cd84f80173f9385eb8ebb27d5d0ddec8ed8cb",
+      "mode": "100644"
+    },
+    {
+      "path": "firebase.json",
+      "bytes": 980,
+      "blob_sha1": "04a0a54c96abde147a61ab800d924a8c56130109",
+      "mode": "100644"
+    },
+    {
+      "path": "firebase/firebase.ts",
+      "bytes": 2567,
+      "blob_sha1": "fe440316f57c00e80dfa96e1a39667f3509902ff",
+      "mode": "100644"
+    },
+    {
+      "path": "firestore.indexes.json",
+      "bytes": 1871,
+      "blob_sha1": "1186857ee66cc43e8dc15e77f86560f8752e6120",
+      "mode": "100644"
+    },
+    {
+      "path": "firestore.rules",
+      "bytes": 3883,
+      "blob_sha1": "257bd6908dbdf3c6306f9ec68be12b4cdee1d4fa",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/package-lock.json",
+      "bytes": 109342,
+      "blob_sha1": "f236e4ec9d59fd409b856afdc7528cae56c7decf",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/package.json",
+      "bytes": 702,
+      "blob_sha1": "72bc245aabba067d9384451c7657ad7da66d5334",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/consent-api.ts",
+      "bytes": 10380,
+      "blob_sha1": "990fe87ee063650b3006a4f1b03ecd87e4578cda",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/consent-decision.ts",
+      "bytes": 5200,
+      "blob_sha1": "0ce462c292d2a948d25e641bbebda5a04b7de2b7",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/consent-expiry.ts",
+      "bytes": 859,
+      "blob_sha1": "20676e43801bfae8d45dc5ac9bfb626320389bb8",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/consent-functions.ts",
+      "bytes": 432,
+      "blob_sha1": "e2babd9062349b131a1d580a0743a6dd0c1a743c",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/consent-policy.ts",
+      "bytes": 4353,
+      "blob_sha1": "52067a7c63132a133cee7aa2c1274a90c366fd23",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/consent-revocation-transition.ts",
+      "bytes": 585,
+      "blob_sha1": "0b862f27407e34c4123fafccf5d5309af379bc77",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/consent-revocation.ts",
+      "bytes": 7445,
+      "blob_sha1": "dfc2b1c3788b0fe839edeae283fdd690f23e95d6",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-completion-authority.ts",
+      "bytes": 3460,
+      "blob_sha1": "bcb5fa5533dbca7caf56686cf3d5088e752680b6",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-completion-verifier.ts",
+      "bytes": 4338,
+      "blob_sha1": "45b9ea0f1ffbb2a24ce9755cf0e4e20c57d4dbc0",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-contract.ts",
+      "bytes": 4824,
+      "blob_sha1": "b9a21137336a69351625534ddb08daa30a63a8cd",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-functions.ts",
+      "bytes": 6396,
+      "blob_sha1": "d03296709b1ce348c486846d4b11e5a46d07abf4",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-inventory.ts",
+      "bytes": 3587,
+      "blob_sha1": "781b5895992bd84ef7057b473488b856416aa533",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-local-executor.ts",
+      "bytes": 3687,
+      "blob_sha1": "3f44440a1907d7634fd7fdf5a63bebe045657141",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-mutation-guard.ts",
+      "bytes": 16345,
+      "blob_sha1": "de9622bf80bf29ce6634f9010950c51b80d5c529",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-mutation-policy.ts",
+      "bytes": 4822,
+      "blob_sha1": "b909511f92a9438321ecdeaf33004da5fbb6650a",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/deletion-source-registry.ts",
+      "bytes": 1393,
+      "blob_sha1": "f68c1fa6f1dea9306d8e41f1500484ff60cf8fa8",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-artifact-cleanup.ts",
+      "bytes": 553,
+      "blob_sha1": "0f8e25d6d5f1ccaa06a6240e8d9008a47efe8e6e",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-attempt-maintenance.ts",
+      "bytes": 7798,
+      "blob_sha1": "17582a6580d4102317a4f8c6102df5e49ce5235a",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-contract.ts",
+      "bytes": 3259,
+      "blob_sha1": "57b1e694788ba42233578cf92d7638f6e48027b6",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-contributor-registry.ts",
+      "bytes": 6045,
+      "blob_sha1": "94fde2e955322d6053156b4077c73123fa5d486b",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-functions.ts",
+      "bytes": 294,
+      "blob_sha1": "93808c24f0f68ab1ea99a50b34066937f21f929a",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-lifecycle-contract.ts",
+      "bytes": 2104,
+      "blob_sha1": "ae5cbd7ef296ea7c7c020292b8dfd9576711619c",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-lifecycle-functions.ts",
+      "bytes": 27682,
+      "blob_sha1": "2b810de902d393994a0500330f7223c7838d60e1",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-pagination.ts",
+      "bytes": 2418,
+      "blob_sha1": "cf9ff2404b8a78ff72783eebf185d6363526bd5a",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-processing-authority.ts",
+      "bytes": 2369,
+      "blob_sha1": "21e68183d67a50349ef564080ff2a7dbf1c6eff6",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/export-request.ts",
+      "bytes": 22630,
+      "blob_sha1": "5e597225d5c69143dc7a0af80ee7ab8e9b1a3e63",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/exports.ts",
+      "bytes": 204,
+      "blob_sha1": "12ede16ab55b3ce365c5cbfabe58b8660632baea",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/functions-entry.ts",
+      "bytes": 584,
+      "blob_sha1": "98aef90e6ba1f86360e840293feeeec8d1eab140",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/index.ts",
+      "bytes": 50091,
+      "blob_sha1": "f99c04732d86d22480cbf624540f67b92b7475a8",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/src/privacy-actor-guard.ts",
+      "bytes": 3362,
+      "blob_sha1": "bdc0ef7795b8124ad2515442b1eb87b8a1164baa",
+      "mode": "100644"
+    },
+    {
+      "path": "functions/tsconfig.json",
+      "bytes": 329,
+      "blob_sha1": "00bbc9cb1be6166a6136eafd1cff9ff2379368bd",
+      "mode": "100644"
+    },
+    {
+      "path": "GOVERNANCE.md",
+      "bytes": 1121,
+      "blob_sha1": "ba92c421fce76d70d3ae085704876575e15bb04a",
+      "mode": "100644"
+    },
+    {
+      "path": "LAUNCH_READINESS.md",
+      "bytes": 2445,
+      "blob_sha1": "8e41faf006b5b5da4ca7cb9a7e2c1b27715207e5",
+      "mode": "100644"
+    },
+    {
+      "path": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/CONTINUE3_SAFE_FIXES.md",
+      "bytes": 2696,
+      "blob_sha1": "9d59bb4ffafeeff1edafdaa77aa35d7e2b984f76",
+      "mode": "100644"
+    },
+    {
+      "path": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/CONTINUE4_EXECUTABLE_PROOF_GATE.md",
+      "bytes": 2457,
+      "blob_sha1": "4eca25bfc95c58888ae6d1935305defefcf2d405",
+      "mode": "100644"
+    },
+    {
+      "path": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/CONTINUE5_REPO_SIDE_COMPLETION_LOCK.md",
+      "bytes": 2799,
+      "blob_sha1": "f11a8437aed7689353cd3635241faacc53710c63",
+      "mode": "100644"
+    },
+    {
+      "path": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/CONTINUE6_STRICT_DONE_DONE_LOCK.md",
+      "bytes": 2626,
+      "blob_sha1": "a4a1f4344635c06c3f9b7a3d1e8ef48422421c37",
+      "mode": "100644"
+    },
+    {
+      "path": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/CONTINUE7_REPO_SAFETY_SWEEP.md",
+      "bytes": 2159,
+      "blob_sha1": "49b82e8fe162fead954a433175317f84cc6b80ce",
+      "mode": "100644"
+    },
+    {
+      "path": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/CONTINUE8_DEPLOY_ATTEMPT_RECEIPT.md",
+      "bytes": 2769,
+      "blob_sha1": "7503543a60e969def6f8765b6106735ee9279752",
+      "mode": "100644"
+    },
+    {
+      "path": "launch-proof/urai-privacy-production-lock/2026-06-30T000000-0500/PRODUCTION_LOCK_AUDIT.md",
+      "bytes": 9595,
+      "blob_sha1": "f6b48959261f7364e15ebe85f64fa94a133d08a7",
+      "mode": "100644"
+    },
+    {
+      "path": "legal/BIOMETRIC_AND_AI_INFERENCE_NOTICE_TEMPLATE.md",
+      "bytes": 1425,
+      "blob_sha1": "6b6f26112a773bdd7bf4b4d32d0e56a4d3a2ca89",
+      "mode": "100644"
+    },
+    {
+      "path": "legal/CHILDREN_AND_MINOR_PRIVACY_POLICY.md",
+      "bytes": 1659,
+      "blob_sha1": "29121b907cb5eaa15e7732bc17efcac91ec1a654",
+      "mode": "100644"
+    },
+    {
+      "path": "legal/COOKIE_AND_LOCAL_STORAGE_NOTICE.md",
+      "bytes": 1658,
+      "blob_sha1": "fc3cfd9256fbde88b9376277be82490542cfcd16",
+      "mode": "100644"
+    },
+    {
+      "path": "legal/DATA_SHARING_NOTICE_TEMPLATE.md",
+      "bytes": 2013,
+      "blob_sha1": "b9fee013f01010c547aae7504bf64ad25c8ddf59",
+      "mode": "100644"
+    },
+    {
+      "path": "legal/PRIVACY_POLICY_TEMPLATE.md",
+      "bytes": 2599,
+      "blob_sha1": "6cc256b1ccea98a45bcc689afe17b1847d581fca",
+      "mode": "100644"
+    },
+    {
+      "path": "legal/TERMS_PRIVACY_CLAUSES_TEMPLATE.md",
+      "bytes": 1548,
+      "blob_sha1": "3f464c6602ad37df270f227e29db58fba50ec991",
+      "mode": "100644"
+    },
+    {
+      "path": "legal/TRANSPARENCY_REPORT_TEMPLATE.md",
+      "bytes": 1760,
+      "blob_sha1": "31a045613d999c91a86021b484f0cce98645da10",
+      "mode": "100644"
+    },
+    {
+      "path": "legal/USER_RIGHTS_REQUEST_NOTICE.md",
+      "bytes": 1826,
+      "blob_sha1": "5688e28832d9e5bf0d34f5a459ff99a787b9625f",
+      "mode": "100644"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11357,
+      "blob_sha1": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "mode": "100644"
+    },
+    {
+      "path": "MIGRATION_GUIDE.md",
+      "bytes": 1905,
+      "blob_sha1": "604b2c1b5f6ccfffd2d9d62d0ff26fd23398af56",
+      "mode": "100644"
+    },
+    {
+      "path": "next-env.d.ts",
+      "bytes": 247,
+      "blob_sha1": "9edff1c7cacb3bfac9a1eadcf6f51eaa99565e38",
+      "mode": "100644"
+    },
+    {
+      "path": "next.config.mjs",
+      "bytes": 341,
+      "blob_sha1": "0a05ad75c181e13bc37c5e48e466709d9bb09c06",
+      "mode": "100644"
+    },
+    {
+      "path": "operations/receipts/privacy/complete-export-20260706.json",
+      "bytes": 971,
+      "blob_sha1": "27255628819f5b8137d07e68ac53acad1d18b2d1",
+      "mode": "100644"
+    },
+    {
+      "path": "operations/receipts/privacy/consent-decision-service-20260706.json",
+      "bytes": 2457,
+      "blob_sha1": "0d1199d7cf0ccb6c392b6b0eef051546e4e8a8ab",
+      "mode": "100644"
+    },
+    {
+      "path": "operations/receipts/privacy/deletion-orchestration-20260706.json",
+      "bytes": 1464,
+      "blob_sha1": "2ea62454b2b3e926eb71e5ec6109b7637d7255ee",
+      "mode": "100644"
+    },
+    {
+      "path": "operations/receipts/privacy/deletion-orchestration-reconciliation-20260714.md",
+      "bytes": 1858,
+      "blob_sha1": "95e6a6c5d02f68b4acd61b502e42af50b829c366",
+      "mode": "100644"
+    },
+    {
+      "path": "operations/receipts/privacy/dependency-audit-20260714.md",
+      "bytes": 1105,
+      "blob_sha1": "6886c9ba7aa73a2aa4d3d6159bf2dbc8cbcde12c",
+      "mode": "100644"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 609346,
+      "blob_sha1": "3776e9ad8183ade6e3918add4831897a7f309d0f",
+      "mode": "100644"
+    },
+    {
+      "path": "package.json",
+      "bytes": 4084,
+      "blob_sha1": "d4975caa76e7c89d8645ea5e90472f14a7547f18",
+      "mode": "100644"
+    },
+    {
+      "path": "POLICY_VERSIONING.md",
+      "bytes": 1715,
+      "blob_sha1": "4be76e437f4eae1902f15bd593332ab2604ec3a7",
+      "mode": "100644"
+    },
+    {
+      "path": "policy/audit-event-types.yaml",
+      "bytes": 1534,
+      "blob_sha1": "37e2ff2c768ae8c830d59191e31dad41b72718bc",
+      "mode": "100644"
+    },
+    {
+      "path": "policy/blocked-data-uses.yaml",
+      "bytes": 1373,
+      "blob_sha1": "df02b3e0bd2dc3cd88116dccdb4e75a8551e2d65",
+      "mode": "100644"
+    },
+    {
+      "path": "policy/consent-tiers.yaml",
+      "bytes": 1505,
+      "blob_sha1": "aaf0642b6fa3e601fac19da16e65dfe4f0195d82",
+      "mode": "100644"
+    },
+    {
+      "path": "policy/data-classes.yaml",
+      "bytes": 1604,
+      "blob_sha1": "f6b2c51d70872e4077f85cafcdbeb44a89774e2b",
+      "mode": "100644"
+    },
+    {
+      "path": "policy/retention-classes.yaml",
+      "bytes": 1191,
+      "blob_sha1": "6aca1358b4d30262e126f6c2a6099e68ff1f4a73",
+      "mode": "100644"
+    },
+    {
+      "path": "privacy/feature-manifests/README.md",
+      "bytes": 2466,
+      "blob_sha1": "fa34d9c5acfc19f1af7e2dfd7d6fa229103b8126",
+      "mode": "100644"
+    },
+    {
+      "path": "privacy/system-of-systems/registry.json",
+      "bytes": 15706,
+      "blob_sha1": "05747d8955a8764a626968777b2b192e368c3a67",
+      "mode": "100644"
+    },
+    {
+      "path": "PRODUCTION_LOCK_STATUS.json",
+      "bytes": 2849,
+      "blob_sha1": "07031fbe24c5c6444143e3d330d060b05be058be",
+      "mode": "100644"
+    },
+    {
+      "path": "README.md",
+      "bytes": 9857,
+      "blob_sha1": "25cd468284ec208d5475ea6b1e37dea07f86abd9",
+      "mode": "100644"
+    },
+    {
+      "path": "RELEASE_PROCESS.md",
+      "bytes": 1691,
+      "blob_sha1": "20f394a03859d456846da584d40e8f45d804e418",
+      "mode": "100644"
+    },
+    {
+      "path": "release-evidence/authenticated-live/AUTHENTICATED_LIVE_WORKFLOW_PROOF.example.json",
+      "bytes": 4425,
+      "blob_sha1": "fabc3a2bc6ae73f11b34260fafb6cd05195a54c4",
+      "mode": "100644"
+    },
+    {
+      "path": "release-evidence/staging/STAGING_DEPLOYMENT_EVIDENCE.md",
+      "bytes": 2796,
+      "blob_sha1": "c0734c9b94b5739d4cefaf3bd2981cad4330f699",
+      "mode": "100644"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 33,
+      "blob_sha1": "6ea4ae62e1e341d42e4363bacca231237088f50f",
+      "mode": "100644"
+    },
+    {
+      "path": "schemas/data-inventory.schema.json",
+      "bytes": 3347,
+      "blob_sha1": "4c31d4b41157e4d12d392cf7ec5acb47d1a7f885",
+      "mode": "100644"
+    },
+    {
+      "path": "schemas/feature-privacy-manifest.schema.json",
+      "bytes": 7109,
+      "blob_sha1": "618dc8216bbe2f04d8427c4ad67b0cb411faa15c",
+      "mode": "100644"
+    },
+    {
+      "path": "schemas/firestore-privacy-schema.json",
+      "bytes": 5467,
+      "blob_sha1": "5eee30e693ff23c6db5121ed3f96a40820435efe",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/assert-production-ready.sh",
+      "bytes": 5971,
+      "blob_sha1": "563eb1751b84e7ff1514f20511fd8eb9eba0c57d",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/audit-tier-one.mjs",
+      "bytes": 3877,
+      "blob_sha1": "57b4e96c32a31c3c17fc2d654fa35d7c183f3ff3",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/check-complete-export-contract.mjs",
+      "bytes": 8197,
+      "blob_sha1": "73013becb96878ce12f173e4efbdeb65d2014965",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/check-deletion-orchestration-contract.mjs",
+      "bytes": 2840,
+      "blob_sha1": "8510f5080c7106af6bf567c5dbfd3f96ca2396ae",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/check-functions-emulator-loaded.mjs",
+      "bytes": 1223,
+      "blob_sha1": "119bcdc8b54dfaf6c99b5a02dc77bc141cd8bf34",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/check-java.mjs",
+      "bytes": 1965,
+      "blob_sha1": "10d078543d4b878b4f6178555d626b0279f26da3",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/clean-legacy.sh",
+      "bytes": 578,
+      "blob_sha1": "d889d55e3ed0eba2e8eb333ffbc97c55c04e1272",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/dependency-security.behavior.node-test.cjs",
+      "bytes": 6061,
+      "blob_sha1": "43d5f1630a7ca0ba1bd378095f783a2c5f35a0eb",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/final-production-lock.sh",
+      "bytes": 1429,
+      "blob_sha1": "6a73633c5aa6495a84d3ddfadbac801be186e3ec",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/functions-emulator-loaded.cases.mjs",
+      "bytes": 645,
+      "blob_sha1": "a145804cced797a83df2ddc365d175a573ac7315",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/lint-existing.mjs",
+      "bytes": 575,
+      "blob_sha1": "b701f21bf1b0d3621b7369b147cd6e088536c5f4",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/privacy-export-loaded-sdk-emulator.cjs",
+      "bytes": 8397,
+      "blob_sha1": "25b347944e7df97305dc7ad68ce561be1697b33e",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/security-gate.sh",
+      "bytes": 6958,
+      "blob_sha1": "d61925f3fc30bfc85b2526d7591571761314da28",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/setup-dev-env.sh",
+      "bytes": 1035,
+      "blob_sha1": "3d1075e3db945115742374043e782a023cac68b8",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/smoke-live.mjs",
+      "bytes": 2421,
+      "blob_sha1": "5f9b00d61cd20c5aedfe95786b15e3f91eb4db1a",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/smoke-routes.mjs",
+      "bytes": 2328,
+      "blob_sha1": "ea375baf8c82e1cb657aa75a53a5a977e08804fa",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/staging-evidence.mjs",
+      "bytes": 7818,
+      "blob_sha1": "3b458eb9c59219eaebf257463c8659182e52fbb2",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/urai_privacy_adoption_check.mjs",
+      "bytes": 5546,
+      "blob_sha1": "cee26fb46d873baac0e85ad21f5a274507f06c04",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/urai-production-verify.mjs",
+      "bytes": 1091,
+      "blob_sha1": "65fae4688fcde5f5785798e3361ecac2e58f2d6f",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/urai-qa-checks.js",
+      "bytes": 2843,
+      "blob_sha1": "9a7cd7d3953a945d4c6fafd6a4f81389b33f4c3c",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/validate-rules.mjs",
+      "bytes": 2813,
+      "blob_sha1": "c36bc6e6bcf3f0a7edd7b2923f7bea8e86dd66aa",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/verify-authenticated-live-proof.mjs",
+      "bytes": 5821,
+      "blob_sha1": "e4e282b583b8e0ce025cd1b29b74f2ea18a5bc4a",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/verify-release.sh",
+      "bytes": 2952,
+      "blob_sha1": "1f88620e076ba524bab04bb61bc726abffed22ce",
+      "mode": "100644"
+    },
+    {
+      "path": "SECURITY.md",
+      "bytes": 2446,
+      "blob_sha1": "addfa2e62a47fddbb75d8659d11f7bfffca0d2a7",
+      "mode": "100644"
+    },
+    {
+      "path": "sops/ADMIN_ACCESS_APPROVAL.md",
+      "bytes": 1402,
+      "blob_sha1": "ae17bfc6a472fbe11205184765c4f5e4eb16ad7f",
+      "mode": "100644"
+    },
+    {
+      "path": "sops/AUDIT_REVIEW_CADENCE.md",
+      "bytes": 1733,
+      "blob_sha1": "988a7b641a11d4c76ccb115e9c8f7ae479c4999f",
+      "mode": "100644"
+    },
+    {
+      "path": "sops/BREAK_GLASS_ACCESS.md",
+      "bytes": 1610,
+      "blob_sha1": "2f847a542051d2567720dd295ecce68657ae6165",
+      "mode": "100644"
+    },
+    {
+      "path": "sops/EMPLOYEE_ACCESS_REMOVAL.md",
+      "bytes": 1753,
+      "blob_sha1": "aaf4bfc899eeea3d69938cb36623ede643d43922",
+      "mode": "100644"
+    },
+    {
+      "path": "sops/INCIDENT_ESCALATION_MATRIX.md",
+      "bytes": 2477,
+      "blob_sha1": "3e6f1cbad1a19adb2b39386c19d89f8afaec1be1",
+      "mode": "100644"
+    },
+    {
+      "path": "sops/README.md",
+      "bytes": 758,
+      "blob_sha1": "127a9d62c4297338f77b5f1b42fef74c11f3a0ae",
+      "mode": "100644"
+    },
+    {
+      "path": "src/lib/export-download-client.ts",
+      "bytes": 3370,
+      "blob_sha1": "e81165078ba980d93290c3aa700b990e7b6f9c3d",
+      "mode": "100644"
+    },
+    {
+      "path": "src/lib/firebase-privacy-client.ts",
+      "bytes": 5902,
+      "blob_sha1": "91684ab1ca7a3f834268fa69e2699124ffedb8ee",
+      "mode": "100644"
+    },
+    {
+      "path": "src/lib/privacy-types.ts",
+      "bytes": 3957,
+      "blob_sha1": "7cac674b48a88a3806a79d06a621c3d4bc38b287",
+      "mode": "100644"
+    },
+    {
+      "path": "src/lib/privacy-workflows.ts",
+      "bytes": 11213,
+      "blob_sha1": "2cf21256e65071de7d47003dad3415878c6fdd16",
+      "mode": "100644"
+    },
+    {
+      "path": "src/lib/urai-attribution.js",
+      "bytes": 2275,
+      "blob_sha1": "41cad4e584d900ca2a54c60e8c1c499751059e29",
+      "mode": "100644"
+    },
+    {
+      "path": "src/lib/urai-form.js",
+      "bytes": 2410,
+      "blob_sha1": "b7622f13b137067755964a4d19295f35ceb38d6a",
+      "mode": "100644"
+    },
+    {
+      "path": "src/lib/urai-trust.js",
+      "bytes": 1426,
+      "blob_sha1": "e9d00ae4519d1e5d5375204afcc1ebdf6f61a537",
+      "mode": "100644"
+    },
+    {
+      "path": "src/styles/urai-network-system.css",
+      "bytes": 3703,
+      "blob_sha1": "f65e2c2c3cc9218db343149c8668a08d3e549916",
+      "mode": "100644"
+    },
+    {
+      "path": "storage.rules",
+      "bytes": 1019,
+      "blob_sha1": "50e6aae0752913130fc0214a3d63980cdef5f54b",
+      "mode": "100644"
+    },
+    {
+      "path": "SUPPORT.md",
+      "bytes": 2237,
+      "blob_sha1": "99ace744f03fb88daf6030b5b38de180c58c2964",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/fixtures/canonical-consent.ts",
+      "bytes": 1041,
+      "blob_sha1": "e5d56767ef1371c5a0661276f0e22af4246c899c",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/fixtures/invalid-biometric-without-c5.privacy.yaml",
+      "bytes": 879,
+      "blob_sha1": "aae201920f9266a8a5dbcb56b2f607ce5faddd35",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/fixtures/invalid-data-sharing-without-c8.privacy.yaml",
+      "bytes": 922,
+      "blob_sha1": "2a553c0af24cfafa7b94ced6d373cc4d030262b0",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/fixtures/invalid-sensitive-without-c4.privacy.yaml",
+      "bytes": 857,
+      "blob_sha1": "b611a1ed59ded2acf9850d9a9cf396371a2cc37f",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/integration/consent-current-actor.emulator.test.ts",
+      "bytes": 17767,
+      "blob_sha1": "562218be983e9d368399126053f579d712b13d76",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/integration/privacy-integration-smoke.test.ts",
+      "bytes": 3872,
+      "blob_sha1": "7530f0d21e5b41c2cee744dd3e36119356fc45d4",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/rules/firestore.rules.test.ts",
+      "bytes": 10365,
+      "blob_sha1": "95808ed3820d392bc595a0db4922febc4487a6d4",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/rules/storage.rules.test.ts",
+      "bytes": 13681,
+      "blob_sha1": "2c133bff98063b8e64de3709254cff9201374fbc",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_adoption_validator.py",
+      "bytes": 4362,
+      "blob_sha1": "a603eae3ff1bca5413d7ab4d1ba63340c78bffef",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_privacy_validators.py",
+      "bytes": 4017,
+      "blob_sha1": "433955d273e99dabb3cd2a7bfb2170db7868deb7",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_website_e2e.py",
+      "bytes": 5086,
+      "blob_sha1": "1f4e3a7b4bc3159cd7160415964358be4fe15ad6",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_workflow_concurrency.py",
+      "bytes": 2173,
+      "blob_sha1": "ab28a499ffec7c00732ece2e3b502f8343377228",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/auth-gate-session.test.tsx",
+      "bytes": 9654,
+      "blob_sha1": "1e28fccb3f2551e51181ab38fcce5968e03ddf0a",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/consent-current-actor.test.ts",
+      "bytes": 25844,
+      "blob_sha1": "daf227cc94b7253efd2883020a1d5c1283447705",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/consent-decision.test.ts",
+      "bytes": 4203,
+      "blob_sha1": "46c2c92c8f6e91fb5ffd1425adab70dbb61b62f1",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/consent-expiry.test.ts",
+      "bytes": 1479,
+      "blob_sha1": "f16faf90105a20b4015bac5e2130513628be1544",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/consent-policy.test.ts",
+      "bytes": 2623,
+      "blob_sha1": "d8f50aaaf62821998fe8b0e3a352e75fdeb8df7e",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/consent-revocation-publisher.test.ts",
+      "bytes": 4509,
+      "blob_sha1": "4aa4116290155d6150c59b1963e5a7a14de3625d",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/consent-revocation-transition.test.ts",
+      "bytes": 1355,
+      "blob_sha1": "535b03a266185697143b89cfbe8420958bf8ecc6",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/deletion-completion-authority.test.ts",
+      "bytes": 4182,
+      "blob_sha1": "e02877fdabadac3acaf87794ad85dd595139bc04",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/deletion-completion-verifier.test.ts",
+      "bytes": 3513,
+      "blob_sha1": "0d329c60b863af5b154ac15be981002172bd4aa6",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/deletion-contract.test.ts",
+      "bytes": 5646,
+      "blob_sha1": "6d4ece61bd57a7b2edc5de34195c35152e7d2617",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/deletion-execution-state.test.ts",
+      "bytes": 6279,
+      "blob_sha1": "3931ed1bd0dee83e8276633478cf34127e4d7574",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/deletion-mutation-policy.test.ts",
+      "bytes": 4180,
+      "blob_sha1": "3f4aa810511622c8d6de267c9e5a2dc66aea9921",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/deletion-target-isolation.test.ts",
+      "bytes": 19849,
+      "blob_sha1": "4e5c54ee805e56f8d9f6faece38175787f59d464",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-artifact-cleanup.test.ts",
+      "bytes": 1513,
+      "blob_sha1": "71a5676e53bfafafb1fe0c89137675b604febe34",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-consent-projection.test.ts",
+      "bytes": 6338,
+      "blob_sha1": "92d77e5996d5d65f4cc2a9fbb4560cf1aeb64bfd",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-contract.test.ts",
+      "bytes": 3632,
+      "blob_sha1": "61603dc5cffc0e53dc4fd2f1997919e6e2158420",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-contributor-registry.test.ts",
+      "bytes": 6418,
+      "blob_sha1": "c0cad55199d4d13f1d09776150d391bb9e3db734",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-download-authority.test.ts",
+      "bytes": 17898,
+      "blob_sha1": "c183bdb09d70bc0879eac269f297bfd9564307b3",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-download-client.test.ts",
+      "bytes": 6809,
+      "blob_sha1": "39b0c5f723ba46202540cb6faa444d0afd5f6d52",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-lifecycle-contract.test.ts",
+      "bytes": 3670,
+      "blob_sha1": "cdffed2342292b985c5bd86093718cc48300e868",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-pagination.test.ts",
+      "bytes": 3061,
+      "blob_sha1": "c7f2ec828182fc3c4c90fadcdecf6cc1ee45fd3a",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-processing-authority.test.ts",
+      "bytes": 3197,
+      "blob_sha1": "b57148cc921209ecee1890d555d8a768a38f4e33",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-processing-failure.test.ts",
+      "bytes": 26121,
+      "blob_sha1": "f17329115870d22cfb7c14efd49ed8d497126460",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/export-redaction-and-lease.test.ts",
+      "bytes": 4445,
+      "blob_sha1": "9d371e5f4f3c7206fa0c305f2be9ce9de983bb89",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/privacy-client-session.test.ts",
+      "bytes": 6608,
+      "blob_sha1": "16c9479b7b8365c202a862917985d2b9fbd810f0",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/privacy-workflows.test.ts",
+      "bytes": 5667,
+      "blob_sha1": "45c8df0b9bfead4ae465d809211ae90310749d50",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/protected-route-boundaries.test.ts",
+      "bytes": 1479,
+      "blob_sha1": "1609c322a3952e976b1732566d16cb3038ae70c8",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/release-proof-boundaries.test.ts",
+      "bytes": 5986,
+      "blob_sha1": "e2f23d6bb4b712db7bb7d01e3634c0968b780c65",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/security-boundaries.test.ts",
+      "bytes": 13097,
+      "blob_sha1": "342108059b39b66e6c6e2380d98f57c445d4ffc4",
+      "mode": "100644"
+    },
+    {
+      "path": "tools/check_secrets.py",
+      "bytes": 3184,
+      "blob_sha1": "6d132a486acbe6863a784922cefef8b80a9bd57d",
+      "mode": "100644"
+    },
+    {
+      "path": "tools/check_website.py",
+      "bytes": 2091,
+      "blob_sha1": "4159fffa969adf9c5995ae1fb1c5e6f160689c02",
+      "mode": "100644"
+    },
+    {
+      "path": "tools/validate_privacy_package.py",
+      "bytes": 21846,
+      "blob_sha1": "beb6b7ca499418ec54e441e7e3caf1b8b5ee2d91",
+      "mode": "100644"
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 929,
+      "blob_sha1": "6432c15a247b5da365e3d1efefb9fa8b7d16d43a",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/index.js",
+      "bytes": 4380,
+      "blob_sha1": "d222c13b579d2d476dc26d692219dbaee1665b88",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/lib/compile.js",
+      "bytes": 1691,
+      "blob_sha1": "70aced2464d1a6029d2c29ca1fda88b6830d1705",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/lib/constants.js",
+      "bytes": 1666,
+      "blob_sha1": "e83f5f5bf20b1b5a3483caf946b81fa0d01c2b85",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/lib/expand.js",
+      "bytes": 2987,
+      "blob_sha1": "fa96594a750d58210babb44402d9d5f67640e8ee",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/lib/parse.js",
+      "bytes": 7174,
+      "blob_sha1": "91fb5ee0b35b156d0416c7ee3140c880cbd9e44c",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/lib/stringify.js",
+      "bytes": 903,
+      "blob_sha1": "f5498e39cd44037e4c2126a5b21f6b0b4c5e083b",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/lib/utils.js",
+      "bytes": 2518,
+      "blob_sha1": "d19311fe044ad5157624077670dc297e8b53da49",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/LICENSE",
+      "bytes": 1091,
+      "blob_sha1": "9af4a67d206f24ecdbb5fdff2839041ca0bbd346",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/package.json",
+      "bytes": 1384,
+      "blob_sha1": "ea32dd71f224957c09a3d625febf4adddd3e4337",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/README.md",
+      "bytes": 21610,
+      "blob_sha1": "e684b7dc9102a4bd8a9d3e760f0ea78ce65b5f7c",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/SECURITY-FORK.md",
+      "bytes": 2215,
+      "blob_sha1": "61c3451b7a8b627db1fceec95e2f09f1e1c5646f",
+      "mode": "100644"
+    },
+    {
+      "path": "vendor/braces/UPSTREAM-PROVENANCE.json",
+      "bytes": 1695,
+      "blob_sha1": "2fe51e44858dcac89591c1387916a0fa5ee07474",
+      "mode": "100644"
+    },
+    {
+      "path": "VERSION.md",
+      "bytes": 1434,
+      "blob_sha1": "e5ece735503db1b7eb883274e076a797849b06c9",
+      "mode": "100644"
+    },
+    {
+      "path": "website/.nojekyll",
+      "bytes": 0,
+      "blob_sha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "mode": "100644"
+    },
+    {
+      "path": "website/404.html",
+      "bytes": 1453,
+      "blob_sha1": "a051dff7997463fc3bd9d30114576298d9dc4aaf",
+      "mode": "100644"
+    },
+    {
+      "path": "website/accessibility.html",
+      "bytes": 3163,
+      "blob_sha1": "ca141fc509c97e57c7ab3615b7f98d7fb5ad3462",
+      "mode": "100644"
+    },
+    {
+      "path": "website/CNAME",
+      "bytes": 16,
+      "blob_sha1": "1dbb8a3c370600b0df63aa4065cc9e146048908d",
+      "mode": "100644"
+    },
+    {
+      "path": "website/contact.html",
+      "bytes": 3861,
+      "blob_sha1": "e18846daeec237037bb08ba1b5b39a3856750fc8",
+      "mode": "100644"
+    },
+    {
+      "path": "website/control.css",
+      "bytes": 4015,
+      "blob_sha1": "2f1be51c26f5602e0d45518bd10117e50e232d1b",
+      "mode": "100644"
+    },
+    {
+      "path": "website/governance.html",
+      "bytes": 2880,
+      "blob_sha1": "d345a0166b4e95bdae858f0ae344237d035038ce",
+      "mode": "100644"
+    },
+    {
+      "path": "website/index.html",
+      "bytes": 7960,
+      "blob_sha1": "b9a64afec41a2bec75ff27134d16dffd70cbfd5b",
+      "mode": "100644"
+    },
+    {
+      "path": "website/legal.html",
+      "bytes": 3228,
+      "blob_sha1": "5c5c60eac3240e521d2c4e5521445f5df179ca01",
+      "mode": "100644"
+    },
+    {
+      "path": "website/principles.html",
+      "bytes": 2722,
+      "blob_sha1": "dd0424a4e3f79f597dc76f57f2ff7ef50e1b820c",
+      "mode": "100644"
+    },
+    {
+      "path": "website/PUBLISHING.md",
+      "bytes": 1879,
+      "blob_sha1": "3a4dff0f655a498847566d298be2d0ee8a69a893",
+      "mode": "100644"
+    },
+    {
+      "path": "website/README.md",
+      "bytes": 1426,
+      "blob_sha1": "ecb86a294a9e2865c641d950d1126ea0ee97af89",
+      "mode": "100644"
+    },
+    {
+      "path": "website/rights.html",
+      "bytes": 2847,
+      "blob_sha1": "147c75fe8b66df8ac7adf888fc6e361d26d621f1",
+      "mode": "100644"
+    },
+    {
+      "path": "website/robots.txt",
+      "bytes": 69,
+      "blob_sha1": "63779d6f4a7ae29f2491bcbaed58b40daa1b2b83",
+      "mode": "100644"
+    },
+    {
+      "path": "website/sitemap.xml",
+      "bytes": 594,
+      "blob_sha1": "efbab408439b9f0143ce87128c34067edaf1df7b",
+      "mode": "100644"
+    },
+    {
+      "path": "website/status.html",
+      "bytes": 2542,
+      "blob_sha1": "0b8f96f201c4a96963acc82d5afd26ff474a6e9e",
+      "mode": "100644"
+    },
+    {
+      "path": "website/styles.css",
+      "bytes": 5378,
+      "blob_sha1": "0c606c91e4f2c6a0f9dde5fb04b5855482070a81",
+      "mode": "100644"
+    }
+  ]
+}
