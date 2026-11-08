@@ -27,6 +27,7 @@ import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { cleanupExportArtifactAttempts } from "./export-attempt-maintenance";
 import { canonicalGcsGeneration, matchingExportObjectMetadata, exactExportArtifactPath, approvedExportCleanupGeneration } from "./export-object-generation-policy";
 import { deleteApprovedExportArtifact } from "./export-generation-cleanup";
+import { sameCompletedExportForCleanup } from "./export-cleanup-state-policy";
 import { evaluateConsentDecision, CONSENT_DECISION_POLICY_VERSION } from "./consent-decision";
 import { createPrivacyActorGuard } from "./privacy-actor-guard";
 import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
@@ -272,80 +273,98 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
 });
 
 async function cleanupJob(document: QueryDocumentSnapshot<DocumentData>, now: number) {
-  const job = document.data();
-  const uid = text(job.uid);
-  const requestId = text(job.requestId);
-  const jobId = document.id;
-  const packageExpiresAt = resolveExportPackageExpiry(job);
-  if (!packageExpiresAt || packageExpiresAt > now) return false;
-  if (!uid || !requestId) {
-    await document.ref.update({
-      status: "cleanup_blocked",
-      complete: false,
-      cleanupStatus: "failed",
-      cleanupUpdatedAt: FieldValue.serverTimestamp(),
-      cleanupReason: "INVALID_EXPORT_IDENTIFIERS"
-    });
-    return false;
-  }
-
-  const paths = [job.exportPackagePath, job.exportManifestPath];
-  if (!paths.every((path) => validExportObjectPath({ uid, jobId, path }))) {
-    await document.ref.update({
-      status: "cleanup_blocked",
-      complete: false,
-      cleanupStatus: "failed",
-      cleanupUpdatedAt: FieldValue.serverTimestamp(),
-      cleanupReason: "INVALID_EXPORT_PATH"
-    });
-    await writeAudit({
-      actorUid: "system",
-      actorRole: "system",
-      action: "export_cleanup_failed",
-      targetUid: uid,
-      requestId,
-      metadata: { jobId, reason: "INVALID_EXPORT_PATH" }
-    });
-    return false;
-  }
-
-  const binding = {
-    uid, jobId, exportPath: job.exportPackagePath, manifestPath: job.exportManifestPath,
-    exportGeneration: job.exportGeneration, manifestGeneration: job.manifestGeneration
-  };
-  if ((paths as string[]).some((path) => !approvedExportCleanupGeneration({ ...binding, path }))) {
-    await document.ref.update({
-      status: "cleanup_blocked", complete: false, cleanupStatus: "failed",
-      cleanupReason: "MISSING_EXACT_EXPORT_GENERATION",
-      cleanupUpdatedAt: FieldValue.serverTimestamp()
-    });
-    return false;
-  }
-  for (const path of paths as string[]) {
-    await deleteApprovedExportArtifact({ ...binding, path });
-  }
-
-  await db.runTransaction(async (tx) => {
+  const cleanupToken = randomUUID();
+  const claim = await db.runTransaction(async (tx) => {
     const fresh = await tx.get(document.ref);
-    if (!fresh.exists || fresh.data()?.status !== "completed") return;
+    if (!fresh.exists) return null;
+    const job = fresh.data() ?? {};
+    const uid = text(job.uid);
+    const requestId = text(job.requestId);
+    const jobId = document.id;
+    const packageExpiresAt = resolveExportPackageExpiry(job);
+    const binding = {
+      uid, jobId, requestId,
+      exportPath: job.exportPackagePath,
+      manifestPath: job.exportManifestPath,
+      exportGeneration: job.exportGeneration,
+      manifestGeneration: job.manifestGeneration
+    };
+    const expected = {
+      uid, requestId, exportPath: text(binding.exportPath), manifestPath: text(binding.manifestPath),
+      exportGeneration: text(binding.exportGeneration), manifestGeneration: text(binding.manifestGeneration),
+      packageExpiresAtMillis: packageExpiresAt ?? Number.NaN
+    };
+    if (!packageExpiresAt || packageExpiresAt > now || job.status !== "completed") return null;
+    if (!uid || !requestId || !sameCompletedExportForCleanup(job, expected, now, packageExpiresAt)
+      || ![binding.exportPath, binding.manifestPath].every(path =>
+        approvedExportCleanupGeneration({ ...binding, path }))) {
+      tx.update(document.ref, {
+        status: "cleanup_blocked", complete: false, cleanupStatus: "failed",
+        cleanupReason: "INVALID_EXACT_EXPORT_CLEANUP_IDENTITY",
+        cleanupUpdatedAt: FieldValue.serverTimestamp()
+      });
+      return null;
+    }
+    const pendingPaths = [binding.exportPath, binding.manifestPath] as string[];
     tx.update(document.ref, {
-      status: "expired",
-      cleanupStatus: "completed",
-      cleanupUpdatedAt: FieldValue.serverTimestamp(),
-      packageDeletedAt: FieldValue.serverTimestamp(),
-      packageExpiresAt: Timestamp.fromMillis(packageExpiresAt)
+      status: "artifact_cleanup", complete: false,
+      artifactCleanupStatus: "processing",
+      artifactCleanupLeaseToken: cleanupToken,
+      artifactCleanupLeaseExpiresAt: Timestamp.fromMillis(now + FAILED_ARTIFACT_CLEANUP_LEASE_MS),
+      artifactCleanupPendingPaths: pendingPaths,
+      artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
     });
+    return { ...binding, packageExpiresAt, pendingPaths };
   });
-
+  if (!claim) return false;
+  const cleanup = await removeExportArtifacts(claim.pendingPaths, async path => {
+    await deleteApprovedExportArtifact({ ...claim, path });
+  });
+  await db.runTransaction(async tx => {
+    const fresh = await tx.get(document.ref);
+    const current = fresh.data() ?? {};
+    if (!fresh.exists || current.status !== "artifact_cleanup"
+      || current.artifactCleanupStatus !== "processing"
+      || current.artifactCleanupLeaseToken !== cleanupToken
+      || current.uid !== claim.uid || current.requestId !== claim.requestId
+      || current.exportPackagePath !== claim.exportPath || current.exportManifestPath !== claim.manifestPath
+      || current.exportGeneration !== claim.exportGeneration
+      || current.manifestGeneration !== claim.manifestGeneration
+      || resolveExportPackageExpiry(current) !== claim.packageExpiresAt) {
+      throw new Error("Export expiry cleanup claim changed before finalization.");
+    }
+    if (cleanup.pendingPaths.length === 0) {
+      tx.update(document.ref, {
+        status: "expired", cleanupStatus: "completed",
+        artifactCleanupStatus: "completed", artifactCleanupPendingPaths: [],
+        packageDeletedAt: FieldValue.serverTimestamp(),
+        packageExpiresAt: Timestamp.fromMillis(claim.packageExpiresAt),
+        cleanupUpdatedAt: FieldValue.serverTimestamp(),
+        artifactCleanupLeaseToken: FieldValue.delete(),
+        artifactCleanupLeaseExpiresAt: FieldValue.delete()
+      });
+    } else {
+      tx.update(document.ref, {
+        status: "failed", complete: false,
+        artifactCleanupStatus: "incomplete",
+        artifactCleanupPendingPaths: cleanup.pendingPaths,
+        artifactCleanupFailureCount: cleanup.pendingPaths.length,
+        artifactCleanupUpdatedAt: FieldValue.serverTimestamp(),
+        artifactCleanupLeaseToken: FieldValue.delete(),
+        artifactCleanupLeaseExpiresAt: FieldValue.delete()
+      });
+    }
+  });
   await writeAudit({
-    actorUid: "system",
-    actorRole: "system",
-    action: "export_package_expired_and_deleted",
-    targetUid: uid,
-    requestId,
-    metadata: { jobId, packageExpiresAt, paths }
+    actorUid: "system", actorRole: "system",
+    action: cleanup.pendingPaths.length ? "export_cleanup_incomplete" : "export_package_expired_and_deleted",
+    targetUid: claim.uid, requestId: claim.requestId,
+    metadata: {
+      jobId: document.id, packageExpiresAt: claim.packageExpiresAt,
+      targetCount: cleanup.targetCount, pendingCount: cleanup.pendingPaths.length
+    }
   });
-  return true;
+  return cleanup.pendingPaths.length === 0;
 }
 
 async function cleanupFailedJob(document: QueryDocumentSnapshot<DocumentData>) {
@@ -537,40 +556,11 @@ export const cleanupExpiredExportPackages = onSchedule(
         try {
           if (await cleanupJob(document, now)) deleted += 1;
         } catch (error) {
-          const job = document.data();
-          const uid = text(job.uid);
-          const requestId = text(job.requestId);
-          const paths = [job.exportPackagePath, job.exportManifestPath]
-            .filter((value): value is string => typeof value === "string");
-          if (uid && requestId && paths.length > 0
-            && paths.every((value) => validExportObjectPath({ uid, jobId: document.id, path: value }))) {
-            await document.ref.update({
-              status: "failed",
-              complete: false,
-              artifactCleanupStatus: "incomplete",
-              artifactCleanupPendingPaths: paths,
-              artifactCleanupFailureCount: paths.length,
-              artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
-            });
-          } else {
-            await document.ref.update({
-              status: "cleanup_blocked",
-              complete: false,
-              cleanupStatus: "failed",
-              cleanupReason: "INVALID_EXPORT_CLEANUP_FAILURE",
-              cleanupUpdatedAt: FieldValue.serverTimestamp()
-            });
-          }
-          if (uid && requestId) {
-            await writeAudit({
-              actorUid: "system",
-              actorRole: "system",
-              action: "export_cleanup_failed",
-              targetUid: uid,
-              requestId,
-              metadata: { jobId: document.id, reasonHash: digest(error) }
-            }).catch(() => undefined);
-          }
+          // Never overwrite a newer export/cleanup lease from the stale page snapshot.
+          // The claimed lease remains recoverable by reclaimExpiredCleanupClaim.
+          console.error("Export expiry cleanup failed without state overwrite", {
+            jobId: document.id, reasonHash: digest(error)
+          });
         }
       }
 
