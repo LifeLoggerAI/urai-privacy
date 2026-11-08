@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { FieldPath, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { EXPORT_CLEANUP_MAX_PAGES, EXPORT_CLEANUP_PAGE_SIZE, timestampMillis, resolveExportPackageExpiry } from "./export-lifecycle-contract";
-import { attemptCleanupBlockReason } from "./export-cleanup-state-policy";
+import { attemptCleanupBlockReason, attemptCleanupFinalizationBlockReason } from "./export-cleanup-state-policy";
 import { exportAttemptPaths } from "./export-processing-authority";
 import { approvedExportCleanupGeneration } from "./export-object-generation-policy";
 import { deleteApprovedExportArtifact } from "./export-generation-cleanup";
@@ -91,22 +91,30 @@ export async function cleanupExportArtifactAttempts(now: number) {
             });
             return null;
           }
-          const ownsProcessing = jobData.status === "processing" && jobData.processingLeaseToken === token
-            && jobData.uid === uid && jobData.requestId === requestId;
-          const ownsCompleted = jobData.status === "completed" && jobData.exportPackagePath === expectedPaths[0]
-            && jobData.uid === uid && jobData.requestId === requestId;
-          if (ownsProcessing) {
-            tx.update(jobRef, {
-              status: "failed", complete: false, processingLeaseToken: FieldValue.delete(),
-              processingLeaseExpiresAt: FieldValue.delete(), processingBy: FieldValue.delete(),
-              artifactCleanupStatus: "incomplete", artifactCleanupPendingPaths: paths,
-              updatedAt: FieldValue.serverTimestamp()
-            });
-            if (request.exists && request.data()?.uid === uid && request.data()?.status === "processing") {
-              tx.update(requestRef, { status: "failed", updatedAt: FieldValue.serverTimestamp() });
-            }
-          } else if (ownsCompleted) {
-            tx.update(jobRef, { status: "expired", complete: false, updatedAt: FieldValue.serverTimestamp() });
+          const ownsProcessing = jobData.status === "processing";
+          // The claim policy above established either an expired matching
+          // processing attempt or an expired matching completed package.
+          const cleanupLeaseExpiresAt = Timestamp.fromMillis(now + CLEANUP_LEASE_MS);
+          tx.update(jobRef, {
+            status: "artifact_cleanup", complete: false,
+            artifactCleanupStatus: "processing",
+            artifactCleanupLeaseToken: cleanupToken,
+            artifactCleanupLeaseExpiresAt: cleanupLeaseExpiresAt,
+            artifactCleanupPendingPaths: paths,
+            artifactCleanupUpdatedAt: FieldValue.serverTimestamp(),
+            exportPackagePath: expectedPaths[0],
+            exportManifestPath: expectedPaths[1],
+            exportGeneration: attempt.exportGeneration,
+            manifestGeneration: attempt.manifestGeneration,
+            ...(ownsProcessing ? {
+              processingLeaseToken: FieldValue.delete(),
+              processingLeaseExpiresAt: FieldValue.delete(),
+              processingBy: FieldValue.delete()
+            } : {})
+          });
+          if (ownsProcessing && request.exists && request.data()?.uid === uid
+            && request.data()?.status === "processing") {
+            tx.update(requestRef, { status: "failed", updatedAt: FieldValue.serverTimestamp() });
           }
           if (fence.exists && fence.data()?.exportProcessingJobId === jobId && fence.data()?.exportProcessingLeaseToken === token) {
             tx.update(fenceRef, {
@@ -117,32 +125,66 @@ export async function cleanupExportArtifactAttempts(now: number) {
           }
           tx.update(document.ref, {
             status: "artifact_cleanup", cleanupLeaseToken: cleanupToken,
-            cleanupLeaseExpiresAt: Timestamp.fromMillis(now + CLEANUP_LEASE_MS), updatedAt: FieldValue.serverTimestamp()
+            cleanupLeaseExpiresAt, updatedAt: FieldValue.serverTimestamp()
           });
-          return { ...binding, requestId, paths: paths as string[] };
+          return { ...binding, requestId, paths: paths as string[],
+            attemptToken: token, cleanupToken, originalCompleted: !ownsProcessing };
         });
         if (!claim) continue;
         const cleanup = await removeExportArtifacts(claim.paths, async (path) => {
           await deleteApprovedExportArtifact({ ...claim, path });
         });
         await db.runTransaction(async (tx) => {
-          const fresh = await tx.get(document.ref);
-          // Account deletion can remove the ledger while cleanup is in flight.
-          if (!fresh.exists || fresh.data()?.cleanupLeaseToken !== cleanupToken) return;
+          const jobRef = db.collection("exportJobs").doc(claim.jobId);
+          const [fresh, currentJob] = await Promise.all([
+            tx.get(document.ref), tx.get(jobRef)
+          ]);
+          if (!fresh.exists || !currentJob.exists) {
+            // Deletion may have erased both records; never re-create them.
+            return;
+          }
+          const block = attemptCleanupFinalizationBlockReason({
+            attempt: fresh.data() ?? {}, job: currentJob.data() ?? {},
+            authority: {
+              uid: claim.uid, jobId: claim.jobId, requestId: claim.requestId,
+              attemptToken: claim.attemptToken, cleanupToken,
+              exportPath: claim.exportPath, manifestPath: claim.manifestPath,
+              exportGeneration: claim.exportGeneration, manifestGeneration: claim.manifestGeneration,
+              paths: claim.paths
+            },
+            nowMillis: Date.now(),
+            attemptLeaseExpiresAtMillis: timestampMillis(fresh.data()?.cleanupLeaseExpiresAt),
+            jobLeaseExpiresAtMillis: timestampMillis(currentJob.data()?.artifactCleanupLeaseExpiresAt)
+          });
+          if (block) throw new Error("Export attempt cleanup finalization authority changed: " + block);
+          const pending = cleanup.pendingPaths.length !== 0;
+          tx.update(jobRef, {
+            status: pending ? "failed" : (claim.originalCompleted ? "expired" : "failed"),
+            complete: false,
+            artifactCleanupStatus: pending ? "incomplete" : "completed",
+            artifactCleanupPendingPaths: cleanup.pendingPaths,
+            artifactCleanupFailureCount: cleanup.pendingPaths.length,
+            artifactCleanupLeaseToken: FieldValue.delete(),
+            artifactCleanupLeaseExpiresAt: FieldValue.delete(),
+            artifactCleanupUpdatedAt: FieldValue.serverTimestamp()
+          });
           tx.update(document.ref, {
-            status: cleanup.pendingPaths.length ? "cleanup_pending" : "cleaned",
+            status: pending ? "cleanup_pending" : "cleaned",
             paths: cleanup.pendingPaths,
             cleanupFailureCount: cleanup.pendingPaths.length,
-            cleanupDueAt: cleanup.pendingPaths.length ? Timestamp.fromMillis(now) : FieldValue.delete(),
+            // Failed-job recovery owns any remaining paths; do not repeatedly
+            // claim an attempt that can no longer have processing/completed status.
+            cleanupDueAt: FieldValue.delete(),
             cleanupLeaseToken: FieldValue.delete(), cleanupLeaseExpiresAt: FieldValue.delete(),
             updatedAt: FieldValue.serverTimestamp()
           });
           const auditRef = db.collection("auditLogs").doc();
           const audit = {
             actorUid: "system", actorRole: "system", source: "system",
-            action: cleanup.pendingPaths.length ? "export_attempt_cleanup_incomplete" : "export_attempt_cleanup_completed",
+            action: pending ? "export_attempt_cleanup_incomplete" : "export_attempt_cleanup_completed",
             targetUid: claim.uid, requestId: claim.requestId,
-            metadata: { jobId: claim.jobId, attemptToken: document.id, targetCount: cleanup.targetCount, pendingCount: cleanup.pendingPaths.length }
+            metadata: { jobId: claim.jobId, attemptToken: document.id,
+              targetCount: cleanup.targetCount, pendingCount: cleanup.pendingPaths.length }
           };
           tx.create(auditRef, {
             ...audit, timestamp: FieldValue.serverTimestamp(),
