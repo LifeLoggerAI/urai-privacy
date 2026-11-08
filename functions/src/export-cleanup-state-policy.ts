@@ -43,3 +43,57 @@ export function attemptCleanupBlockReason(args: {
   }
   return "ACTIVE_SUPERSEDED_OR_UNEXPIRED_EXPORT";
 }
+
+/** A stale cleanup worker must never finalize a replacement job or attempt. */
+export type ExportAttemptCleanupFinalizationAuthority = Readonly<{
+  uid: string;
+  jobId: string;
+  requestId: string;
+  attemptToken: string;
+  cleanupToken: string;
+  exportPath: string;
+  manifestPath: string;
+  exportGeneration: string;
+  manifestGeneration: string;
+  paths: readonly string[];
+}>;
+
+export function attemptCleanupFinalizationBlockReason(args: {
+  attempt: Record<string, unknown>;
+  job: Record<string, unknown>;
+  authority: ExportAttemptCleanupFinalizationAuthority;
+  nowMillis: number;
+  attemptLeaseExpiresAtMillis: number | null;
+  jobLeaseExpiresAtMillis: number | null;
+}): string | null {
+  const { attempt, job, authority, nowMillis, attemptLeaseExpiresAtMillis, jobLeaseExpiresAtMillis } = args;
+  if (attempt.status !== "artifact_cleanup" || attempt.uid !== authority.uid
+    || attempt.jobId !== authority.jobId || attempt.requestId !== authority.requestId
+    || attempt.token !== authority.attemptToken || attempt.cleanupLeaseToken !== authority.cleanupToken
+    || attempt.exportGeneration !== authority.exportGeneration
+    || attempt.manifestGeneration !== authority.manifestGeneration
+    || !Array.isArray(attempt.paths) || attempt.paths.length !== authority.paths.length
+    || !attempt.paths.every((path, i) => path === authority.paths[i])) {
+    return "ATTEMPT_CLEANUP_AUTHORITY_CHANGED";
+  }
+  if (job.status !== "artifact_cleanup" || job.artifactCleanupStatus !== "processing"
+    || job.uid !== authority.uid || job.requestId !== authority.requestId
+    || job.artifactCleanupLeaseToken !== authority.cleanupToken
+    || job.exportPackagePath !== authority.exportPath
+    || job.exportManifestPath !== authority.manifestPath
+    || job.exportGeneration !== authority.exportGeneration
+    || job.manifestGeneration !== authority.manifestGeneration
+    || !Array.isArray(job.artifactCleanupPendingPaths)
+    || job.artifactCleanupPendingPaths.length !== authority.paths.length
+    || !job.artifactCleanupPendingPaths.every((path, i) => path === authority.paths[i])) {
+    return "JOB_CLEANUP_AUTHORITY_CHANGED";
+  }
+  if (!Number.isSafeInteger(nowMillis)
+    || !Number.isSafeInteger(attemptLeaseExpiresAtMillis)
+    || !Number.isSafeInteger(jobLeaseExpiresAtMillis)
+    || attemptLeaseExpiresAtMillis! <= nowMillis
+    || jobLeaseExpiresAtMillis! <= nowMillis) {
+    return "CLEANUP_LEASE_EXPIRED";
+  }
+  return null;
+}
