@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { FieldPath, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
-import { EXPORT_CLEANUP_MAX_PAGES, EXPORT_CLEANUP_PAGE_SIZE, timestampMillis } from "./export-lifecycle-contract";
+import { EXPORT_CLEANUP_MAX_PAGES, EXPORT_CLEANUP_PAGE_SIZE, timestampMillis, resolveExportPackageExpiry } from "./export-lifecycle-contract";
+import { attemptCleanupBlockReason } from "./export-cleanup-state-policy";
 import { exportAttemptPaths } from "./export-processing-authority";
 import { approvedExportCleanupGeneration } from "./export-object-generation-policy";
 import { deleteApprovedExportArtifact } from "./export-generation-cleanup";
@@ -69,6 +70,27 @@ export async function cleanupExportArtifactAttempts(now: number) {
           const fenceRef = db.collection("privacyDeletionTombstones").doc(uid);
           const [job, fence, request] = await Promise.all([tx.get(jobRef), tx.get(fenceRef), tx.get(requestRef)]);
           const jobData = job.data() ?? {};
+          const jobLeaseExpiresAtMillis = timestampMillis(jobData.processingLeaseExpiresAt);
+          const packageExpiresAtMillis = resolveExportPackageExpiry(jobData);
+          const block = attemptCleanupBlockReason({
+            attempt, job: jobData, uid, jobId, requestId, token,
+            exportPath: expectedPaths[0], manifestPath: expectedPaths[1],
+            nowMillis: now, jobLeaseExpiresAtMillis, packageExpiresAtMillis
+          });
+          if (block) {
+            // Reevaluate after a lease/expiry. Never delete an active or
+            // superseded job's objects because an old attempt became due.
+            tx.update(document.ref, {
+              cleanupReason: block,
+              cleanupDueAt: Timestamp.fromMillis(Math.max(
+                now + CLEANUP_LEASE_MS,
+                jobLeaseExpiresAtMillis ?? 0,
+                packageExpiresAtMillis ?? 0
+              )),
+              updatedAt: FieldValue.serverTimestamp()
+            });
+            return null;
+          }
           const ownsProcessing = jobData.status === "processing" && jobData.processingLeaseToken === token
             && jobData.uid === uid && jobData.requestId === requestId;
           const ownsCompleted = jobData.status === "completed" && jobData.exportPackagePath === expectedPaths[0]
