@@ -204,6 +204,7 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
     }
 
     const evaluated = evaluateConsentDecision({
+      subjectUid: targetUid,
       purpose,
       record: snapshot.exists ? snapshot.data() : null
     });
