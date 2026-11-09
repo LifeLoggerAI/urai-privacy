@@ -8,6 +8,7 @@ import {
   consentPurposeRegistry,
   evaluateConsentDecision,
   isRegisteredConsentPurpose,
+  LIFE_MOVIE_RENDER_CONSENT_PURPOSE,
   type ConsentPurpose
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
@@ -15,7 +16,6 @@ import { crossUserAuthority as crossUserAuthorityOwnClaims } from "./cross-user-
 import { evaluateLifeMovieRenderAuthorization } from "./life-movie-render-authorization";
 import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
 import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
-import { LIFE_MOVIE_RENDER_CONSENT_PURPOSE, LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION } from "./consent-decision";
 
 const db = getFirestore();
 
