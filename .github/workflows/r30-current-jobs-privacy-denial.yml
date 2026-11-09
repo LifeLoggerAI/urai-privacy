@@ -40,6 +40,12 @@ jobs:
           persist-credentials: false
           show-progress: false
 
+      - name: Setup Java 21 for Firebase emulators
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Prepare credential-free pinned execution
         shell: bash
         run: |
