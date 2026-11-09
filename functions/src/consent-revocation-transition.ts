@@ -27,3 +27,24 @@ export function selectConsentRevocationSource(
 
   return after ?? before;
 }
+
+/**
+ * Carry the receipt of the previously granted consent separately from
+ * sourceReceiptHash, which may be the later denial/revocation receipt.
+ *
+ * "present" validates the digest's format ONLY, not its signature,
+ * provenance, live canonical authority, or any downstream purge.
+ */
+export function priorGrantReceiptEvidence(before: ConsentRecordSnapshot): {
+  priorGrantReceiptHash: string | null;
+  priorGrantEvidenceState: "present" | "missing_or_invalid" | "not_applicable";
+} {
+  if (before?.status !== "granted") {
+    return { priorGrantReceiptHash: null, priorGrantEvidenceState: "not_applicable" };
+  }
+  const hash = before.receiptHash;
+  if (typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) {
+    return { priorGrantReceiptHash: null, priorGrantEvidenceState: "missing_or_invalid" };
+  }
+  return { priorGrantReceiptHash: hash, priorGrantEvidenceState: "present" };
+}

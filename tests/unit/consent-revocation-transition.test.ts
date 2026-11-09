@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectConsentRevocationSource } from "../../functions/src/consent-revocation-transition";
+import { priorGrantReceiptEvidence, selectConsentRevocationSource } from "../../functions/src/consent-revocation-transition";
 
 const granted = {
   uid: "subject-1",
@@ -51,5 +51,48 @@ describe("consent revocation transition selection", () => {
     const revoked = { ...granted, status: "revoked", receiptHash: "d".repeat(64) };
     expect(selectConsentRevocationSource(revoked, { ...revoked })).toBeNull();
     expect(selectConsentRevocationSource({ ...granted, status: "denied" }, null)).toBeNull();
+  });
+});
+
+describe("prior granted receipt evidence", () => {
+  it("preserves the original approved receipt when the new denial has a different receipt", () => {
+    const denied = { ...granted, status: "denied", receiptHash: "b".repeat(64) };
+    expect(selectConsentRevocationSource(granted, denied)).toEqual(denied);
+    expect(priorGrantReceiptEvidence(granted)).toEqual({
+      priorGrantReceiptHash: "a".repeat(64),
+      priorGrantEvidenceState: "present"
+    });
+  });
+
+  it("preserves the original owner receipt when the replacement changes owner", () => {
+    const replacement = { ...granted, uid: "subject-2", status: "revoked", receiptHash: "b".repeat(64) };
+    expect(selectConsentRevocationSource(granted, replacement)).toEqual(granted);
+    expect(priorGrantReceiptEvidence(granted).priorGrantReceiptHash).toEqual("a".repeat(64));
+  });
+
+  it.each([null, { ...granted, status: "denied" }, { ...granted, status: "revoked" }])(
+    "does not invent a prior grant for missing/non-granted records",
+    (before) => {
+      expect(priorGrantReceiptEvidence(before)).toEqual({
+        priorGrantReceiptHash: null,
+        priorGrantEvidenceState: "not_applicable"
+      });
+    }
+  );
+
+  it.each([null, "", "Z".repeat(64), "a".repeat(63), 999, {}])(
+    "flags absent, malformed or noncanonical prior hashes without certifying them: %s",
+    (receiptHash) => {
+      expect(priorGrantReceiptEvidence({ ...granted, receiptHash })).toEqual({
+        priorGrantReceiptHash: null,
+        priorGrantEvidenceState: "missing_or_invalid"
+      });
+    }
+  );
+
+  it("retains the old receipt through a granted-to-granted identity replacement", () => {
+    const replacement = { ...granted, purpose: "data.export", receiptHash: "b".repeat(64) };
+    expect(selectConsentRevocationSource(granted, replacement)).toEqual(granted);
+    expect(priorGrantReceiptEvidence(granted).priorGrantReceiptHash).toBe(granted.receiptHash);
   });
 });

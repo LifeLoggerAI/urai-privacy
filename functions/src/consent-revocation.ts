@@ -3,7 +3,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { selectConsentRevocationSource } from "./consent-revocation-transition";
+import { priorGrantReceiptEvidence, selectConsentRevocationSource } from "./consent-revocation-transition";
 
 const db = getFirestore();
 const REVOCATION_SCHEMA_VERSION = "consent.revoked.v1";
@@ -39,6 +39,7 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
   const after = event.data?.after.exists ? event.data.after.data() ?? null : null;
   const source = selectConsentRevocationSource(before, after);
   if (!source) return;
+  const priorGrant = priorGrantReceiptEvidence(before);
 
   const uid = typeof source.uid === "string" ? source.uid : "";
   const purpose = typeof source.purpose === "string" ? source.purpose : "";
@@ -73,11 +74,12 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
       consentTier,
       policyVersion,
       sourceReceiptHash: receiptHash,
+      ...priorGrant,
       status: "pending",
       attempts: 0,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-      integrityHash: digest({ eventId, recordId, uid, purpose })
+      integrityHash: digest({ eventId, recordId, uid, purpose, ...priorGrant })
     });
   });
 });
