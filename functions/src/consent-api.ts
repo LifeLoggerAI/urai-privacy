@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
@@ -10,6 +11,11 @@ import {
   type ConsentPurpose
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
+import { crossUserAuthority as crossUserAuthorityOwnClaims } from "./cross-user-authority";
+import { evaluateLifeMovieRenderAuthorization } from "./life-movie-render-authorization";
+import { checkedLifeMovieDeletionState } from "./life-movie-deletion-fence";
+import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from "./life-movie-jobs-identity";
+import { LIFE_MOVIE_RENDER_CONSENT_PURPOSE, LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION } from "./consent-decision";
 
 const db = getFirestore();
 
@@ -237,4 +243,110 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
   });
 
   return { ...decision, targetUid, correlationId: parsed.data.correlationId, decisionEventId: accessRef.id };
+});
+
+
+// This dedicated endpoint is deliberately denial-only until the canonical
+// Life Movie purpose is approved and registered by Privacy/legal. No grant
+// issuer or renderer is created here.
+const lifeMovieRenderScopeSchema = z.object({
+  projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
+  renderPlanDigest: z.string().regex(/^[0-9a-f]{64}$/),
+  sourceSetDigest: z.string().regex(/^[0-9a-f]{64}$/)
+}).strict();
+
+const lifeMovieVerificationSchema = z.object({
+  subjectUid: z.string().trim().min(1).max(160),
+  tenantId: z.string().trim().min(1).max(160),
+  correlationId: z.string().trim().min(8).max(160),
+  decisionReceiptId: z.string().regex(/^[0-9a-f]{64}$/),
+  policyVersion: z.string().trim().min(1).max(80),
+  renderScope: lifeMovieRenderScopeSchema
+}).strict();
+
+/** Jobs-only current decision. It never issues a grant or reusable capability. */
+export const verifyLifeMovieRenderConsent = onCall(async (request) => {
+  const actorUid = uidFrom(request);
+  const authority = crossUserAuthorityOwnClaims(request.auth?.token);
+  if (!authority || authority.role !== "system" || authority.consumerId !== "urai-jobs" ||
+      !isTrustedJobsConsentCaller(
+        { uid: actorUid, token: request.auth?.token },
+        process.env.URAI_PRIVACY_JOBS_VERIFIER_UID
+      )) {
+    throw new HttpsError("permission-denied", "A dedicated verified Jobs system identity is required.");
+  }
+
+  // Reverify the authenticated bearer with revocation checking before looking
+  // up any subject consent record. The inbound Studio/user token is never used.
+  const currentJobsIdentity = await isTrustedActiveJobsConsentCaller(
+    { uid: actorUid, token: request.auth?.token },
+    process.env.URAI_PRIVACY_JOBS_VERIFIER_UID,
+    request.rawRequest?.headers.authorization,
+    (idToken, checkRevoked) => getAuth().verifyIdToken(idToken, checkRevoked)
+  );
+  if (!currentJobsIdentity) {
+    throw new HttpsError("permission-denied", "Current Jobs service identity verification is required.");
+  }
+
+  const parsed = lifeMovieVerificationSchema.safeParse(request.data ?? {});
+  if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid Life Movie verification request.");
+
+  const { subjectUid, tenantId, correlationId, decisionReceiptId, policyVersion, renderScope } = parsed.data;
+  const purpose = LIFE_MOVIE_RENDER_CONSENT_PURPOSE;
+  const recordId = consentRecordId(subjectUid, purpose);
+  const recordRef = db.collection("consentRecords").doc(recordId);
+  const tombstoneRef = db.collection("privacyDeletionTombstones").doc(subjectUid);
+  const accessRef = db.collection("dataAccessEvents").doc();
+
+  return await db.runTransaction(async (transaction) => {
+    const [recordSnapshot, tombstone] = await Promise.all([
+      transaction.get(recordRef),
+      transaction.get(tombstoneRef)
+    ]);
+    const record = recordSnapshot.exists ? recordSnapshot.data() : null;
+    const { evaluated, allowed, reason } = evaluateLifeMovieRenderAuthorization({
+      record,
+      deletionActive: checkedLifeMovieDeletionState(tombstone),
+      subjectUid,
+      tenantId,
+      decisionReceiptId,
+      policyVersion,
+      renderScope
+    });
+    transaction.create(accessRef, {
+      uid: subjectUid,
+      actorUid,
+      actorRole: "system",
+      consumerId: authority.consumerId,
+      tenantId,
+      purpose,
+      correlationId,
+      decision: allowed ? "allow" : "deny",
+      reason,
+      policyVersion: evaluated.policyVersion,
+      renderScopeHash: hash(renderScope),
+      consentRecordId: recordSnapshot.exists ? recordId : null,
+      evaluatedAt: FieldValue.serverTimestamp(),
+      integrityHash: hash({
+        subjectUid, actorUid, tenantId, purpose, correlationId,
+        receiptHash: decisionReceiptId, renderScopeHash: hash(renderScope),
+        allowed, reason, eventId: accessRef.id
+      })
+    });
+    return {
+      allowed,
+      reason,
+      subjectUid,
+      tenantId,
+      purpose,
+      correlationId,
+      policyVersion: evaluated.policyVersion,
+      requiredTier: evaluated.requiredTier,
+      receiptHash: null,
+      expiresAt: null,
+      renderScope: null,
+      evaluatedAt: evaluated.evaluatedAt,
+      decisionEventId: accessRef.id
+    };
+  });
 });
