@@ -63,20 +63,6 @@ function consentRecordId(uid: string, purpose: string) {
   return `${uid}_${purpose.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
-function crossUserAuthority(token?: Record<string, unknown>) {
-  if (token?.admin === true || token?.role === "admin") {
-    return { role: "admin" as const, consumerId: null };
-  }
-
-  const system = token?.system === true || token?.role === "system";
-  const consumerId = typeof token?.consumerId === "string" ? token.consumerId.trim() : "";
-  if (system && /^[a-zA-Z0-9._-]{2,120}$/.test(consumerId)) {
-    return { role: "system" as const, consumerId };
-  }
-
-  return null;
-}
-
 export const setCanonicalConsent = onCall(async (request) => {
   const uid = uidFrom(request);
   const parsed = setConsentSchema.safeParse(request.data ?? {});
@@ -191,7 +177,7 @@ export const evaluateCanonicalConsent = onCall(async (request) => {
 
   const purpose = canonicalPurpose(parsed.data.purpose);
   const targetUid = parsed.data.targetUid ?? actorUid;
-  const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthority(request.auth?.token);
+  const authority = targetUid === actorUid ? { role: "user" as const, consumerId: null } : crossUserAuthorityOwnClaims(request.auth?.token);
   if (!authority) {
     throw new HttpsError("permission-denied", "Owner, administrator, or a consumer-bound trusted system authority is required.");
   }
