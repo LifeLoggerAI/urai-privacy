@@ -30,11 +30,23 @@ jobs:
           persist-credentials: false
           show-progress: false
 
+      - name: Require read-only cross-repository checkout credential
+        shell: bash
+        env:
+          R30_JOBS_READ_TOKEN: ${{ secrets.URAI_READONLY_REPO_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$R30_JOBS_READ_TOKEN" || {
+            echo "Missing URAI_READONLY_REPO_TOKEN; provide a GitHub credential restricted to contents:read on LifeLoggerAI/urai-jobs."
+            exit 1
+          }
+
       - name: Checkout exact Jobs R932 candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: LifeLoggerAI/urai-jobs
           ref: e8ba07fc26f154169f2e065d9aa65e77014635d2
+          token: ${{ secrets.URAI_READONLY_REPO_TOKEN }}
           path: jobs-source
           fetch-depth: 1
           persist-credentials: false
