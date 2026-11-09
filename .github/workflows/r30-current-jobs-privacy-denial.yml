@@ -1,0 +1,73 @@
+name: R30 current-source Jobs to Privacy denial emulator
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r30-current-jobs-privacy-denial-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  r30-native-denial:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_PRIVACY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      URAI_EXPECTED_PRIVACY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      URAI_JOBS_SOURCE_DIR: /tmp/urai-jobs-r932
+    steps:
+      - name: Checkout exact Privacy candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.TARGET_PRIVACY_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Checkout exact Jobs R932 candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: LifeLoggerAI/urai-jobs
+          ref: e8ba07fc26f154169f2e065d9aa65e77014635d2
+          path: jobs-source
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Prepare credential-free pinned execution
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_PRIVACY_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          test "$(git -C jobs-source rev-parse HEAD)" = "e8ba07fc26f154169f2e065d9aa65e77014635d2"
+          test -z "$(git -C jobs-source status --porcelain --untracked-files=all)"
+          mv "$GITHUB_WORKSPACE/jobs-source" /tmp/urai-jobs-r932
+          node --version
+          npm --version
+          npm install --global pnpm@8.15.9
+          test "$(pnpm --version)" = "8.15.9"
+          java -version
+          java -version 2>&1 | grep -Eq 'version "21\.'
+          mkdir -p artifacts/r30
+
+      - name: Execute exact-source R30 native denial acceptance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash scripts/run-r30-native-jobs-privacy-acceptance.sh 2>&1 | tee artifacts/r30/native-denial.log
+
+      - name: Upload R30 emulator evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r30-current-jobs-privacy-denial-${{ env.TARGET_PRIVACY_SHA }}
+          path: artifacts/r30
+          if-no-files-found: warn
+          retention-days: 90
