@@ -143,6 +143,12 @@ describe("R27 scoped Life Movie verifier — denial-only integration candidate",
     expect(crossUserAuthority(Object.create({ system: true, role: "system", consumerId: "urai-jobs" }))).toBe(null);
   });
 
+  it("routes the generic cross-user consent endpoint through the own-claims guard", () => {
+    const api = readFileSync("functions/src/consent-api.ts", "utf8");
+    expect(api).toContain("crossUserAuthorityOwnClaims(request.auth?.token)");
+    expect(api).not.toContain("function crossUserAuthority(");
+  });
+
   it("exports the verifier only as a denial-only callable, never as a grant writer", () => {
     const api = readFileSync("functions/src/consent-api.ts", "utf8");
     const entry = readFileSync("functions/src/functions-entry.ts", "utf8");
