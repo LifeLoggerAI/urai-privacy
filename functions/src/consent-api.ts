@@ -304,7 +304,7 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
       transaction.get(tombstoneRef)
     ]);
     const record = recordSnapshot.exists ? recordSnapshot.data() : null;
-    const { evaluated, allowed, reason } = evaluateLifeMovieRenderAuthorization({
+    const { evaluated, reason: evaluatedReason } = evaluateLifeMovieRenderAuthorization({
       record,
       deletionActive: checkedLifeMovieDeletionState(tombstone),
       subjectUid,
@@ -313,6 +313,10 @@ export const verifyLifeMovieRenderConsent = onCall(async (request) => {
       policyVersion,
       renderScope
     });
+    // R27 deliberately has no approved scoped-grant issuer or legal approval.
+    // Force denial even if a future fixture/document happens to look valid.
+    const allowed = false;
+    const reason = evaluated.allowed ? "LIFE_MOVIE_CONSENT_POLICY_NOT_APPROVED" : evaluatedReason;
     transaction.create(accessRef, {
       uid: subjectUid,
       actorUid,
