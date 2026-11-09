@@ -23,6 +23,7 @@ export function isRegisteredConsentPurpose(value: string): value is ConsentPurpo
 }
 export type ConsentTier = (typeof consentPurposeRegistry)[ConsentPurpose]["requiredTier"];
 export type ConsentRecordSnapshot = {
+  uid?: unknown;
   purpose?: unknown;
   consentTier?: unknown;
   status?: unknown;
@@ -34,6 +35,7 @@ export type ConsentDecisionReason =
   | "ALLOWED"
   | "UNKNOWN_PURPOSE"
   | "MISSING_CONSENT"
+  | "SUBJECT_MISMATCH"
   | "PURPOSE_MISMATCH"
   | "TIER_MISMATCH"
   | "POLICY_VERSION_MISMATCH"
@@ -73,12 +75,13 @@ function deny(purpose: string, reason: Exclude<ConsentDecisionReason, "ALLOWED">
   return { allowed: false, reason, purpose, requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, evaluatedAt };
 }
 
-export function evaluateConsentDecision(args: { purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date }): ConsentDecision {
+export function evaluateConsentDecision(args: { subjectUid: string; purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date }): ConsentDecision {
   const now = args.now ?? new Date();
   const evaluatedAt = now.toISOString();
   if (!isRegisteredConsentPurpose(args.purpose)) return deny(args.purpose, "UNKNOWN_PURPOSE", null, evaluatedAt);
   const definition = consentPurposeRegistry[args.purpose];
   if (!args.record) return deny(args.purpose, "MISSING_CONSENT", definition.requiredTier, evaluatedAt);
+  if (!args.subjectUid || args.record.uid !== args.subjectUid) return deny(args.purpose, "SUBJECT_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.purpose !== args.purpose) return deny(args.purpose, "PURPOSE_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.consentTier !== definition.requiredTier) return deny(args.purpose, "TIER_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.policyVersion !== CONSENT_DECISION_POLICY_VERSION) return deny(args.purpose, "POLICY_VERSION_MISMATCH", definition.requiredTier, evaluatedAt);
@@ -91,7 +94,7 @@ export function evaluateConsentDecision(args: { purpose: string; record: Consent
   return { allowed: true, reason: "ALLOWED", purpose: args.purpose, requiredTier: definition.requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, evaluatedAt };
 }
 
-export async function runWithConsent<T>(args: { purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date; operation: () => Promise<T> | T }): Promise<T> {
+export async function runWithConsent<T>(args: { subjectUid: string; purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date; operation: () => Promise<T> | T }): Promise<T> {
   const decision = evaluateConsentDecision(args);
   if (!decision.allowed) throw new Error(`CONSENT_REQUIRED:${decision.reason}`);
   return await args.operation();
