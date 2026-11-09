@@ -1,0 +1,113 @@
+name: R27 scoped Life Movie denial-boundary verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r27-scoped-consent-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  r27-boundary:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 257
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact R27 candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Prove exact clean source and capture runtimes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          mkdir -p artifacts/r27
+          node --version | tee artifacts/r27/node-version.txt
+          npm --version | tee artifacts/r27/npm-version.txt
+          git rev-parse HEAD > artifacts/r27/source-sha.txt
+          git status --porcelain=v1 --untracked-files=all > artifacts/r27/initial-status.txt
+
+      - name: Setup Node 20.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 20.19.0
+          cache: npm
+
+      - name: Capture focused validation
+        id: capture
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          mkdir -p artifacts/r27
+          run_check() {
+            name="$1"
+            shift
+            "$@" > "artifacts/r27/$name.log" 2>&1
+            status=$?
+            printf '%s\n' "$status" > "artifacts/r27/$name.exit-code"
+            echo "$name=$status" | tee -a artifacts/r27/summary.txt
+            return 0
+          }
+
+          run_check root-npm-ci npm ci
+          root_install="$(cat artifacts/r27/root-npm-ci.exit-code)"
+          if [ "$root_install" = "0" ]; then
+            run_check r27-vitest npx vitest run tests/unit/r27-life-movie-verifier-boundary.test.ts
+            run_check root-typecheck npm run typecheck
+          else
+            printf 'SKIPPED: root npm ci failed\n' > artifacts/r27/r27-vitest.log
+            printf 'SKIPPED: root npm ci failed\n' > artifacts/r27/root-typecheck.log
+            printf '125\n' > artifacts/r27/r27-vitest.exit-code
+            printf '125\n' > artifacts/r27/root-typecheck.exit-code
+          fi
+
+          run_check functions-npm-ci npm ci --prefix functions
+          functions_install="$(cat artifacts/r27/functions-npm-ci.exit-code)"
+          if [ "$functions_install" = "0" ]; then
+            run_check functions-typecheck npm --prefix functions run typecheck
+            run_check functions-build npm --prefix functions run build
+          else
+            printf 'SKIPPED: Functions npm ci failed\n' > artifacts/r27/functions-typecheck.log
+            printf 'SKIPPED: Functions npm ci failed\n' > artifacts/r27/functions-build.log
+            printf '125\n' > artifacts/r27/functions-typecheck.exit-code
+            printf '125\n' > artifacts/r27/functions-build.exit-code
+          fi
+          echo "captured=1" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload R27 diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r27-scoped-consent-diagnostics-${{ env.TARGET_SHA }}-${{ github.run_id }}
+          path: artifacts/r27
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce captured validation results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          for result in root-npm-ci r27-vitest root-typecheck functions-npm-ci functions-typecheck functions-build; do
+            test "$(cat "artifacts/r27/$result.exit-code")" = "0" || {
+              echo "$result failed or was skipped; see uploaded R27 diagnostic artifact"
+              exit 1
+            }
+          done
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
