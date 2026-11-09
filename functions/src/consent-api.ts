@@ -6,6 +6,7 @@ import {
   CONSENT_DECISION_POLICY_VERSION,
   consentPurposeRegistry,
   evaluateConsentDecision,
+  isRegisteredConsentPurpose,
   type ConsentPurpose
 } from "./consent-decision";
 import { resolveConsentExpiry } from "./consent-expiry";
@@ -46,7 +47,7 @@ function uidFrom(request: { auth?: { uid?: string; token?: Record<string, unknow
 }
 
 function canonicalPurpose(value: string): ConsentPurpose {
-  if (!(value in consentPurposeRegistry)) {
+  if (!isRegisteredConsentPurpose(value)) {
     throw new HttpsError("failed-precondition", "Unknown consent purpose. Processing must fail closed until the purpose registry is updated.");
   }
   return value as ConsentPurpose;

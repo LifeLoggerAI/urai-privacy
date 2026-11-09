@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CONSENT_DECISION_POLICY_VERSION,
   evaluateConsentDecision,
+  isRegisteredConsentPurpose,
   runWithConsent
 } from "../../functions/src/consent-decision";
 
@@ -75,6 +76,50 @@ describe("canonical consent decision engine", () => {
       reason: "UNKNOWN_PURPOSE",
       requiredTier: null
     });
+  });
+
+  it.each([
+    "toString", "constructor", "__proto__", "hasOwnProperty",
+    "valueOf", "isPrototypeOf", "propertyIsEnumerable", "toLocaleString"
+  ])("rejects inherited prototype name %s even with a matching granted record", (purpose) => {
+    expect(isRegisteredConsentPurpose(purpose)).toBe(false);
+    expect(evaluateConsentDecision({
+      purpose,
+      record: {
+        purpose,
+        status: "granted",
+        policyVersion: CONSENT_DECISION_POLICY_VERSION,
+        expiresAt: "2099-01-01T00:00:00.000Z"
+      },
+      now
+    })).toMatchObject({ allowed: false, reason: "UNKNOWN_PURPOSE", requiredTier: null });
+  });
+
+  it.each(["SOCIAL_PUBLICATION", "social.publication", "provider.unregistered"])(
+    "does not accept unregistered social or provider purpose %s",
+    (purpose) => {
+      expect(isRegisteredConsentPurpose(purpose)).toBe(false);
+      expect(evaluateConsentDecision({
+        purpose,
+        record: { ...grantedMemory, purpose },
+        now
+      })).toMatchObject({ allowed: false, reason: "UNKNOWN_PURPOSE", requiredTier: null });
+    }
+  );
+
+  it("blocks protected provider work for prototype-inherited purpose", async () => {
+    const providerCall = vi.fn(async () => "unsafe");
+    await expect(runWithConsent({
+      purpose: "toString",
+      record: {
+        purpose: "toString", status: "granted",
+        policyVersion: CONSENT_DECISION_POLICY_VERSION,
+        expiresAt: "2099-01-01T00:00:00.000Z"
+      },
+      now,
+      operation: providerCall
+    })).rejects.toThrow("CONSENT_REQUIRED:UNKNOWN_PURPOSE");
+    expect(providerCall).not.toHaveBeenCalled();
   });
 
   it("prevents provider work after a denied decision", async () => {
