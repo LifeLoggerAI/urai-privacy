@@ -16,6 +16,11 @@ export const consentPurposeRegistry = {
 } as const;
 
 export type ConsentPurpose = keyof typeof consentPurposeRegistry;
+
+/** Reject inherited Object.prototype names even when a consent record was forged. */
+export function isRegisteredConsentPurpose(value: string): value is ConsentPurpose {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(consentPurposeRegistry, value);
+}
 export type ConsentTier = (typeof consentPurposeRegistry)[ConsentPurpose]["requiredTier"];
 export type ConsentRecordSnapshot = {
   purpose?: unknown;
@@ -71,8 +76,8 @@ function deny(purpose: string, reason: Exclude<ConsentDecisionReason, "ALLOWED">
 export function evaluateConsentDecision(args: { purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date }): ConsentDecision {
   const now = args.now ?? new Date();
   const evaluatedAt = now.toISOString();
-  const definition = consentPurposeRegistry[args.purpose as ConsentPurpose];
-  if (!definition) return deny(args.purpose, "UNKNOWN_PURPOSE", null, evaluatedAt);
+  if (!isRegisteredConsentPurpose(args.purpose)) return deny(args.purpose, "UNKNOWN_PURPOSE", null, evaluatedAt);
+  const definition = consentPurposeRegistry[args.purpose];
   if (!args.record) return deny(args.purpose, "MISSING_CONSENT", definition.requiredTier, evaluatedAt);
   if (args.record.purpose !== args.purpose) return deny(args.purpose, "PURPOSE_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.consentTier !== definition.requiredTier) return deny(args.purpose, "TIER_MISMATCH", definition.requiredTier, evaluatedAt);
