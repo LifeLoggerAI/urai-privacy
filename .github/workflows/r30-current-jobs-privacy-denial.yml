@@ -78,19 +78,19 @@ jobs:
           test "$(pnpm --version)" = "8.15.9"
           java -version
           java -version 2>&1 | grep -Eq 'version "21\.'
-          mkdir -p artifacts/r30
+          mkdir -p "$RUNNER_TEMP/r30-evidence"
 
       - name: Execute exact-source R30 native denial acceptance
         shell: bash
         run: |
           set -Eeuo pipefail
-          bash scripts/run-r30-native-jobs-privacy-acceptance.sh 2>&1 | tee artifacts/r30/native-denial.log
+          bash scripts/run-r30-native-jobs-privacy-acceptance.sh 2>&1 | tee "$RUNNER_TEMP/r30-evidence/native-denial.log"
 
       - name: Upload R30 emulator evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: r30-current-jobs-privacy-denial-${{ env.TARGET_PRIVACY_SHA }}
-          path: artifacts/r30
+          path: ${{ runner.temp }}/r30-evidence
           if-no-files-found: warn
           retention-days: 90

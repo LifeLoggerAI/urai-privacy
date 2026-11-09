@@ -12,6 +12,7 @@ JOBS_DIR="${URAI_JOBS_SOURCE_DIR:-}"
 [[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || die "Pinned Privacy SHA required"
 [[ "$(git rev-parse HEAD)" == "$EXPECTED" ]] || die "Privacy HEAD mismatch"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || die "Privacy dirty"
+[[ -f tests/integration/life-movie-jobs-r932-native-transport.emulator.mjs ]] || die "Pinned R932 native transport harness missing"
 [[ "$JOBS_DIR" == /tmp/* && -d "$JOBS_DIR/.git" ]] || die "Disposable Jobs checkout required"
 [[ "$(git -C "$JOBS_DIR" rev-parse HEAD)" == "$JOBS_SHA" ]] || die "Jobs SHA mismatch"
 [[ -z "$(git -C "$JOBS_DIR" status --porcelain --untracked-files=all)" ]] || die "Jobs dirty"
@@ -44,5 +45,5 @@ export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.
 export FIREBASE_FUNCTIONS_EMULATOR_HOST=127.0.0.1:5001 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
 npx --no-install firebase --project "$PROJECT" emulators:exec \
   --config firebase.emulators.json --only auth,firestore,functions,storage \
-  'node tests/integration/life-movie-jobs-native-transport.emulator.mjs'
+  'node tests/integration/life-movie-jobs-r932-native-transport.emulator.mjs'
 printf 'URAI_R30_NATIVE_JOBS_PRIVACY_BOUNDARY_PASS privacy=%s jobs=%s positiveGrant=false render=false\n' "$EXPECTED" "$JOBS_SHA"
