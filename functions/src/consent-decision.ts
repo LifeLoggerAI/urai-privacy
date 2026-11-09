@@ -1,5 +1,29 @@
 export const CONSENT_DECISION_POLICY_VERSION = "1.0.0";
 
+// Reserved purpose contract from historical R307. It remains deliberately
+// unregistered until Privacy/legal approval and a server-owned scoped issuer exist.
+export const LIFE_MOVIE_RENDER_CONSENT_PURPOSE = "life-movie.render";
+export const LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION = "1.1.0";
+export type LifeMovieRenderScope = Readonly<{ projectId: string; renderPlanDigest: string; sourceSetDigest: string }>;
+
+export function policyVersionForPurpose(purpose: string): string {
+  return purpose === LIFE_MOVIE_RENDER_CONSENT_PURPOSE
+    ? LIFE_MOVIE_RENDER_CONSENT_POLICY_VERSION
+    : CONSENT_DECISION_POLICY_VERSION;
+}
+
+export function matchesLifeMovieRenderScope(recordScope: unknown, requestedScope: LifeMovieRenderScope): boolean {
+  if (!recordScope || typeof recordScope !== "object" || Array.isArray(recordScope)) return false;
+  const scoped = recordScope as Record<string, unknown>;
+  return Reflect.ownKeys(scoped).length === 3
+    && Object.prototype.hasOwnProperty.call(scoped, "projectId")
+    && Object.prototype.hasOwnProperty.call(scoped, "renderPlanDigest")
+    && Object.prototype.hasOwnProperty.call(scoped, "sourceSetDigest")
+    && scoped.projectId === requestedScope.projectId
+    && scoped.renderPlanDigest === requestedScope.renderPlanDigest
+    && scoped.sourceSetDigest === requestedScope.sourceSetDigest;
+}
+
 export const consentPurposeRegistry = {
   "memory.storage": { requiredTier: "C1", dataCategories: ["memories", "user-content"] },
   "behavior.passive-context": { requiredTier: "C2", dataCategories: ["app-metadata", "interaction-rhythms"] },
@@ -72,7 +96,7 @@ function epoch(value: unknown): number | null {
 }
 
 function deny(purpose: string, reason: Exclude<ConsentDecisionReason, "ALLOWED">, requiredTier: ConsentTier | null, evaluatedAt: string): ConsentDecision {
-  return { allowed: false, reason, purpose, requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, evaluatedAt };
+  return { allowed: false, reason, purpose, requiredTier, policyVersion: policyVersionForPurpose(purpose), evaluatedAt };
 }
 
 export function evaluateConsentDecision(args: { subjectUid: string; purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date }): ConsentDecision {
@@ -84,14 +108,14 @@ export function evaluateConsentDecision(args: { subjectUid: string; purpose: str
   if (!args.subjectUid || args.record.uid !== args.subjectUid) return deny(args.purpose, "SUBJECT_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.purpose !== args.purpose) return deny(args.purpose, "PURPOSE_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.consentTier !== definition.requiredTier) return deny(args.purpose, "TIER_MISMATCH", definition.requiredTier, evaluatedAt);
-  if (args.record.policyVersion !== CONSENT_DECISION_POLICY_VERSION) return deny(args.purpose, "POLICY_VERSION_MISMATCH", definition.requiredTier, evaluatedAt);
+  if (args.record.policyVersion !== policyVersionForPurpose(args.purpose)) return deny(args.purpose, "POLICY_VERSION_MISMATCH", definition.requiredTier, evaluatedAt);
   if (args.record.status === "denied") return deny(args.purpose, "DENIED", definition.requiredTier, evaluatedAt);
   if (args.record.status === "revoked") return deny(args.purpose, "REVOKED", definition.requiredTier, evaluatedAt);
   if (args.record.status === "expired") return deny(args.purpose, "EXPIRED", definition.requiredTier, evaluatedAt);
   if (args.record.status !== "granted") return deny(args.purpose, "INVALID_STATUS", definition.requiredTier, evaluatedAt);
   const expiresAt = epoch(args.record.expiresAt);
   if (expiresAt === null || expiresAt <= now.getTime()) return deny(args.purpose, "EXPIRED", definition.requiredTier, evaluatedAt);
-  return { allowed: true, reason: "ALLOWED", purpose: args.purpose, requiredTier: definition.requiredTier, policyVersion: CONSENT_DECISION_POLICY_VERSION, evaluatedAt };
+  return { allowed: true, reason: "ALLOWED", purpose: args.purpose, requiredTier: definition.requiredTier, policyVersion: policyVersionForPurpose(args.purpose), evaluatedAt };
 }
 
 export async function runWithConsent<T>(args: { subjectUid: string; purpose: string; record: ConsentRecordSnapshot | null | undefined; now?: Date; operation: () => Promise<T> | T }): Promise<T> {
