@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { priorGrantReceiptEvidence, selectConsentRevocationSource } from "../../functions/src/consent-revocation-transition";
+import { classifyRevocationOutboxReplay, priorGrantReceiptEvidence, selectConsentRevocationSource } from "../../functions/src/consent-revocation-transition";
 
 const granted = {
   uid: "subject-1",
@@ -94,5 +94,56 @@ describe("prior granted receipt evidence", () => {
     const replacement = { ...granted, purpose: "data.export", receiptHash: "b".repeat(64) };
     expect(selectConsentRevocationSource(granted, replacement)).toEqual(granted);
     expect(priorGrantReceiptEvidence(granted).priorGrantReceiptHash).toBe(granted.receiptHash);
+  });
+});
+
+describe("immutable revocation outbox replay admission", () => {
+  const event = {
+    schemaVersion: "consent.revoked.v1",
+    eventId: "a".repeat(64),
+    consentRecordId: "subject-1_memory_storage",
+    uid: "subject-1",
+    purpose: "memory.storage",
+    consentTier: "C1",
+    policyVersion: "2026-07-06",
+    sourceReceiptHash: "b".repeat(64),
+    priorGrantReceiptHash: "c".repeat(64),
+    priorGrantEvidenceState: "present",
+    integrityHash: "d".repeat(64)
+  };
+
+  it("accepts identical immutable facts despite mutable ACK bookkeeping", () => {
+    expect(classifyRevocationOutboxReplay({
+      ...event, status: "done", attempts: 8, lastAcknowledgementStatus: "applied"
+    }, event)).toBe("identical");
+  });
+
+  it("does not silently mark a legacy event missing both prior-grant fields as identical", () => {
+    const existing = { ...event };
+    delete (existing as Partial<typeof event>).priorGrantReceiptHash;
+    delete (existing as Partial<typeof event>).priorGrantEvidenceState;
+    expect(classifyRevocationOutboxReplay(existing, event)).toBe("legacy_missing_lineage");
+  });
+
+  it.each(["priorGrantReceiptHash", "priorGrantEvidenceState", "sourceReceiptHash", "integrityHash", "uid"] as const)(
+    "rejects mismatched immutable field %s",
+    (key) => {
+      expect(classifyRevocationOutboxReplay({ ...event, [key]: "tampered" }, event)).toBe("conflicting");
+    }
+  );
+
+  it("rejects a prior-grant collision at an identical v1 event ID", () => {
+    const old = { ...event, priorGrantReceiptHash: "e".repeat(64) };
+    expect(old.eventId).toBe(event.eventId);
+    expect(classifyRevocationOutboxReplay(old, event)).toBe("conflicting");
+  });
+
+  it("rejects partial lineage and missing identity fields", () => {
+    const partial = { ...event };
+    delete (partial as Partial<typeof event>).priorGrantReceiptHash;
+    expect(classifyRevocationOutboxReplay(partial, event)).toBe("conflicting");
+    const missingId = { ...event };
+    delete (missingId as Partial<typeof event>).eventId;
+    expect(classifyRevocationOutboxReplay(missingId, event)).toBe("conflicting");
   });
 });

@@ -3,7 +3,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { priorGrantReceiptEvidence, selectConsentRevocationSource } from "./consent-revocation-transition";
+import { classifyRevocationOutboxReplay, priorGrantReceiptEvidence, selectConsentRevocationSource } from "./consent-revocation-transition";
 
 const db = getFirestore();
 const REVOCATION_SCHEMA_VERSION = "consent.revoked.v1";
@@ -61,25 +61,36 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
     receiptHash
   });
   const outboxRef = db.collection("consentRevocationOutbox").doc(eventId);
+  const immutableEvent = {
+    schemaVersion: REVOCATION_SCHEMA_VERSION,
+    eventId,
+    consentRecordId: recordId,
+    uid,
+    purpose,
+    consentTier,
+    policyVersion,
+    sourceReceiptHash: receiptHash,
+    ...priorGrant,
+    integrityHash: digest({ eventId, recordId, uid, purpose, ...priorGrant })
+  };
 
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(outboxRef);
-    if (existing.exists) return;
+    if (existing.exists) {
+      const verdict = classifyRevocationOutboxReplay(existing.data() ?? null, immutableEvent);
+      if (verdict !== "identical") {
+        // Never mutate or silently backfill prior events; quarantine/repair
+        // requires a separately reviewed versioned reconciliation path.
+        throw new Error(`Revocation outbox replay refused: ${verdict}`);
+      }
+      return;
+    }
     transaction.create(outboxRef, {
-      schemaVersion: REVOCATION_SCHEMA_VERSION,
-      eventId,
-      consentRecordId: recordId,
-      uid,
-      purpose,
-      consentTier,
-      policyVersion,
-      sourceReceiptHash: receiptHash,
-      ...priorGrant,
+      ...immutableEvent,
       status: "pending",
       attempts: 0,
       createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-      integrityHash: digest({ eventId, recordId, uid, purpose, ...priorGrant })
+      updatedAt: FieldValue.serverTimestamp()
     });
   });
 });
