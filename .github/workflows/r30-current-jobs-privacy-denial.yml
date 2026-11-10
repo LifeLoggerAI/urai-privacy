@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   r30-native-denial:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258 || startsWith(github.head_ref, 'review/chalk-r31-') || startsWith(github.head_ref, 'review/chalk-r1012-native-denial-ci-trigger-')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
