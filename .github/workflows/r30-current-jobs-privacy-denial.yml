@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: LifeLoggerAI/urai-jobs
-          ref: 472d3c73a904c8269098f03aaa80f2de9edb7082
+          ref: 2ead65f9d6e109a057c0b322f0755a8b9a271b8a
           token: ${{ secrets.URAI_READONLY_REPO_TOKEN }}
           path: jobs-source
           fetch-depth: 1
@@ -69,7 +69,7 @@ jobs:
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_PRIVACY_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
-          test "$(git -C jobs-source rev-parse HEAD)" = "472d3c73a904c8269098f03aaa80f2de9edb7082"
+          test "$(git -C jobs-source rev-parse HEAD)" = "2ead65f9d6e109a057c0b322f0755a8b9a271b8a"
           test -z "$(git -C jobs-source status --porcelain --untracked-files=all)"
           mv "$GITHUB_WORKSPACE/jobs-source" /tmp/urai-jobs-r1053
           node --version
