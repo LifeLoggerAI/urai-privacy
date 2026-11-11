@@ -6,7 +6,7 @@ die() { echo "URAI_R30_HOLD: $*" >&2; exit 1; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 PROJECT=urai-privacy-integration-test
-JOBS_SHA=38fe74bf1b05d6df3c8bb14b45dbacab453e98bd
+JOBS_SHA=60c728f6db766aa839cc8b0286bb81d7a3c6c2f6
 EXPECTED="${URAI_EXPECTED_PRIVACY_SHA:-}"
 JOBS_DIR="${URAI_JOBS_SOURCE_DIR:-}"
 [[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || die "Pinned Privacy SHA required"
