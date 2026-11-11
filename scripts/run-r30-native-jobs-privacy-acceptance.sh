@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# R30 review only. Current Jobs R1053 candidate -> current Privacy R27/R29 callable.
+# R30 review only. Current Jobs R1059 candidate -> current Privacy R27/R29 callable.
 set -Eeuo pipefail
 umask 077
 die() { echo "URAI_R30_HOLD: $*" >&2; exit 1; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 PROJECT=urai-privacy-integration-test
-JOBS_SHA=65c746bdc8f1c39db417ce7cf978e1e29b8aac16
+JOBS_SHA=bbe3ef6f8807a42c0a402ade8a5d5ebd43f4c0aa
 EXPECTED="${URAI_EXPECTED_PRIVACY_SHA:-}"
 JOBS_DIR="${URAI_JOBS_SOURCE_DIR:-}"
 [[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || die "Pinned Privacy SHA required"
