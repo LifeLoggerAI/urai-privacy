@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   r30-native-denial:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258 || startsWith(github.head_ref, 'review/chalk-r31-') || startsWith(github.head_ref, 'review/chalk-r1012-native-denial-ci-trigger-') || startsWith(github.head_ref, 'review/chalk-r1016-jobs-r1015-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1020-jobs-r1017-native-denial-')
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258 || startsWith(github.head_ref, 'review/chalk-r31-') || startsWith(github.head_ref, 'review/chalk-r1012-native-denial-ci-trigger-') || startsWith(github.head_ref, 'review/chalk-r1016-jobs-r1015-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1020-jobs-r1017-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1022-jobs-r1020-native-denial-')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: LifeLoggerAI/urai-jobs
-          ref: c38f92e5276f66e2d22e7deb7499a59b750a92bf
+          ref: c0958ea884a686a13a1a99008470b535404b9e80
           token: ${{ secrets.URAI_READONLY_REPO_TOKEN }}
           path: jobs-source
           fetch-depth: 1
@@ -69,7 +69,7 @@ jobs:
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_PRIVACY_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
-          test "$(git -C jobs-source rev-parse HEAD)" = "c38f92e5276f66e2d22e7deb7499a59b750a92bf"
+          test "$(git -C jobs-source rev-parse HEAD)" = "c0958ea884a686a13a1a99008470b535404b9e80"
           test -z "$(git -C jobs-source status --porcelain --untracked-files=all)"
           mv "$GITHUB_WORKSPACE/jobs-source" /tmp/urai-jobs-r932
           node --version
