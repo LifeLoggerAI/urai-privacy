@@ -1,0 +1,7 @@
+# R1063B Jobs #448 moving-head correction — review/HOLD
+
+Privacy PR #276 originally pinned Jobs #448 `472d3c73a904c8269098f03aaa80f2de9edb7082` (then HEAD), but during final readback another worker advanced #448 by two commits to `2ead65f9d6e109a057c0b322f0755a8b9a271b8a`. GitHub comparison shows only two emulator/revocation-test file modifications (not a production Storage writer). Preserve the previous review commit and its documentation as historical custody.
+
+This follow-up replaces exactly four source pins in the same three test-target files (workflow 2, runner 1, native fixture 1), from the old Jobs SHA to `2ead65f9d6e109a057c0b322f0755a8b9a271b8a`. No consent, Firebase production rules, physical deletion, authentication, runtime writes, or provider IAM changed.
+
+**Critical:** Native Jobs and Privacy test execution on the corrected exact pair remains pending. Previously reported pass receipts for Jobs #443/Privacy #274/#275 do not certify this source. Jobs #448's latest revisions must independently complete frozen installation, full verify/typecheck/build and native four-Firebase-emulator denial tests, with sanitized logs and immutable source receipts. Maintain original hard-off private writes and unconditionally denying broker. P0 Jobs #252 GCS sole writer/drain/deletion, Labs #370 Runpod exposed credential revocation and protected CI/independent release signoff remain HOLD. No production deployment or private media enabled.
