@@ -14,13 +14,13 @@ concurrency:
 
 jobs:
   r30-native-denial:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258 || startsWith(github.head_ref, 'review/chalk-r31-') || startsWith(github.head_ref, 'review/chalk-r1012-native-denial-ci-trigger-') || startsWith(github.head_ref, 'review/chalk-r1016-jobs-r1015-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1020-jobs-r1017-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1022-jobs-r1020-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1026-jobs-r1024-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1027-jobs-r1026-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1032-jobs-r1031-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1035-jobs419-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1037-jobs420-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1048-privacy-jobs-r1047-') || startsWith(github.head_ref, 'review/chalk-r1052-privacy-jobs-r1051-') || startsWith(github.head_ref, 'review/chalk-r1054-privacy-jobs-r1053-') || startsWith(github.head_ref, 'review/chalk-r1060-privacy-jobs-r1059-')
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258 || startsWith(github.head_ref, 'review/chalk-r31-') || startsWith(github.head_ref, 'review/chalk-r1012-native-denial-ci-trigger-') || startsWith(github.head_ref, 'review/chalk-r1016-jobs-r1015-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1020-jobs-r1017-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1022-jobs-r1020-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1026-jobs-r1024-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1027-jobs-r1026-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1032-jobs-r1031-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1035-jobs419-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1037-jobs420-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1048-privacy-jobs-r1047-') || startsWith(github.head_ref, 'review/chalk-r1052-privacy-jobs-r1051-') || startsWith(github.head_ref, 'review/chalk-r1054-privacy-jobs-r1053-') || startsWith(github.head_ref, 'review/chalk-r1060-privacy-jobs-r1059-') || startsWith(github.head_ref, 'review/chalk-r1064-privacy-jobs-r1063-')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       TARGET_PRIVACY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       URAI_EXPECTED_PRIVACY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      URAI_JOBS_SOURCE_DIR: /tmp/urai-jobs-r1053
+      URAI_JOBS_SOURCE_DIR: /tmp/urai-jobs-r1063
     steps:
       - name: Checkout exact Privacy candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -41,11 +41,11 @@ jobs:
             exit 1
           }
 
-      - name: Checkout exact Jobs R1053 candidate
+      - name: Checkout exact Jobs R1063 candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: LifeLoggerAI/urai-jobs
-          ref: bbe3ef6f8807a42c0a402ade8a5d5ebd43f4c0aa
+          ref: 2ead65f9d6e109a057c0b322f0755a8b9a271b8a
           token: ${{ secrets.URAI_READONLY_REPO_TOKEN }}
           path: jobs-source
           fetch-depth: 1
@@ -69,9 +69,9 @@ jobs:
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_PRIVACY_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
-          test "$(git -C jobs-source rev-parse HEAD)" = "bbe3ef6f8807a42c0a402ade8a5d5ebd43f4c0aa"
+          test "$(git -C jobs-source rev-parse HEAD)" = "2ead65f9d6e109a057c0b322f0755a8b9a271b8a"
           test -z "$(git -C jobs-source status --porcelain --untracked-files=all)"
-          mv "$GITHUB_WORKSPACE/jobs-source" /tmp/urai-jobs-r1053
+          mv "$GITHUB_WORKSPACE/jobs-source" /tmp/urai-jobs-r1063
           node --version
           npm --version
           npm install --global pnpm@8.15.9
