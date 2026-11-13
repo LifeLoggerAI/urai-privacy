@@ -1,0 +1,5 @@
+# R1224 - Privacy native acceptance to Jobs #501 combined candidate (HOLD)
+
+Base Privacy #308 commit `428d5e158bf51cd75ce36d46a47f8986852a5405`. Jobs target PR #501 commit `c7fe6b39cc2496a2f84ee7e7e05f7a4888123164`, integrating Jobs #499 lockfile remediation with #500 synthetic GCS canary. Only original R30 CI, runner and fixture exact source pins plus a review-branch eligibility entry were modified. Production private-memory writes remain disabled.
+
+Require a new independent, original four-emulator negative-denial receipt, exact Git blob hashes, Java/Node/pnpm runtime, original exit and TAP hash before any scoped PASS. No emulators can certify physical live GCS IAM or generation deletion, and mock canaries do not constitute provider certification. Jobs dependency audit remains C0/H30/M40/L9, nonzero. Protected GitHub Actions/billing, Runpod credential incident, owner-positive C6 lifecycle, external qualified security/privacy/accessibility signoff and full product device acceptance remain open. Release HOLD / NO-GO. No main merge or production promotion.
