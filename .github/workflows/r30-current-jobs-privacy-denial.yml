@@ -80,6 +80,13 @@ jobs:
           java -version 2>&1 | grep -Eq 'version "21\.'
           mkdir -p "$RUNNER_TEMP/r30-evidence"
 
+      - name: Verify R1237 native CI source-lock regression checks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node --test tests/integration/r1237-r30-merged-jobs-ci-gate.test.mjs 2>&1 | tee "$RUNNER_TEMP/r30-evidence/source-lock.tap"
+          sha256sum "$RUNNER_TEMP/r30-evidence/source-lock.tap" | tee "$RUNNER_TEMP/r30-evidence/source-lock.sha256"
+
       - name: Execute exact-source R30 native denial acceptance
         shell: bash
         run: |
