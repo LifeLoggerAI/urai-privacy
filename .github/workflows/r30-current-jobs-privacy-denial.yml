@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   r30-native-denial:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258 || startsWith(github.head_ref, 'review/chalk-r31-') || startsWith(github.head_ref, 'review/chalk-r1012-native-denial-ci-trigger-') || startsWith(github.head_ref, 'review/chalk-r1016-jobs-r1015-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1020-jobs-r1017-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1022-jobs-r1020-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1026-jobs-r1024-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1027-jobs-r1026-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1032-jobs-r1031-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1035-jobs419-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1037-jobs420-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1048-privacy-jobs-r1047-') || startsWith(github.head_ref, 'review/chalk-r1052-privacy-jobs-r1051-') || startsWith(github.head_ref, 'review/chalk-r1054-privacy-jobs-r1053-') || startsWith(github.head_ref, 'review/chalk-r1064-privacy-jobs448-') || startsWith(github.head_ref, 'review/chalk-r1067-privacy-jobs449-') || startsWith(github.head_ref, 'review/chalk-r1078-privacy-jobs456-') || startsWith(github.head_ref, 'review/chalk-r1086-privacy-jobs459-') || startsWith(github.head_ref, 'review/chalk-r1093-privacy-jobs463-') || startsWith(github.head_ref, 'review/chalk-r1096-privacy-jobs464-') || startsWith(github.head_ref, 'review/chalk-r1099-privacy-jobs468-') || startsWith(github.head_ref, 'review/chalk-r1101-privacy-jobs470-') || startsWith(github.head_ref, 'review/chalk-r1102-privacy-jobs471-') || startsWith(github.head_ref, 'review/chalk-r1105-privacy-jobs472-') || startsWith(github.head_ref, 'review/chalk-r1119-privacy-jobs480-') || startsWith(github.head_ref, 'review/chalk-r1125-privacy292-jobs484-') || startsWith(github.head_ref, 'review/chalk-r1128-privacy293-jobs486-') || github.event.pull_request.number == 297 || github.head_ref == 'review/chalk-r1138-privacy297-ci-eligibility-hold-20261112' || github.head_ref == 'review/chalk-r1182-privacy299-jobs491-native-denial-hold-20261112' || github.head_ref == 'review/chalk-r1183-privacy-jobs494-merged-iam-sourcepin-hold-20261112' || github.head_ref == 'review/chalk-r1186-privacy-jobs495-iam-convergence-hold-20261112' || github.head_ref == 'review/chalk-r1189-privacy304-jobs496-reader-iam-repin-hold-20261112' || github.head_ref == 'review/chalk-r1212-privacy-jobs497-security-lock-hold-20261112' || github.head_ref == 'review/chalk-r1217-privacy-jobs498-audit-pin-hold-20261112' || github.head_ref == 'review/chalk-r1222-privacy-jobs499-source-pin-hold-20261112'
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 258 || startsWith(github.head_ref, 'review/chalk-r31-') || startsWith(github.head_ref, 'review/chalk-r1012-native-denial-ci-trigger-') || startsWith(github.head_ref, 'review/chalk-r1016-jobs-r1015-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1020-jobs-r1017-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1022-jobs-r1020-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1026-jobs-r1024-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1027-jobs-r1026-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1032-jobs-r1031-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1035-jobs419-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1037-jobs420-native-denial-') || startsWith(github.head_ref, 'review/chalk-r1048-privacy-jobs-r1047-') || startsWith(github.head_ref, 'review/chalk-r1052-privacy-jobs-r1051-') || startsWith(github.head_ref, 'review/chalk-r1054-privacy-jobs-r1053-') || startsWith(github.head_ref, 'review/chalk-r1064-privacy-jobs448-') || startsWith(github.head_ref, 'review/chalk-r1067-privacy-jobs449-') || startsWith(github.head_ref, 'review/chalk-r1078-privacy-jobs456-') || startsWith(github.head_ref, 'review/chalk-r1086-privacy-jobs459-') || startsWith(github.head_ref, 'review/chalk-r1093-privacy-jobs463-') || startsWith(github.head_ref, 'review/chalk-r1096-privacy-jobs464-') || startsWith(github.head_ref, 'review/chalk-r1099-privacy-jobs468-') || startsWith(github.head_ref, 'review/chalk-r1101-privacy-jobs470-') || startsWith(github.head_ref, 'review/chalk-r1102-privacy-jobs471-') || startsWith(github.head_ref, 'review/chalk-r1105-privacy-jobs472-') || startsWith(github.head_ref, 'review/chalk-r1119-privacy-jobs480-') || startsWith(github.head_ref, 'review/chalk-r1125-privacy292-jobs484-') || startsWith(github.head_ref, 'review/chalk-r1128-privacy293-jobs486-') || github.event.pull_request.number == 297 || github.head_ref == 'review/chalk-r1138-privacy297-ci-eligibility-hold-20261112' || github.head_ref == 'review/chalk-r1182-privacy299-jobs491-native-denial-hold-20261112' || github.head_ref == 'review/chalk-r1183-privacy-jobs494-merged-iam-sourcepin-hold-20261112' || github.head_ref == 'review/chalk-r1186-privacy-jobs495-iam-convergence-hold-20261112' || github.head_ref == 'review/chalk-r1189-privacy304-jobs496-reader-iam-repin-hold-20261112' || github.head_ref == 'review/chalk-r1212-privacy-jobs497-security-lock-hold-20261112' || github.head_ref == 'review/chalk-r1217-privacy-jobs498-audit-pin-hold-20261112' || github.head_ref == 'review/chalk-r1222-privacy-jobs499-source-pin-hold-20261112' || github.head_ref == 'review/chalk-r1224-privacy-jobs501-converged-native-hold-20261113' || github.head_ref == 'review/chalk-r1228-privacy-jobs502-exact-denial-hold-20261113' || github.head_ref == 'review/chalk-r1236-privacy-jobs502-merged-head-repin-hold-20261113' || github.head_ref == 'review/chalk-r1247-privacy-jobs504-merge-denial-hold-20261113' || github.head_ref == 'review/chalk-r1252-privacy-jobs505-native-hold-20261113' || github.head_ref == 'review/chalk-r1257-privacy-jobs506-native-hold-20261113' || github.head_ref == 'review/chalk-r1260-privacy-jobs507-native-hold-20261113' || github.head_ref == 'review/chalk-r1265-privacy-jobs508-native-hold-20261113' || github.head_ref == 'review/chalk-r1269-privacy-jobs509-native-hold-20261113' || github.head_ref == 'review/chalk-r1273-privacy-jobs510-native-hold-20261114'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -41,11 +41,11 @@ jobs:
             exit 1
           }
 
-      - name: Checkout exact Jobs #499 dependency security candidate
+      - name: Checkout exact Jobs #510 merged review dependency candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: LifeLoggerAI/urai-jobs
-          ref: fa9e64cd79f4097b783cb85702fe127386f241e8
+          ref: fed883c750179842800b9056d6fc1deddcb39f9f
           token: ${{ secrets.URAI_READONLY_REPO_TOKEN }}
           path: jobs-source
           fetch-depth: 1
@@ -68,10 +68,10 @@ jobs:
         run: |
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_PRIVACY_SHA"
-          test -z "$(git status --porcelain --untracked-files=all)"
-          test "$(git -C jobs-source rev-parse HEAD)" = "fa9e64cd79f4097b783cb85702fe127386f241e8"
+          test "$(git -C jobs-source rev-parse HEAD)" = "fed883c750179842800b9056d6fc1deddcb39f9f"
           test -z "$(git -C jobs-source status --porcelain --untracked-files=all)"
           mv "$GITHUB_WORKSPACE/jobs-source" /tmp/urai-jobs-r1059
+          test -z "$(git status --porcelain --untracked-files=all)"
           node --version
           npm --version
           npm install --global pnpm@8.15.9
@@ -79,6 +79,13 @@ jobs:
           java -version
           java -version 2>&1 | grep -Eq 'version "21\.'
           mkdir -p "$RUNNER_TEMP/r30-evidence"
+
+      - name: Verify R1237 native CI source-lock regression checks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node --test tests/integration/r1237-r30-merged-jobs-ci-gate.test.mjs 2>&1 | tee "$RUNNER_TEMP/r30-evidence/source-lock.tap"
+          sha256sum "$RUNNER_TEMP/r30-evidence/source-lock.tap" | tee "$RUNNER_TEMP/r30-evidence/source-lock.sha256"
 
       - name: Execute exact-source R30 native denial acceptance
         shell: bash
