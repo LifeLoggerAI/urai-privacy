@@ -5,11 +5,11 @@ import { readFileSync } from 'node:fs';
 const workflow = readFileSync(new URL('../../.github/workflows/r30-current-jobs-privacy-denial.yml', import.meta.url), 'utf8');
 const runner = readFileSync(new URL('../../scripts/run-r30-native-jobs-privacy-acceptance.sh', import.meta.url), 'utf8');
 const transport = readFileSync(new URL('./life-movie-jobs-r932-native-transport.emulator.mjs', import.meta.url), 'utf8');
-const JOBS_MERGED_SHA = 'fed883c750179842800b9056d6fc1deddcb39f9f';
-const OLD_JOBS_SHA = 'd7a7152cc3e971bbbf75a9f4d812b0b178058bdf';
-const PR_BRANCH = 'review/chalk-r1273-privacy-jobs510-native-hold-20261114';
+const JOBS_MERGED_SHA = '501520051909534ccf004e03152431392392e1ab';
+const OLD_JOBS_SHA = 'fed883c750179842800b9056d6fc1deddcb39f9f';
+const PR_BRANCH = 'review/chalk-r1281-privacy-jobs511-native-hold-20261114';
 
-test('exact R1273 review branch activates native denial CI without broadening to every PR', () => {
+test('exact R1281 review branch activates native denial CI without broadening to every PR', () => {
   assert.ok(workflow.includes(`github.head_ref == '${PR_BRANCH}'`));
   assert.match(workflow, /r30-native-denial:/);
   assert.match(workflow, /if: github\.event_name == 'workflow_dispatch'/);
