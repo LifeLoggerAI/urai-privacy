@@ -97,10 +97,29 @@ async function run() {
   assert.equal(deletionRequest.status, 'pending')
   assert.ok(deletionRequest.requestId)
   checks.push('owner-account-deletion-request-pending')
-  assert.equal(checks.length, 12)
-  assert.equal(new Set(checks).size, 12)
 
-  console.log('R1512_CANONICAL_PRIVACY_FOUR_EMULATOR_PASS ' + JSON.stringify({
+  // R1514 fail-closed processor gates: owners, strangers and anonymous actors
+  // must never gain administrative execution privilege from a request ID.
+  await assert.rejects(call(owner, 'processExportRequest', { jobId: exportRequest.exportJobId }))
+  checks.push('owner-cannot-process-export')
+  await assert.rejects(call(stranger, 'processExportRequest', { jobId: exportRequest.exportJobId }))
+  checks.push('foreign-user-cannot-process-export')
+  await assert.rejects(call(anonymous, 'processExportRequest', { jobId: exportRequest.exportJobId }))
+  checks.push('anonymous-cannot-process-export')
+  await assert.rejects(call(owner, 'processDeletionRequest', { requestId: deletionRequest.requestId, status: 'processing' }))
+  checks.push('owner-cannot-process-deletion')
+  await assert.rejects(call(stranger, 'processDeletionRequest', { requestId: deletionRequest.requestId, status: 'processing' }))
+  checks.push('foreign-user-cannot-process-deletion')
+  await assert.rejects(call(anonymous, 'processDeletionRequest', { requestId: deletionRequest.requestId, status: 'processing' }))
+  checks.push('anonymous-cannot-process-deletion')
+  await assert.rejects(call(owner, 'executeDeletionRequest', { requestId: deletionRequest.requestId, mode: 'dryRun' }))
+  checks.push('owner-cannot-execute-deletion-dry-run')
+  await assert.rejects(call(stranger, 'executeDeletionRequest', { requestId: deletionRequest.requestId, mode: 'execute' }))
+  checks.push('foreign-user-cannot-execute-deletion')
+  assert.equal(checks.length, 20)
+  assert.equal(new Set(checks).size, 20)
+
+  console.log('R1514_CANONICAL_PRIVACY_FOUR_EMULATOR_PASS ' + JSON.stringify({
     checksPassed: checks.length, checks, source: process.env.URAI_EXACT_SHA || null,
     actualEmulators: ['Authentication', 'Functions', 'Firestore', 'Storage'],
     destructiveDeletionExecuted: false, productionWrites: false,
