@@ -8,6 +8,8 @@ const { randomBytes } = require('node:crypto')
 const { initializeApp, deleteApp } = require('firebase/app')
 const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } = require('firebase/auth')
 const { getFunctions, connectFunctionsEmulator, httpsCallable } = require('firebase/functions')
+const { initializeApp: initializeAdminApp, deleteApp: deleteAdminApp } = require('firebase-admin/app')
+const { getFirestore } = require('firebase-admin/firestore')
 
 const project = 'urai-privacy-r1512-disposable'
 assert.equal(process.env.GCLOUD_PROJECT, project, 'Only the disposable emulator project is permitted')
@@ -116,8 +118,26 @@ async function run() {
   checks.push('owner-cannot-execute-deletion-dry-run')
   await assert.rejects(call(stranger, 'executeDeletionRequest', { requestId: deletionRequest.requestId, mode: 'execute' }))
   checks.push('foreign-user-cannot-execute-deletion')
-  assert.equal(checks.length, 20)
-  assert.equal(new Set(checks).size, 20)
+
+  // Confirm denial did not mutate either pending job into a privileged state.
+  const admin = initializeAdminApp({ projectId: project }, prefix + 'readback')
+  try {
+    const db = getFirestore(admin)
+    const [exportJob, deletionJob] = await Promise.all([
+      db.collection('exportJobs').doc(exportRequest.exportJobId).get(),
+      db.collection('deletionRequests').doc(deletionRequest.requestId).get(),
+    ])
+    assert.equal(exportJob.data()?.status, 'pending')
+    assert.equal(exportJob.data()?.uid, a.user.uid)
+    checks.push('denied-processor-left-export-pending')
+    assert.equal(deletionJob.data()?.status, 'pending')
+    assert.equal(deletionJob.data()?.uid, a.user.uid)
+    checks.push('denied-processor-left-deletion-pending')
+  } finally {
+    await deleteAdminApp(admin)
+  }
+  assert.equal(checks.length, 22)
+  assert.equal(new Set(checks).size, 22)
 
   console.log('R1514_CANONICAL_PRIVACY_FOUR_EMULATOR_PASS ' + JSON.stringify({
     checksPassed: checks.length, checks, source: process.env.URAI_EXACT_SHA || null,
