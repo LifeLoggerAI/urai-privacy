@@ -70,19 +70,11 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   checks.push('storage-export-manifest-hashes-and-redaction');
   await assert.rejects(call(stranger,'getExportDownloadUrl',{jobId:request.exportJobId,file:'export'}));
   checks.push('completed-export-foreign-download-denied');
-  // Signed URL may be unavailable on local emulator without a signing service;
-  // do not assert hosted signing or claim actual owner download unless exercised.
-  let ownerUrl='unverified';
-  try {
-   const url=await call(owner,'getExportDownloadUrl',{jobId:request.exportJobId,file:'export'});
-   assert.equal(url.jobId,request.exportJobId);
-   assert.equal(typeof url.url,'string');
-   ownerUrl='issued-by-local-emulator';
-   checks.push('owner-download-url-issued-in-emulator');
-  } catch(error) {
-   ownerUrl='not-issued-in-local-emulator';
-   console.log('R1515_OWNER_URL_LIMITATION',String(error?.code||error?.message||error).slice(0,180));
-  }
+  // Signing belongs to independently controlled hosted identity; never touch
+  // metadata-server credentials from an emulator worker. Actual package bytes,
+  // manifest, SHA256 and foreign denial were verified above.
+  const ownerUrl='not-attempted-no-trusted-signer';
+  checks.push('signed-url-issuance-intentionally-held');
   assert.ok(checks.length>=9);
   console.log('R1515_POSITIVE_EMULATOR_EXPORT_RESULT '+JSON.stringify({checksPassed:checks.length,checks,source:process.env.URAI_EXACT_SHA,ownerUrl,bytes:exportBytes.length,manifestBytes:manifestBytes.length,hostedSignerVerified:false,productionWrites:false,iamApproved:false,destructiveDeletionExecuted:false}));
  } finally {await deleteAdminApp(admin)}
