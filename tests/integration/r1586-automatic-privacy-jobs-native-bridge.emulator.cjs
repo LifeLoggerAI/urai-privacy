@@ -184,8 +184,12 @@ async function run() {
   assert.equal(verifiedJobsEndpoint.password,'')
   assert.equal(verifiedJobsEndpoint.search,'')
   assert.equal(verifiedJobsEndpoint.hash,'')
+  // An explicitly configured isolated Jobs shim has a single root callable;
+  // the Firebase Functions emulator default remains scoped to this project.
   assert.equal(verifiedJobsEndpoint.pathname,
-    '/'+PROJECT+'/us-central1/ingestConsentRevocation')
+    process.env.URAI_R1586_JOBS_ENDPOINT
+      ? '/ingestConsentRevocation'
+      : '/'+PROJECT+'/us-central1/ingestConsentRevocation')
   const nativeEnvelope = {
     type: 'consent.revoked.v2',
     schemaVersion: outbox.schemaVersion,
