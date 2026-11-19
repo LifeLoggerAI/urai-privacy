@@ -7,7 +7,7 @@ const { randomBytes, createHash } = require('node:crypto')
 const { readFileSync } = require('node:fs')
 const { execFileSync } = require('node:child_process')
 const { resolve } = require('node:path')
-const { exactErrorCode, assertTerminalDeletion, buildReceipt } = require('./r1545-lifecycle-assertions.cjs')
+const { exactErrorCode, assertPendingDownstreamDeletion, buildReceipt } = require('./r1545-lifecycle-assertions.cjs')
 
 const project = 'urai-privacy-r1512-disposable'
 const sourceRoot = resolve(__dirname, '../..')
@@ -40,7 +40,7 @@ const phases = { exportRequest: 'not-started', exportPackage: 'not-verified', de
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 let admin
 function receipt(failed) {
-  console.log('R1545_CANONICAL_PRIVACY_LIFECYCLE_RESULT ' + JSON.stringify(buildReceipt({
+  console.log('R1579_PRIVACY_DOWNSTREAM_ACK_HOLD_RESULT ' + JSON.stringify(buildReceipt({
     checks, phases, failed, source: backendSource,
     harnessSha256: digest(readFileSync(__filename)),
     helperSha256: digest(readFileSync(require.resolve('./r1545-lifecycle-assertions.cjs'))),
@@ -127,18 +127,18 @@ async function run() {
   assert.ok(dryRun.plan.storageObjects.includes(job.exportPackagePath))
   assert.ok(dryRun.plan.storageObjects.includes(job.exportManifestPath))
   checks.push('deletion-approved-plan-includes-seeded-record-and-export')
-  const executed = await call(operator, 'executeDeletionRequest', { requestId, mode: 'execute', expectedPlanHash: dryRun.planHash })
-  // The guarded entry point returns the inner mutation result unchanged, then
-  // verifies completion before resolving. Only persisted evidence proves finality.
-  assert.equal(executed.requestId, requestId); assert.equal(executed.status, 'processing')
-  assert.equal(executed.mode, 'execute'); assert.equal(executed.planHash, dryRun.planHash)
-  assert.equal(executed.verificationRequired, true)
-  phases.deletionMutation = 'returned-awaiting-terminal-readback'
+  // R1579: invoke the actual mutation on disposable emulators, but refuse
+  // global completion without trusted subject-scoped downstream acknowledgements.
+  await assert.rejects(
+    call(operator, 'executeDeletionRequest', { requestId, mode: 'execute', expectedPlanHash: dryRun.planHash }),
+    exactErrorCode('functions/failed-precondition'),
+  )
+  phases.deletionMutation = 'local-mutation-performed-global-completion-rejected'
   const record = (await db.collection('deletionRequests').doc(requestId).get()).data()
   assert.ok(record?.deletionCompletionVerificationAuditId, 'Missing completion-verification audit linkage')
   const audit = (await db.collection('auditLogs').doc(record.deletionCompletionVerificationAuditId).get()).data()
   const tombstone = (await db.collection('privacyDeletionTombstones').doc(uid).get()).data()
-  assertTerminalDeletion({ record, tombstone, audit, uid, requestId, operatorUid })
+  assertPendingDownstreamDeletion({ record, tombstone, audit, uid, requestId, operatorUid })
   await assert.rejects(adminAuth.getUser(uid), exactErrorCode('auth/user-not-found'))
   assert.equal((await userRef.get()).exists, false)
   for (const collection of ['privacyRequests', 'exportJobs', 'consentRecords', 'dataAccessEvents']) {
@@ -149,9 +149,10 @@ async function run() {
   }
   assert.equal((await strangerRef.get()).data()?.memo, foreignMarker)
   assert.equal((await adminAuth.getUser(strangerUid)).uid, strangerUid)
-  phases.deletionRequest = 'completed'; phases.deletionMutation = 'completed'
-  phases.deletion = 'completed-verified-for-canonical-emulator-scope'
-  checks.push('terminal-deletion-readback-linked-audit-tombstone-and-residuals-verified')
+  phases.deletionRequest = 'processing-awaiting-downstream-acknowledgements'
+  phases.deletionMutation = 'local-mutation-verified-downstream-incomplete'
+  phases.deletion = 'blocked-global-completion-local-residuals-zero'
+  checks.push('local-deletion-readback-global-completion-refused-and-audited')
   // Existing cached owner token must not recreate consent through the fence.
   await assert.rejects(call(owner, 'setCanonicalConsent', { purpose: 'memory.storage', status: 'granted', surface: 'r1545-post-delete' }), exactErrorCode('functions/failed-precondition'))
   phases.postDeletionFence = 'consent-recreation-denied'
