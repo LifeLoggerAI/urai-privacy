@@ -37,7 +37,8 @@
     "verify:release": "bash scripts/verify-release.sh",
     "final:production-lock": "bash scripts/final-production-lock.sh",
     "test:export:contract": "node scripts/check-complete-export-contract.mjs",
-    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs"
+    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs",
+    "test:r1512:canonical-emulator": "npm --prefix functions run build && GCLOUD_PROJECT=urai-privacy-r1512-disposable firebase emulators:exec --config firebase.emulators.json --project urai-privacy-r1512-disposable --only auth,functions,firestore,storage \"node tests/integration/r1512-canonical-privacy-callable.emulator.cjs\""
   },
   "dependencies": {
     "firebase": "^12.13.0",

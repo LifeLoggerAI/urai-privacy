@@ -1,0 +1,156 @@
+'use strict';
+
+// R1512: Genuine local four-Firebase-emulator callable acceptance.
+// Disposable users only. No provider IAM, production writes, or destructive
+// deletion execution. Protected CI and qualified review remain required.
+const assert = require('node:assert/strict')
+const { randomBytes } = require('node:crypto')
+const { initializeApp, deleteApp } = require('firebase/app')
+const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } = require('firebase/auth')
+const { getFunctions, connectFunctionsEmulator, httpsCallable } = require('firebase/functions')
+const { initializeApp: initializeAdminApp, deleteApp: deleteAdminApp } = require('firebase-admin/app')
+const { getFirestore } = require('firebase-admin/firestore')
+
+const project = 'urai-privacy-r1512-disposable'
+assert.equal(process.env.GCLOUD_PROJECT, project, 'Only the disposable emulator project is permitted')
+assert.equal(process.env.FIREBASE_AUTH_EMULATOR_HOST, '127.0.0.1:9099')
+assert.equal(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8080')
+assert.equal(process.env.FIREBASE_STORAGE_EMULATOR_HOST, '127.0.0.1:9199')
+for (const key of ['GOOGLE_APPLICATION_CREDENTIALS', 'FIREBASE_TOKEN', 'RUNPOD_API_KEY', 'VERCEL_TOKEN']) {
+  assert.ok(!process.env[key], key + ' must not be present in this test')
+}
+
+const prefix = 'r1512_' + randomBytes(6).toString('hex')
+const apps = []
+const checks = []
+const timeout = setTimeout(() => {
+  console.error('R1512_TIMEOUT')
+  process.exit(1)
+}, 150000)
+timeout.unref()
+
+function client(name) {
+  const app = initializeApp(
+    { apiKey: 'disposable-emulator-only', projectId: project, appId: '1:123:web:emulator' },
+    prefix + name,
+  )
+  apps.push(app)
+  const auth = getAuth(app)
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+  const fn = getFunctions(app, 'us-central1')
+  connectFunctionsEmulator(fn, '127.0.0.1', 5001)
+  return { auth, fn }
+}
+
+async function call(who, name, data = {}) {
+  return (await httpsCallable(who.fn, name, { timeout: 30000 })(data)).data
+}
+
+async function run() {
+  const owner = client('owner')
+  const stranger = client('stranger')
+  const anonymous = client('anonymous')
+  const [a, b] = await Promise.all([owner, stranger].map(
+    (who, i) => createUserWithEmailAndPassword(
+      who.auth, prefix + i + '@example.test', 'DisposableOnly123!',
+    ),
+  ))
+  assert.notEqual(a.user.uid, b.user.uid)
+  checks.push('distinct-owner-identities')
+
+  await assert.rejects(call(anonymous, 'createExportRequest'))
+  checks.push('anonymous-export-denied')
+  await assert.rejects(call(anonymous, 'createDeletionRequest'))
+  checks.push('anonymous-deletion-denied')
+  await assert.rejects(call(anonymous, 'setCanonicalConsent', { purpose: 'memory.storage', status: 'granted' }))
+  checks.push('anonymous-consent-denied')
+  await assert.rejects(call(owner, 'setCanonicalConsent', { purpose: 'unregistered', status: 'granted' }))
+  checks.push('unknown-purpose-denied')
+
+  const consent = await call(owner, 'setCanonicalConsent', {
+    purpose: 'memory.storage', status: 'granted', surface: 'r1512-emulator-acceptance',
+  })
+  assert.equal(consent.status, 'granted')
+  checks.push('canonical-consent-granted')
+  const decision = await call(owner, 'evaluateCanonicalConsent', {
+    purpose: 'memory.storage', correlationId: prefix + 'eval',
+  })
+  assert.equal(decision.allowed, true)
+  checks.push('owner-consent-evaluation-allowed')
+  await assert.rejects(call(stranger, 'evaluateCanonicalConsent', {
+    targetUid: a.user.uid, purpose: 'memory.storage', correlationId: prefix + 'foreign',
+  }))
+  checks.push('foreign-consent-evaluation-denied')
+
+  const exportRequest = await call(owner, 'createExportRequest')
+  assert.equal(exportRequest.status, 'pending')
+  assert.ok(exportRequest.exportJobId)
+  checks.push('owner-export-request-pending')
+  await assert.rejects(call(owner, 'getExportDownloadUrl', {
+    jobId: exportRequest.exportJobId, file: 'export',
+  }))
+  checks.push('premature-download-denied')
+  await assert.rejects(call(stranger, 'getExportDownloadUrl', {
+    jobId: exportRequest.exportJobId, file: 'export',
+  }))
+  checks.push('foreign-download-denied')
+
+  const deletionRequest = await call(owner, 'createDeletionRequest', { reason: 'User requested deletion' })
+  assert.equal(deletionRequest.status, 'pending')
+  assert.ok(deletionRequest.requestId)
+  checks.push('owner-account-deletion-request-pending')
+
+  // R1514 fail-closed processor gates: owners, strangers and anonymous actors
+  // must never gain administrative execution privilege from a request ID.
+  await assert.rejects(call(owner, 'processExportRequest', { jobId: exportRequest.exportJobId }))
+  checks.push('owner-cannot-process-export')
+  await assert.rejects(call(stranger, 'processExportRequest', { jobId: exportRequest.exportJobId }))
+  checks.push('foreign-user-cannot-process-export')
+  await assert.rejects(call(anonymous, 'processExportRequest', { jobId: exportRequest.exportJobId }))
+  checks.push('anonymous-cannot-process-export')
+  await assert.rejects(call(owner, 'processDeletionRequest', { requestId: deletionRequest.requestId, status: 'processing' }))
+  checks.push('owner-cannot-process-deletion')
+  await assert.rejects(call(stranger, 'processDeletionRequest', { requestId: deletionRequest.requestId, status: 'processing' }))
+  checks.push('foreign-user-cannot-process-deletion')
+  await assert.rejects(call(anonymous, 'processDeletionRequest', { requestId: deletionRequest.requestId, status: 'processing' }))
+  checks.push('anonymous-cannot-process-deletion')
+  await assert.rejects(call(owner, 'executeDeletionRequest', { requestId: deletionRequest.requestId, mode: 'dryRun' }))
+  checks.push('owner-cannot-execute-deletion-dry-run')
+  await assert.rejects(call(stranger, 'executeDeletionRequest', { requestId: deletionRequest.requestId, mode: 'execute' }))
+  checks.push('foreign-user-cannot-execute-deletion')
+
+  // Confirm denial did not mutate either pending job into a privileged state.
+  const admin = initializeAdminApp({ projectId: project }, prefix + 'readback')
+  try {
+    const db = getFirestore(admin)
+    const [exportJob, deletionJob] = await Promise.all([
+      db.collection('exportJobs').doc(exportRequest.exportJobId).get(),
+      db.collection('deletionRequests').doc(deletionRequest.requestId).get(),
+    ])
+    assert.equal(exportJob.data()?.status, 'pending')
+    assert.equal(exportJob.data()?.uid, a.user.uid)
+    checks.push('denied-processor-left-export-pending')
+    assert.equal(deletionJob.data()?.status, 'pending')
+    assert.equal(deletionJob.data()?.uid, a.user.uid)
+    checks.push('denied-processor-left-deletion-pending')
+  } finally {
+    await deleteAdminApp(admin)
+  }
+  assert.equal(checks.length, 22)
+  assert.equal(new Set(checks).size, 22)
+
+  console.log('R1514_CANONICAL_PRIVACY_FOUR_EMULATOR_PASS ' + JSON.stringify({
+    checksPassed: checks.length, checks, source: process.env.URAI_EXACT_SHA || null,
+    actualEmulators: ['Authentication', 'Functions', 'Firestore', 'Storage'],
+    destructiveDeletionExecuted: false, productionWrites: false,
+    independentCloudIAMVerified: false, consumerAppIntegrated: false, releaseApproved: false,
+  }))
+}
+
+run().catch(error => {
+  console.error('R1512_FAILURE', error.stack || String(error))
+  process.exitCode = 1
+}).finally(async () => {
+  await Promise.all(apps.map(deleteApp))
+  clearTimeout(timeout)
+})
