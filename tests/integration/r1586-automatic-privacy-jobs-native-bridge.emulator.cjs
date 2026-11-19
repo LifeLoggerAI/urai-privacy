@@ -246,35 +246,25 @@ async function run() {
   assert.equal(acknowledgementRows.size, 1)
   const automaticAck = acknowledgementRows.docs[0].data()
   assert.equal(automaticAck.consumerId, 'urai-jobs')
-  assert.equal(automaticAck.eventId, eventId)
+  // The event is bound by its immutable outbox path and consumer document ID.
+  // The receiver's actual system identity and receipt bind the body.
+  assert.equal(automaticAck.actorUid, 'synthetic-jobs-consumer')
+  assert.equal(automaticAck.actorRole, 'system')
+  assert.equal(automaticAck.status, 'applied')
+  assert.equal(automaticAck.correlationId, eventId)
+  assert.equal(automaticAck.detailHash, actualJobsReceiptHash)
+  assert.equal((await outboxRef.get()).data().lastAcknowledgedConsumer, 'urai-jobs')
   pass('denied_calls_preserved_the_single_legitimate_jobs_acknowledgement')
 
-  const ack = await call(jobs, 'acknowledgeConsentRevocation', payload)
-  assert.equal(ack.eventId, eventId)
-  assert.equal(ack.consumerId, 'urai-jobs')
-  assert.equal(ack.status, 'applied')
-  assert.equal(ack.idempotent, false)
-  assert.ok(ack.auditId)
-  const jobsAck = (await outboxRef.collection('acknowledgements').doc('urai-jobs').get()).data()
-  assert.equal(jobsAck.actorUid, jobsUid)
-  assert.equal(jobsAck.consumerId, 'urai-jobs')
-  assert.equal(jobsAck.status, 'applied')
-  assert.equal(jobsAck.detailHash, payload.detailHash)
-  const audit = (await db.collection('auditLogs').doc(ack.auditId).get()).data()
-  assert.equal(audit.action, 'consent_revocation_acknowledged')
-  assert.equal(audit.targetUid, ownerUid)
-  assert.equal(audit.metadata.eventId, eventId)
-  assert.equal(audit.metadata.consumerId, 'urai-jobs')
-  assert.equal((await outboxRef.get()).data().lastAcknowledgedConsumer, 'urai-jobs')
-  pass('authenticated_system_bound_jobs_acknowledgement_persists_audit_and_receipt')
-
-  const repeated = await call(jobs, 'acknowledgeConsentRevocation', payload)
-  assert.equal(repeated.idempotent, true)
-  assert.equal(repeated.auditId, null)
+  // A different authenticated Jobs actor cannot overwrite the automatic
+  // receiver ACK. HTTP replay above already exercised the receiver's own
+  // idempotent delivery using its configured system identity.
+  await denied(() => call(jobs, 'acknowledgeConsentRevocation', payload),
+    'already-exists', 'different_authenticated_jobs_actor_cannot_replace_automatic_ack')
   assert.equal((await outboxRef.collection('acknowledgements').get()).size, 1)
   await denied(() => call(jobs, 'acknowledgeConsentRevocation', { ...payload, detailHash: 'f'.repeat(64) }),
     'already-exists', 'conflicting_immutable_acknowledgement_refused')
-  pass('idempotent_retry_keeps_one_immutable_provider_receipt')
+  pass('receiver_replay_keeps_one_immutable_provider_receipt')
 
   // Adversarial independent synthetic outbox: privileged emulator seed must NOT
   // be mistaken for trustworthy canonical revocation publication.
