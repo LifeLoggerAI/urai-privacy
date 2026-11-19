@@ -142,7 +142,7 @@ async function run() {
     priorGrantEvidenceState: 'present',
   }))
   pass('native_trigger_outbox_subject_and_immutable_prior_grant_lineage')
-  assert.match(outbox.revokedAt || '', /^\\d{4}-\\d{2}-\\d{2}T/)
+  assert.match(outbox.revokedAt || '', /^\d{4}-\d{2}-\d{2}T/)
   assert.match(outbox.revocationTransportHash || '', /^[0-9a-f]{64}$/)
   assert.equal(outbox.revocationTransportHash, revocationTransportHash({
     eventId, recordId: grant.consentId, uid: ownerUid, purpose: 'memory.storage',
