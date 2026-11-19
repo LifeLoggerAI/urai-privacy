@@ -11,3 +11,4 @@ export { processDeletionRequest, executeDeletionRequest } from "./deletion-mutat
 export { processExportRequest } from "./export-request";
 export { setCanonicalConsent, evaluateCanonicalConsent, verifyLifeMovieRenderConsent } from "./consent-api";
 export { publishConsentRevocation, acknowledgeConsentRevocation } from "./consent-revocation";
+export { dispatchConsentRevocationToJobs } from "./consent-revocation-dispatch";
