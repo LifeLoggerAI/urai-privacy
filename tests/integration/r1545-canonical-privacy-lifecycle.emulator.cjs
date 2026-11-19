@@ -108,7 +108,7 @@ async function run() {
   assert.equal(objects.length, 0)
   checks.push('deleted-export-objects-absent')
 
-  console.log('R1545_CANONICAL_PRIVACY_LIFECYCLE_PARTIAL  + JSON.stringify({
+  console.log('R1545_CANONICAL_PRIVACY_LIFECYCLE_PARTIAL ' + JSON.stringify({
     checksPassed: checks.length,
     checks,
     source: process.env.URAI_EXACT_SHA || null,
