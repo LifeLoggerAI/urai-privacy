@@ -267,7 +267,7 @@ async function run() {
   // Await the actual automatic ACK before checking replay semantics.
   const automaticAck = await waitFor(
     outboxRef.collection('acknowledgements').doc('urai-jobs'),
-    x => x.consumerId==='urai-jobs' && x.eventId===eventId,
+    x => x.consumerId==='urai-jobs' && x.correlationId===eventId,
     'genuine automatic Jobs acknowledgement')
   assert.equal(automaticAck.detailHash, actualJobsReceiptHash)
   assert.equal((await outboxRef.collection('acknowledgements').get()).size,1)
@@ -285,7 +285,7 @@ async function run() {
   assert.equal(jobsAck.consumerId,'urai-jobs')
   assert.equal(jobsAck.status,'applied')
   assert.equal(jobsAck.detailHash,payload.detailHash)
-  assert.equal(jobsAck.eventId,eventId)
+  assert.equal(jobsAck.correlationId,eventId)
   assert.equal((await outboxRef.collection('acknowledgements').get()).size,1)
   assert.equal((await outboxRef.get()).data().lastAcknowledgedConsumer,'urai-jobs')
   pass('authenticated_system_bound_jobs_acknowledgement_persists_audit_and_receipt')
