@@ -91,7 +91,7 @@ echo "[security-gate] Full npm audit visibility (non-blocking)"
 npm audit --omit=dev || true
 npm --prefix functions audit --omit=dev || true
 
-echo "[security-gate] Enforcing critical vulnerability gate"
+echo "[security-gate] Enforcing patched Next.js/Zod lockfile floors"\nnode --test scripts/check-release-dependency-pins.test.mjs\nnode scripts/check-release-dependency-pins.mjs\n\necho "[security-gate] Enforcing critical vulnerability gate"
 npm audit --audit-level=critical --omit=dev
 npm --prefix functions audit --audit-level=critical --omit=dev
 
