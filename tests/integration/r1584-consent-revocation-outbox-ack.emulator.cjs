@@ -11,6 +11,7 @@ const { getFunctions, connectFunctionsEmulator, httpsCallable } = require('fireb
 const { initializeApp: initializeAdminApp, deleteApp: deleteAdminApp } = require('firebase-admin/app')
 const { getAuth: getAdminAuth } = require('firebase-admin/auth')
 const { getFirestore } = require('firebase-admin/firestore')
+const { projectCanonicalJobsV2Revocation, revocationTransportHash } = require('../../functions/lib/consent-revocation-jobs-v2.js')
 
 const PROJECT = 'urai-privacy-r1512-disposable'
 const EXPECTED_SHA = process.env.URAI_EXACT_SHA
@@ -141,6 +142,25 @@ async function run() {
     priorGrantEvidenceState: 'present',
   }))
   pass('native_trigger_outbox_subject_and_immutable_prior_grant_lineage')
+  assert.match(outbox.revokedAt || '', /^\d{4}-\d{2}-\d{2}T/)
+  assert.match(outbox.revocationTransportHash || '', /^[0-9a-f]{64}$/)
+  assert.equal(outbox.revocationTransportHash, revocationTransportHash({
+    eventId, recordId: grant.consentId, uid: ownerUid, purpose: 'memory.storage',
+    policyVersion: revokedRecord.policyVersion,
+    sourceReceiptHash: revoke.receiptHash, revokedAt: outbox.revokedAt,
+  }))
+  const jobsEnvelope = projectCanonicalJobsV2Revocation(outbox)
+  assert.ok(jobsEnvelope, 'emulator-published revocation must project only from valid canonical evidence')
+  assert.deepEqual(jobsEnvelope, {
+    type: 'consent.revoked.v2',
+    eventId, ownerUid, purpose: 'memory.storage',
+    policyVersion: revokedRecord.policyVersion,
+    sourceReceiptHash: revoke.receiptHash,
+    correlationId: 'revocation:' + eventId,
+    revokedAt: outbox.revokedAt,
+  })
+  pass('actual_outbox_projects_to_exact_Jobs_v2_envelope_without_transport')
+
 
   const payload = {
     eventId, consumerId: 'urai-jobs', status: 'applied',

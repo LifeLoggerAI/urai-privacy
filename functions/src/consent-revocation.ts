@@ -4,6 +4,7 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { classifyRevocationOutboxReplay, priorGrantReceiptEvidence, selectConsentRevocationSource } from "./consent-revocation-transition";
+import { isCanonicalEventTime, revocationTransportHash } from "./consent-revocation-jobs-v2";
 
 const db = getFirestore();
 const REVOCATION_SCHEMA_VERSION = "consent.revoked.v1";
@@ -50,6 +51,13 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
     throw new Error("Cannot publish consent revocation from an invalid canonical consent record.");
   }
 
+  // CloudEvent occurrence time, not wall-clock dispatch time or a guessed grant timestamp.
+  // No version-2 projection is admissible without this trusted event-time evidence.
+  const revokedAt = event.time;
+  if (!isCanonicalEventTime(revokedAt)) {
+    throw new Error("Canonical revocation event time missing or invalid.");
+  }
+
   const recordId = event.params.recordId;
   const eventId = digest({
     schemaVersion: REVOCATION_SCHEMA_VERSION,
@@ -71,7 +79,12 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
     policyVersion,
     sourceReceiptHash: receiptHash,
     ...priorGrant,
-    integrityHash: digest({ eventId, recordId, uid, purpose, ...priorGrant })
+    integrityHash: digest({ eventId, recordId, uid, purpose, ...priorGrant }),
+    revokedAt,
+    revocationTransportHash: revocationTransportHash({
+      eventId, recordId, uid, purpose, policyVersion,
+      sourceReceiptHash: receiptHash, revokedAt
+    })
   };
 
   await db.runTransaction(async (transaction) => {
