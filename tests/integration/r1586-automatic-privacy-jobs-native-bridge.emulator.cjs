@@ -154,9 +154,162 @@ async function run() {
   assert.equal(automaticBlock.data().active,true)
   pass('automatic_privacy_outbox_trigger_delivers_real_jobs_v2_event_and_block')
 
-  // R1586: actual Jobs HTTP handler in the same four-emulator project. This is a
-  // *manual synthetic bridge* and does not represent an implemented dispatcher.
-  const jobsEndpoint = 'http://127.0.0.1:5001/' + PROJECT + '/us-central1/ingestConsentRevocation'
+  // R1586 review harness: use only an explicit loopback Jobs receiver. The
+  // production dispatcher is configured independently; no external URL is accepted here.
+  const jobsEndpoint = process.env.URAI_R1586_JOBS_ENDPOINT ||
+    ('http://127.0.0.1:5001/' + PROJECT + '/us-central1/ingestConsentRevocation')
+  assert.match(jobsEndpoint, new RegExp('^http://127\\\\.0\\\\.0\\\\.1:[0-9]+/' + PROJECT + '/us-central1/ingestConsentRevocation
+  const nativeEnvelope = {
+    type: 'consent.revoked.v2',
+    schemaVersion: outbox.schemaVersion,
+    eventId: outbox.eventId,
+    consentRecordId: outbox.consentRecordId,
+    uid: outbox.uid,
+    purpose: outbox.purpose,
+    consentTier: outbox.consentTier,
+    policyVersion: outbox.policyVersion,
+    sourceReceiptHash: outbox.sourceReceiptHash,
+    priorGrantReceiptHash: outbox.priorGrantReceiptHash,
+    priorGrantEvidenceState: outbox.priorGrantEvidenceState,
+    integrityHash: outbox.integrityHash,
+    correlationId: outbox.eventId,
+    revokedAt: outbox.createdAt.toDate().toISOString(),
+  }
+  const syntheticBearer = 'R1586_Synthetic_Emulator_Event_Only'
+  async function postJobs(data, bearer=syntheticBearer) {
+    const response = await fetch(jobsEndpoint, {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + bearer, 'content-type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const body = await response.json()
+    return {status:response.status, body}
+  }
+  const deniedBearer = await postJobs(nativeEnvelope,'wrong-synthetic-token')
+  assert.equal(deniedBearer.status,401)
+  pass('actual_jobs_http_wrong_bearer_denied')
+  const corruptIntegrity = await postJobs({...nativeEnvelope,integrityHash:'f'.repeat(64)})
+  assert.equal(corruptIntegrity.status,400)
+  pass('actual_jobs_http_corrupt_prior_grant_integrity_denied')
+  const delivered = await postJobs(nativeEnvelope)
+  assert.equal(delivered.status,200,JSON.stringify(delivered.body))
+  assert.equal(delivered.body.ok,true)
+  assert.equal(delivered.body.acknowledgement.schemaVersion,'consent.revoked.v2')
+  assert.equal(delivered.body.acknowledgement.sourceReceiptHash,outbox.sourceReceiptHash)
+  const blockId=createHash('sha256').update(ownerUid + String.fromCharCode(10) + 'memory.storage').digest('hex')
+  const jobsBlock = await db.collection('jobConsentBlocks').doc(blockId).get()
+  assert.equal(jobsBlock.exists,true)
+  assert.equal(jobsBlock.data().active,true)
+  assert.equal(jobsBlock.data().schemaVersion,'consent.revoked.v2')
+  pass('actual_jobs_v2_delivery_receipt_and_active_block_persisted')
+  const retry = await postJobs(nativeEnvelope)
+  assert.equal(retry.status,200,JSON.stringify(retry.body))
+  assert.equal(retry.body.acknowledgement.eventId,eventId)
+  const collisions = await postJobs({...nativeEnvelope,revokedAt:'2026-11-19T00:00:00.000Z'})
+  assert.equal(collisions.status,409)
+  pass('actual_jobs_v2_replay_idempotent_timestamp_collision_denied')
+  const v1AfterV2 = await postJobs({
+    type:'consent.revoked.v1', eventId:'legacy-after-v2',
+    ownerUid, purpose:'memory.storage', policyVersion:'legacy',
+    decisionReceiptId:'legacy-source', correlationId:'legacy-correlation',
+    revokedAt:nativeEnvelope.revokedAt,
+  })
+  assert.equal(v1AfterV2.status,409)
+  pass('actual_jobs_v1_cannot_downgrade_v2_enforced_block')
+  const actualJobsReceiptHash = delivered.body.acknowledgement.integrityHash
+  assert.match(actualJobsReceiptHash,/^[a-f0-9]{64}$/)
+
+  const payload = {
+    eventId, consumerId: 'urai-jobs', status: 'applied',
+    correlationId: 'r1584-jobs-confirmed-' + suffix, detailHash: actualJobsReceiptHash,
+  }
+  await denied(() => call(anonymous, 'acknowledgeConsentRevocation', payload),
+    'unauthenticated', 'anonymous_acknowledgement_denied')
+  await denied(() => call(owner, 'acknowledgeConsentRevocation', payload),
+    'permission-denied', 'ordinary_owner_cannot_self_acknowledge_provider')
+  await denied(() => call(stranger, 'acknowledgeConsentRevocation', payload),
+    'permission-denied', 'stranger_cannot_acknowledge_provider')
+  await denied(() => call(analytics, 'acknowledgeConsentRevocation', payload),
+    'permission-denied', 'cross_consumer_id_claim_cannot_ack_for_jobs')
+  await denied(() => call(jobs, 'acknowledgeConsentRevocation', { ...payload, eventId: 'b'.repeat(64) }),
+    'not-found', 'no_ack_for_unknown_event_id')
+  const acknowledgementRows = await outboxRef.collection('acknowledgements').get()
+  // The native dispatcher may already have reconciled the legitimate Jobs ACK.
+  // Denied calls must not add a second consumer acknowledgement or alter its binding.
+  assert.equal(acknowledgementRows.size, 1)
+  const automaticAck = acknowledgementRows.docs[0].data()
+  assert.equal(automaticAck.consumerId, 'urai-jobs')
+  assert.equal(automaticAck.eventId, eventId)
+  pass('denied_calls_preserved_the_single_legitimate_jobs_acknowledgement')
+
+  const ack = await call(jobs, 'acknowledgeConsentRevocation', payload)
+  assert.equal(ack.eventId, eventId)
+  assert.equal(ack.consumerId, 'urai-jobs')
+  assert.equal(ack.status, 'applied')
+  assert.equal(ack.idempotent, false)
+  assert.ok(ack.auditId)
+  const jobsAck = (await outboxRef.collection('acknowledgements').doc('urai-jobs').get()).data()
+  assert.equal(jobsAck.actorUid, jobsUid)
+  assert.equal(jobsAck.consumerId, 'urai-jobs')
+  assert.equal(jobsAck.status, 'applied')
+  assert.equal(jobsAck.detailHash, payload.detailHash)
+  const audit = (await db.collection('auditLogs').doc(ack.auditId).get()).data()
+  assert.equal(audit.action, 'consent_revocation_acknowledged')
+  assert.equal(audit.targetUid, ownerUid)
+  assert.equal(audit.metadata.eventId, eventId)
+  assert.equal(audit.metadata.consumerId, 'urai-jobs')
+  assert.equal((await outboxRef.get()).data().lastAcknowledgedConsumer, 'urai-jobs')
+  pass('authenticated_system_bound_jobs_acknowledgement_persists_audit_and_receipt')
+
+  const repeated = await call(jobs, 'acknowledgeConsentRevocation', payload)
+  assert.equal(repeated.idempotent, true)
+  assert.equal(repeated.auditId, null)
+  assert.equal((await outboxRef.collection('acknowledgements').get()).size, 1)
+  await denied(() => call(jobs, 'acknowledgeConsentRevocation', { ...payload, detailHash: 'f'.repeat(64) }),
+    'already-exists', 'conflicting_immutable_acknowledgement_refused')
+  pass('idempotent_retry_keeps_one_immutable_provider_receipt')
+
+  // Adversarial independent synthetic outbox: privileged emulator seed must NOT
+  // be mistaken for trustworthy canonical revocation publication.
+  const forgedId = 'e'.repeat(64)
+  const forgedRef = db.collection('consentRevocationOutbox').doc(forgedId)
+  await forgedRef.create({
+    schemaVersion: 'consent.revoked.v1',
+    eventId: forgedId,
+    uid: strangerUid,
+    status: 'pending',
+    // Missing consentRecordId, purpose, receipt hashes, lineage, integrityHash.
+  })
+  await denied(() => call(jobs, 'acknowledgeConsentRevocation', { ...payload, eventId: forgedId }),
+    'failed-precondition', 'forged_incomplete_outbox_cannot_be_accepted_as_acknowledgeable')
+  assert.equal((await forgedRef.collection('acknowledgements').get()).size, 0)
+  pass('no_provider_ack_or_audit_written_for_incomplete_outbox')
+  const quarantined = await waitFor(forgedRef, x => x.jobsTransportStatus === 'quarantined', 'forged outbox quarantine')
+  assert.equal(quarantined.jobsTransportReason,'invalid-canonical-outbox')
+  pass('malformed_outbox_quarantined_without_jobs_transport_or_consumer_ack')
+
+  const current = (await consentRef.get()).data()
+  assert.equal(current.status, 'revoked')
+  assert.equal(current.uid, ownerUid)
+  console.log('R1584_NATIVE_CONSENT_REVOCATION_ACK_RESULT ' + JSON.stringify({
+    source: EXPECTED_SHA, projectId: PROJECT, checksPassed: checks.length,
+    checks, ownerUidVerified: !!ownerUid, consumerClaimVerified: true,
+    providerDeliveryVerified: false, emulatedAutomatedDeliveryVerified: true, providerActualEffectVerified: false,
+    emulatorIdentityOnly: true, productionWrites: false, cloudIAMVerified: false,
+    independentSecurityApproval: false, releaseApproved: false,
+  }))
+}
+const timer = setTimeout(() => { console.error('R1584_TIMEOUT'); process.exit(90) }, 165000)
+timer.unref()
+run().catch(error => {
+  console.error('R1584_FAIL', error?.code ?? error?.name, error?.message)
+  process.exitCode = 1
+}).finally(async () => {
+  clearTimeout(timer)
+  await Promise.allSettled(apps.map(deleteApp))
+  if (admin) await deleteAdminApp(admin)
+})
+))
   const nativeEnvelope = {
     type: 'consent.revoked.v2',
     schemaVersion: outbox.schemaVersion,
