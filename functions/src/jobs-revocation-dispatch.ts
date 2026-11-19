@@ -152,3 +152,52 @@ export const deliverJobsConsentRevocation = onSchedule({
     }
   }
 });
+/**
+ * A Jobs HTTP delivery is NOT Privacy acknowledgement. The only admissible
+ * final state is an independently consumer-bound Privacy callable ACK whose
+ * event identity and detailHash agree with the previously verified Jobs receipt.
+ * An integrity hash is not a signature: service IAM/reviewer controls still apply.
+ */
+export function validJobsPrivacyAck(ack: Row, outbox: Row): boolean {
+  if (outbox.status !== "delivered_pending_ack" ||
+      !hex64.test(String(outbox.jobsReceiptHash || "")) ||
+      ack.consumerId !== "urai-jobs" || ack.status !== "applied" ||
+      ack.actorRole !== "system" ||
+      typeof ack.actorUid !== "string" || !ack.actorUid ||
+      ack.correlationId !== outbox.eventId ||
+      ack.detailHash !== outbox.jobsReceiptHash ||
+      !hex64.test(String(ack.integrityHash || ""))) return false;
+  try { projectJobsRevocation(outbox); } catch { return false; }
+  return ack.integrityHash === hash({
+    eventId: outbox.eventId, consumerId: "urai-jobs", status: "applied",
+    correlationId: outbox.eventId, detailHash: outbox.jobsReceiptHash,
+    actorUid: ack.actorUid, tokenConsumerId: "urai-jobs"
+  });
+}
+
+export const reconcileJobsConsentRevocationAck = onSchedule({
+  schedule: "every 5 minutes", retryCount: 0,
+  timeoutSeconds: 120, memory: "256MiB"
+}, async () => {
+  const delivered = await db.collection("consentRevocationOutbox")
+    .where("status", "==", "delivered_pending_ack").limit(20).get();
+  for (const doc of delivered.docs) {
+    try {
+      await db.runTransaction(async (tx) => {
+        const current = await tx.get(doc.ref);
+        const ack = await tx.get(doc.ref.collection("acknowledgements").doc("urai-jobs"));
+        if (!current.exists || !ack.exists ||
+            !validJobsPrivacyAck(ack.data() ?? {}, current.data() ?? {})) return;
+        tx.update(doc.ref, {
+          status: "acknowledged",
+          verifiedConsumerId: "urai-jobs",
+          verifiedJobsReceiptHash: current.data()?.jobsReceiptHash,
+          acknowledgedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      });
+    } catch {
+      console.error("Jobs acknowledgement reconciliation failed", { eventId: doc.id });
+    }
+  }
+});

@@ -6,7 +6,7 @@ const { resolve } = require("node:path");
 const functionsRequire = createRequire(resolve(__dirname, "../../functions/package.json"));
 const { initializeApp } = functionsRequire("firebase-admin/app");
 initializeApp({projectId:"urai-r1586-dispatch-synthetic"});
-const { projectJobsRevocation, verifyJobsReceipt } =
+const { projectJobsRevocation, verifyJobsReceipt, validJobsPrivacyAck } =
   require("../../functions/lib/jobs-revocation-dispatch.js");
 const hash = (x) => createHash("sha256").update(JSON.stringify(x)).digest("hex");
 function row() {
@@ -86,5 +86,41 @@ test("Privacy projection parses under exact Jobs receiver schema",async(t)=>{
   const event=projectJobsRevocation(row());
   assert.equal(consumer.NativeConsentRevokedEventSchema.safeParse(event).success,true);
   assert.equal(consumer.verifyNativeLineage(event),true);
+});
+
+function verifiedAckFixture() {
+  const event=projectJobsRevocation(row());
+  const receipt=verifyJobsReceipt(jobAck(event),event);
+  const outbox={...row(),status:"delivered_pending_ack",jobsReceiptHash:receipt};
+  const actorUid="synthetic-jobs-system-consumer";
+  const ack={consumerId:"urai-jobs",status:"applied",actorUid,actorRole:"system",
+    correlationId:outbox.eventId,detailHash:receipt};
+  ack.integrityHash=hash({eventId:outbox.eventId,consumerId:"urai-jobs",status:"applied",
+    correlationId:outbox.eventId,detailHash:receipt,actorUid,tokenConsumerId:"urai-jobs"});
+  return {outbox,ack};
+}
+test("valid Jobs consumer-bound Privacy ACK can finalize delivery",()=>{
+  const {outbox,ack}=verifiedAckFixture();
+  assert.equal(validJobsPrivacyAck(ack,outbox),true);
+});
+for(const [label,mutate] of [
+ ["wrong consumer",(ack)=>ack.consumerId="urai-analytics"],
+ ["wrong actor role",(ack)=>ack.actorRole="user"],
+ ["mismatched status",(ack)=>ack.status="rejected"],
+ ["changed correlation",(ack)=>ack.correlationId="other-event"],
+ ["changed delivery receipt",(ack)=>ack.detailHash="e".repeat(64)],
+ ["forged integrity hash",(ack)=>ack.integrityHash="e".repeat(64)],
+ ["different actor",(ack)=>ack.actorUid="stranger"],
+]) test("reject noncanonical Privacy ACK: "+label,()=>{
+  const {outbox,ack}=verifiedAckFixture();
+  mutate(ack);assert.equal(validJobsPrivacyAck(ack,outbox),false);
+});
+test("cannot finalize delivery without trusted Jobs receipt",()=>{
+  const {outbox,ack}=verifiedAckFixture();
+  outbox.jobsReceiptHash="";assert.equal(validJobsPrivacyAck(ack,outbox),false);
+});
+test("cannot acknowledge event not in delivered_pending_ack",()=>{
+  const {outbox,ack}=verifiedAckFixture();
+  outbox.status="pending";assert.equal(validJobsPrivacyAck(ack,outbox),false);
 });
 
