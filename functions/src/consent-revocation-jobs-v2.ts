@@ -42,7 +42,7 @@ export function revocationTransportHash(input: TransportHashFields): string {
   });
 }
 
-function isCanonicalEventTime(value: unknown): value is string {
+export function isCanonicalEventTime(value: unknown): value is string {
   if (typeof value !== "string" ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value)) return false;
   const millis = Date.parse(value);
