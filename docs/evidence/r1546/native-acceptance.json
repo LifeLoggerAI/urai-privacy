@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "urai-r1546-native-acceptance-v1",
+  "repository": "LifeLoggerAI/urai-privacy",
+  "source": "2a3ae01e6353bea95d83166b88f28d74f061436b",
+  "tree": "62a683a496a4dcd68589487ee88c55aba7d35d21",
+  "pod": "6wjqgu8fj931ww",
+  "node": "22",
+  "isolatedProject": "urai-privacy-r1512-disposable",
+  "native": {
+    "outcome": "PARTIAL",
+    "checksPassed": 7,
+    "checks": [
+      "distinct-authenticated-identities-and-emulator-operator-claim",
+      "owner-and-foreign-records-seeded-and-read-back",
+      "consent-grant-owner-isolation-and-revocation-denial",
+      "export-terminal-records-package-hashes-content-redaction-and-foreign-denial",
+      "deletion-approved-plan-includes-seeded-record-and-export",
+      "terminal-deletion-readback-linked-audit-tombstone-and-residuals-verified",
+      "post-deletion-consent-recreation-denied"
+    ],
+    "source": "2a3ae01e6353bea95d83166b88f28d74f061436b",
+    "harnessSha256": "446a08b85279ea551c207e09f088a11618b02ab68415b49cd76e64471f0aa020",
+    "helperSha256": "50b7e5b7f963544c12a56fe7ec594dd93288c10327961aaba244d3c88f97e894",
+    "sourceIdentityBasis": "Git HEAD matched to runner pin; clean tracked checkout; independent build custody still required",
+    "requestVsCompletion": {
+      "exportRequest": "completed",
+      "exportPackage": "completed-and-admin-storage-bytes-verified",
+      "deletionRequest": "completed",
+      "deletionMutation": "completed",
+      "deletion": "completed-verified-for-canonical-emulator-scope",
+      "postDeletionFence": "consent-recreation-denied"
+    },
+    "downloadUrl": {
+      "status": "not-attempted",
+      "reason": "no-authorized-provider-signer-in-emulator-scope"
+    },
+    "authorizedUserDownload": "not-tested",
+    "adminStorageReadIsUserDownload": false,
+    "productionWrites": false,
+    "independentCloudIAMVerified": false,
+    "independentSecurityCertification": false,
+    "releaseApproved": false
+  },
+  "exitCode": 0,
+  "assertionUnitTests": {
+    "passed": 23,
+    "nativeEvidence": false
+  },
+  "commands": [
+    "npm ci --no-audit --no-fund",
+    "npm --prefix functions ci --no-audit --no-fund",
+    "npm --prefix functions run build",
+    "node --test tests/r1545-lifecycle-assertions.test.cjs",
+    "node node_modules/firebase-tools/lib/bin/firebase.js emulators:exec --config firebase.emulators.json --project urai-privacy-r1512-disposable --only auth,functions,firestore,storage \"node tests/integration/r1545-canonical-privacy-lifecycle.emulator.cjs\""
+  ],
+  "environment": "env -i; isolated HOME; Node/Java PATH; CI; disposable GCLOUD_PROJECT; exact URAI_EXACT_SHA; emulator environment injected by Firebase CLI. No provider credentials.",
+  "lockfiles": {
+    "root": "96098aaf6f4be6920b44a0ee722d36f8bdcd5cd489befc1cae23dc52fa87fde4",
+    "functions": "d44043eafddf146ea7ca815de884eb4806a4b202a41a31dacc54e38e98e759c8"
+  },
+  "logHashes": {
+    "setup.log": "a6c167a275ca55ced602a9e7a7f132dbfdb6cbf4c2547228bdb77d964bbcd725",
+    "root-install.log": "b94789a5b4302dfd6398a23b7279fcce0bfe9825b74f7abab13e64b204f8c59b",
+    "functions-install.log": "0b5b7a0c148eec5f25f1c8f6c3964872253e163e894999026b71c5a611423b50",
+    "java-setup.log": "fa73ae21a566874e49017d4b81b1401c0de87298cc1e66830ccb8b5bc64b7bd4",
+    "lifecycle.log": "21fec35136ab455ffdceb136bc08f05ab79803398b03cc98cd030bb5c3ae9c31",
+    "lifecycle.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  "scope": "Canonical backend callable lifecycle only. No hosted UI journey, authorized-user download, production IAM, or independent certification.",
+  "production": "HOLD / NO-GO",
+  "productionPrivateMemoryWrites": "DISABLED"
+}
