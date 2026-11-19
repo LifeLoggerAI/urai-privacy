@@ -5,6 +5,8 @@ import {
   type DeletionCompletionResiduals
 } from "../../functions/src/deletion-completion-verifier";
 
+import { DELETION_ADAPTERS, deletionEcosystemCompletionBlockReason } from "../../functions/src/deletion-contract";
+
 const deletionMutationGuard = readFileSync(
   "functions/src/deletion-mutation-guard.ts",
   "utf8"
@@ -91,5 +93,39 @@ describe("deletion completion residual policy", () => {
     expect(deletionCompletionVerifier).toContain("storageResults.flatMap");
     expect(privacyFunctions).not.toContain("deletionPlan: result.plan");
     expect(privacyFunctions).toContain("deletionPlanCounts: result.plan.counts");
+  });
+});
+
+describe("cross-system deletion completion authority (R704 fail-closed)", () => {
+  it("cannot certify global completion while independent contributors remain pending", () => {
+    const pending = DELETION_ADAPTERS.filter((adapter) => adapter.status === "pending");
+    expect(pending.length).toBeGreaterThan(0);
+    expect(pending.some((adapter) => adapter.id === "ruai-b2bportal")).toBe(true);
+    expect(pending.some((adapter) => adapter.id === "urai-jobs")).toBe(true);
+    expect(deletionEcosystemCompletionBlockReason()).toBe(
+      "PENDING_DOWNSTREAM_DELETION_CONTRIBUTORS"
+    );
+  });
+
+  it("keeps global completion blocked even after local Privacy residual verification is clean", () => {
+    expect(deletionCompletionBlockReason(residuals())).toBeNull();
+    expect(deletionEcosystemCompletionBlockReason()).not.toBe("");
+  });
+
+  it("places a trusted downstream-denial audit before the completed-state write", () => {
+    const gate = deletionMutationGuard.indexOf(
+      "const downstreamReason = deletionEcosystemCompletionBlockReason();"
+    );
+    expect(gate).toBeGreaterThan(0);
+    const blockedAudit = deletionMutationGuard.indexOf("verified: false", gate);
+    const completionWrite = deletionMutationGuard.indexOf("verified: true", gate);
+    expect(blockedAudit).toBeGreaterThan(gate);
+    expect(completionWrite).toBeGreaterThan(blockedAudit);
+    expect(deletionMutationGuard.slice(gate, completionWrite)).toContain(
+      '"failed-precondition"'
+    );
+    expect(deletionMutationGuard.slice(gate, completionWrite)).toContain(
+      "throw new HttpsError"
+    );
   });
 });
