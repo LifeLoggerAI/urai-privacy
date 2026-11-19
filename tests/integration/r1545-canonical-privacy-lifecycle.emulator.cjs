@@ -22,7 +22,7 @@ for (const key of ['GOOGLE_APPLICATION_CREDENTIALS', 'FIREBASE_TOKEN', 'RUNPOD_A
 
 const prefix = 'r1545_' + randomBytes(6).toString('hex')
 const apps = []
-const admin = initializeAdminApp({ projectId: project }, prefix + '-admin')
+const admin = initializeAdminApp({ projectId: project, storageBucket: project + '.appspot.com' }, prefix + '-admin')
 const adminAuth = getAdminAuth(admin)
 const db = getFirestore(admin)
 const bucket = getStorage(admin).bucket()
