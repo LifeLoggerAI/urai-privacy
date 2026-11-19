@@ -88,6 +88,22 @@ async function run() {
   await adminAuth.setCustomUserClaims(analyticsUid, { system: true, consumerId: 'urai-analytics' })
   await Promise.all([jobs.auth.currentUser.getIdToken(true), analytics.auth.currentUser.getIdToken(true)])
   pass('distinct_authenticated_owner_foreign_and_system_bound_consumers')
+  // Install only an actual Firebase Auth emulator-issued scoped test identity
+  // into the separate local compiled Jobs receiver before automatic dispatch.
+  // This loopback endpoint exists only in the review-only Jobs shim.
+  const testJobsEndpoint = new URL(process.env.URAI_R1586_JOBS_ENDPOINT || '')
+  assert.equal(testJobsEndpoint.protocol,'http:')
+  assert.equal(testJobsEndpoint.hostname,'127.0.0.1')
+  assert.match(testJobsEndpoint.port,/^[1-9][0-9]{0,4}$/)
+  assert.equal(testJobsEndpoint.pathname,'/ingestConsentRevocation')
+  assert.equal(testJobsEndpoint.search,'')
+  assert.equal(testJobsEndpoint.hash,'')
+  const identity = await fetch(new URL('/__test_identity',testJobsEndpoint),{
+    method:'POST',redirect:'error',headers:{'content-type':'application/json'},
+    body:JSON.stringify({uid:jobsUid,token:await jobs.auth.currentUser.getIdToken(true)}),
+  })
+  assert.equal(identity.status,204)
+  pass('emulator_issued_scoped_jobs_consumer_identity_installed_in_loopback_receiver')
 
   const grant = await call(owner, 'setCanonicalConsent', {
     purpose: 'memory.storage', status: 'granted', surface: 'r1584-synthetic-grant',
