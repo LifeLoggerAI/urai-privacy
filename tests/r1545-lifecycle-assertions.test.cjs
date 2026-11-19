@@ -1,7 +1,7 @@
 'use strict'
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { exactErrorCode, assertTerminalDeletion, buildReceipt } = require('./integration/r1545-lifecycle-assertions.cjs')
+const { exactErrorCode, assertTerminalDeletion, assertPendingDownstreamDeletion, buildReceipt } = require('./integration/r1545-lifecycle-assertions.cjs')
 
 // Synthetic assertion inputs ONLY. These tests do not claim Firebase behavior.
 function evidence() {
@@ -66,4 +66,38 @@ test('receipt never promotes untested download or entire lifecycle to PASS', () 
   assert.equal(partial.checksPassed, 1)
   assert.equal(partial.independentSecurityCertification, false)
   assert.equal(buildReceipt({ ...args, failed: true }).outcome, 'FAIL')
+})
+
+
+function downstreamEvidence() {
+  const e = evidence()
+  e.record.status = 'processing'
+  e.record.deletionExecutionState = 'verification_required'
+  e.record.deletionCompletionVerified = false
+  e.record.deletionCompletionVerificationRequired = true
+  e.record.deletionCompletionVerificationStatus = 'failed'
+  e.record.destructiveDeletionBlocked = true
+  delete e.record.destructiveDeletionCompletedAt
+  e.record.deletionCompletionVerificationReason = 'PENDING_DOWNSTREAM_DELETION_CONTRIBUTORS'
+  e.tombstone.status = 'verification_required'
+  e.audit.action = 'deletion_completion_reopened'
+  e.audit.metadata.verified = false
+  e.audit.metadata.reason = 'PENDING_DOWNSTREAM_DELETION_CONTRIBUTORS'
+  return e
+}
+test('R1579 accepts local zero-residual state only as pending downstream completion', () =>
+  assertPendingDownstreamDeletion(downstreamEvidence()))
+for (const [name, mutate] of Object.entries({
+  'falsely completed request': e => { e.record.status = 'completed' },
+  'falsely verified request': e => { e.record.deletionCompletionVerified = true },
+  'falsely completed tombstone': e => { e.tombstone.status = 'completed' },
+  'falsely verified audit': e => { e.audit.metadata.verified = true },
+  'missing downstream reason': e => { delete e.record.deletionCompletionVerificationReason },
+  'reappearing Auth account': e => { e.record.deletionCompletionResidualSummary.authUserExists = true },
+  'missing audit linkage': e => { e.record.deletionCompletionVerificationAuditId = '' },
+  'foreign actor': e => { e.audit.actorUid = 'stranger' },
+})) test('R1579 denies ' + name, () => {
+  const e = downstreamEvidence()
+  mutate(e)
+  assert.throws(() => assertPendingDownstreamDeletion(e), { code: 'ERR_ASSERTION' })
 })
