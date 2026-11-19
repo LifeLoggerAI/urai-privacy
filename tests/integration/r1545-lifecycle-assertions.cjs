@@ -64,4 +64,43 @@ function buildReceipt({ checks, phases, source, harnessSha256, helperSha256, fai
   }
 }
 
-module.exports = { exactErrorCode, assertTerminalDeletion, buildReceipt }
+
+function assertPendingDownstreamDeletion({ record, tombstone, audit, uid, requestId, operatorUid }) {
+  assert.ok(record, 'Deletion request must persist for downstream verification')
+  assert.equal(record.uid, uid)
+  assert.equal(record.status, 'processing', 'Local-only deletion must not be globally completed')
+  assert.equal(record.deletionExecutionState, 'verification_required')
+  assert.equal(record.deletionCompletionVerified, false)
+  assert.equal(record.deletionCompletionVerificationRequired, true)
+  assert.equal(record.deletionCompletionVerificationStatus, 'failed')
+  assert.equal(record.destructiveDeletionBlocked, true)
+  assert.equal(record.destructiveDeletionReady, false)
+  assert.ok(!record.destructiveDeletionCompletedAt, 'No global completion timestamp is permitted')
+  assert.equal(record.deletionCompletionVerificationReason, 'PENDING_DOWNSTREAM_DELETION_CONTRIBUTORS')
+  assert.equal(typeof record.deletionCompletionVerificationAuditId, 'string')
+  assert.ok(record.deletionCompletionVerificationAuditId.length > 0)
+  const residual = record.deletionCompletionResidualSummary
+  assert.ok(residual)
+  assert.equal(residual.totalResidualTargets, 0)
+  assert.equal(residual.storageObjectCount, 0)
+  assert.equal(residual.authUserExists, false)
+  assert.equal(residual.legalHold, false)
+  assert.deepEqual(residual.firestoreCounts, {
+    users: 0, privacyRequests: 0, exportJobs: 0, consentRecords: 0, dataAccessEvents: 0,
+  })
+  assert.ok(tombstone)
+  assert.equal(tombstone.uid, uid)
+  assert.equal(tombstone.requestId, requestId)
+  assert.equal(tombstone.active, true)
+  assert.equal(tombstone.status, 'verification_required')
+  assert.ok(audit)
+  assert.equal(audit.action, 'deletion_completion_reopened')
+  assert.equal(audit.targetUid, uid)
+  assert.equal(audit.requestId, requestId)
+  assert.equal(audit.actorUid, operatorUid)
+  assert.equal(audit.metadata?.verified, false)
+  assert.equal(audit.metadata?.reason, 'PENDING_DOWNSTREAM_DELETION_CONTRIBUTORS')
+  assert.deepEqual(audit.metadata?.residualSummary, residual)
+}
+
+module.exports = { exactErrorCode, assertTerminalDeletion, assertPendingDownstreamDeletion, buildReceipt }
