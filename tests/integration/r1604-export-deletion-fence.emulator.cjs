@@ -85,6 +85,11 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
     /failed-precondition/.test(String(e.code)) && /Owner deletion fence is present/.test(String(e.message)));
   checks.push('inactive-tombstone-denies-manifest-url');
   await db.collection('privacyDeletionTombstones').doc(ownerUid).delete();
+  // Even a previously valid admin claim cannot download for a disabled owner.
+  await auth.updateUser(ownerUid,{disabled:true});
+  await assert.rejects(call(operator,'getExportDownloadUrl',{jobId:request.exportJobId,file:'export'}),e=>
+    /failed-precondition/.test(String(e.code)) && /Export owner account is disabled/.test(String(e.message)));
+  checks.push('disabled-owner-denies-admin-download');
   // Signing belongs to independently controlled hosted identity; never touch
   // metadata-server credentials from an emulator worker. Actual package bytes,
   // manifest, SHA256 and foreign denial were verified above.
