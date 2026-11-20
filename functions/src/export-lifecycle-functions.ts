@@ -53,6 +53,22 @@ function requireOwnerOrAdmin(auth: RequestAuth | undefined, ownerUid: string) {
   return { actorUid: auth.uid, actorRole: auth.uid === ownerUid ? "user" : "admin" };
 }
 
+// Any owner-wide deletion marker invalidates new export URL issuance, even if
+// its payload claims to be inactive. A prior completed export is not exemption.
+async function assertNoOwnerDeletionFence(uid: string) {
+  const fences = [
+    db.collection("accountDeletionFences").doc(uid),
+    db.collection("privacyDeletionTombstones").doc(uid)
+  ];
+  const snapshots = await Promise.all(fences.map((ref) => ref.get()));
+  if (snapshots.some((snapshot) => snapshot.exists)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Owner deletion fence is present; export download is denied."
+    );
+  }
+}
+
 async function writeAudit(args: {
   actorUid: string;
   actorRole: string;
@@ -93,6 +109,7 @@ export const getExportDownloadUrl = onCall(async (request) => {
   }
 
   const actor = requireOwnerOrAdmin(request.auth, uid);
+  await assertNoOwnerDeletionFence(uid);
   const packageExpiresAt = resolveExportPackageExpiry(job);
   if (!packageExpiresAt) {
     throw new HttpsError("failed-precondition", "Export package expiry is unavailable.");
@@ -110,11 +127,15 @@ export const getExportDownloadUrl = onCall(async (request) => {
   const [exists] = await object.exists();
   if (!exists) throw new HttpsError("not-found", "Export package file is missing.");
 
+  // Recheck before signing: Storage existence is an awaited external boundary.
+  await assertNoOwnerDeletionFence(uid);
   const signedUrlExpiresAt = Math.min(
     Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS,
     packageExpiresAt
   );
   const [url] = await object.getSignedUrl({ action: "read", expires: signedUrlExpiresAt });
+  // Signing is asynchronous; never return a URL for an owner fenced meanwhile.
+  await assertNoOwnerDeletionFence(uid);
 
   if (!job.packageExpiresAt) {
     await jobRef.update({ packageExpiresAt: Timestamp.fromMillis(packageExpiresAt) });
