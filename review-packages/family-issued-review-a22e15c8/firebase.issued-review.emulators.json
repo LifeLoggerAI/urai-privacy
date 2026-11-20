@@ -1,0 +1,15 @@
+{
+  "functions": [{"source": "fixture/functions", "codebase": "familyissuedreview", "runtime": "nodejs22"}],
+  "firestore": {"rules": "storytime/firestore.rules", "indexes": "storytime/firestore.indexes.json"},
+  "storage": {"rules": "storytime/storage.rules"},
+  "emulators": {
+    "auth": {"host": "127.0.0.1", "port": 30099},
+    "functions": {"host": "127.0.0.1", "port": 30001},
+    "firestore": {"host": "127.0.0.1", "port": 30080, "websocketPort": 30150},
+    "storage": {"host": "127.0.0.1", "port": 30199},
+    "hub": {"host": "127.0.0.1", "port": 30440},
+    "logging": {"host": "127.0.0.1", "port": 30450},
+    "ui": {"enabled": false},
+    "singleProjectMode": true
+  }
+}

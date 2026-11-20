@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "family-issued-review-evidence-v1",
+  "projectId": "demo-urai-family-issued-review",
+  "syntheticOnly": true,
+  "policyAuthority": "SYNTHETIC_REVIEW_POLICY_NOT_CANONICAL_REGISTRATION",
+  "signerAuthority": "EPHEMERAL_REVIEW_SIGNER_NOT_CLOUD_KMS",
+  "deliveryIdentityAuthority": "FIXED_EMULATOR_UID_AND_CURRENT_SYNTHETIC_CLAIM",
+  "adminFixtureWriteCollections": [
+    "storySessions",
+    "storyChapters"
+  ],
+  "testAdminCreatedPositiveReceipt": false,
+  "testAdminChangedWithdrawalFence": false,
+  "testAdminChangedDeletionFence": false,
+  "testReadSigningPrivateKey": false,
+  "productionTouched": false,
+  "realPermissionsGranted": false,
+  "productionHold": true,
+  "privateMemoryWrites": "OFF",
+  "canonicalProductionIssuance": false,
+  "cloudServiceIdentity": false,
+  "automaticOutboxScheduling": false,
+  "currentCanonicalReadRecheck": false,
+  "ownerWideWithdrawal": false,
+  "globalDeletionComplete": false,
+  "checks": [
+    {
+      "name": "verified relatives share family claims but an unissued source grants no access",
+      "status": "PASS"
+    },
+    {
+      "name": "unchanged canonical Privacy set and evaluate APIs still reject family purpose",
+      "status": "PASS"
+    },
+    {
+      "name": "concurrent identical owner issuance converges on one receipt and event before delivery enables Mom's exact view",
+      "status": "PASS"
+    },
+    {
+      "name": "exact issue and delivery retries are idempotent while conflicting issuance is denied",
+      "status": "PASS"
+    },
+    {
+      "name": "same-family cousin, outsider, second story and foreign-owner issuance deny",
+      "status": "PASS"
+    },
+    {
+      "name": "ordinary users cannot dispatch or accept an otherwise valid signed event",
+      "status": "PASS"
+    },
+    {
+      "name": "delivery requires its exact UID and current account claim rather than a copied token claim",
+      "status": "PASS"
+    },
+    {
+      "name": "altered public envelope cannot replace the immutable delivered event",
+      "status": "PASS"
+    },
+    {
+      "name": "same-version content change invalidates the issued projection until the source is restored",
+      "status": "PASS"
+    },
+    {
+      "name": "owner withdrawal is issued and delivered, terminal, idempotent and replay resistant",
+      "status": "PASS"
+    },
+    {
+      "name": "withdrawal delivered before delayed grant prevents any later authorization",
+      "status": "PASS"
+    },
+    {
+      "name": "actual owner deletion propagates a fence and purges scoped authority without deleting foreign sources",
+      "status": "PASS"
+    },
+    {
+      "name": "actual recipient deletion purges its authority while preserving someone else's story and grants",
+      "status": "PASS"
+    },
+    {
+      "name": "delayed grant replays and delete retries cannot restore deleted owner or recipient authority",
+      "status": "PASS"
+    }
+  ],
+  "blockers": [
+    "CANONICAL_PURPOSE_UNREGISTERED_AND_PRODUCTION_ISSUER_UNAPPROVED",
+    "CLOUD_SERVICE_IDENTITY_IAM_AND_SIGNER_CUSTODY_UNCERTIFIED",
+    "WITHDRAWAL_IS_STORY_SCOPED_NOT_OWNER_WIDE",
+    "WITHDRAWAL_AND_DELETION_ENFORCEMENT_PROVEN_AFTER_RECEIVER_ACK_ONLY_NOT_DURING_UNDELIVERED_EVENT_INTERVAL_DISPATCH_IS_SERVICE_DRIVEN_AND_STORYTIME_READS_DO_NOT_RECHECK_CANONICAL_PRIVACY",
+    "PURGE_IS_FAMILY_AUTHORITY_ONLY_NOT_SOURCE_MEDIA_OR_GLOBAL_DELETION"
+  ],
+  "concurrentIssuance": {
+    "requests": 2,
+    "newResponses": 1,
+    "duplicateResponses": 1,
+    "sameReceiptId": true,
+    "sameEventId": true,
+    "sameRevision": true,
+    "sameShareEpoch": true,
+    "scope": "ACTUAL_CONCURRENT_AUTHENTICATED_HTTP_REQUESTS"
+  },
+  "ownerDeletionResiduals": {
+    "ownerReceipts": 0,
+    "recipientReceipts": 0,
+    "ownerGrants": 0,
+    "recipientGrants": 0,
+    "ownerSharingStates": 0
+  },
+  "recipientDeletionResiduals": {
+    "ownerReceipts": 0,
+    "recipientReceipts": 0,
+    "ownerGrants": 0,
+    "recipientGrants": 0,
+    "ownerSharingStates": 0
+  },
+  "finishedAt": "2026-11-20T02:22:10.003Z",
+  "passedCheckCount": 14,
+  "failedCheckCount": 0,
+  "executionComplete": true,
+  "syntheticIssuer": true,
+  "syntheticDelivery": true,
+  "syntheticStoryScopedWithdrawalPropagation": true,
+  "syntheticFamilyAuthorityDeletionPropagation": true
+}

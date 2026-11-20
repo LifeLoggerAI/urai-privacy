@@ -1,0 +1,13 @@
+{
+  "privateTestKeyRemoved": true,
+  "ports": {
+    "30001": "closed",
+    "30080": "closed",
+    "30099": "closed",
+    "30150": "closed",
+    "30199": "closed",
+    "30440": "closed",
+    "30450": "closed"
+  },
+  "interpretation": "Build and default-off preflight passed; Functions metadata discovery failed. The CLI still invoked the scenario runner, which produced 0/14 pass and 14 cascading failures from missing callable endpoints and dependent test state. Attempt 02 corrected fixture metadata loading and passed the complete suite."
+}

@@ -1,0 +1,1 @@
+CalledProcessError: Command '['node', '/workspace/genesis/node_modules/firebase-tools/lib/bin/firebase.js', 'emulators:exec', '--config', 'firebase.issued-review.emulators.json', '--project', 'demo-urai-family-issued-review', '--only', 'auth,firestore,functions,storage', 'node tests/family-issued-path.emulator.cjs']' returned non-zero exit status 1.

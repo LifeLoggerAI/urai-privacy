@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "family-issued-review-source-v1",
+  "services": {
+    "storytime": {
+      "baseCommit": "cc0baee8a4b2bafc452b3e097b1f8770227d4cb7",
+      "baseTree": "61ed8d6c784a5ca2d1733b19173b1709d403e6f0",
+      "proposedTree": "d1c182d311d5233ae19407b29c6f71bfdebd784d",
+      "overlayPath": "functions/src/family-privacy-delivery-review.ts",
+      "overlayBlob": "2b272506a1a5809e51a4cd2673b4d1e55b9d22c8",
+      "overlaySha256": "219c5d5426f2730345a5769b28f88e4c483afc5e84e63903aec8639f24f817c0",
+      "lockSha256": {
+        "root": "91e99907eff729e4d49adbea0a7eebc078a8d572d74b158ff10d1418352cce54",
+        "functions": "4af269bbb8efad71959bb6d1ad985cacea5aba799684c767f8ef88f5f0146ff4"
+      },
+      "ordinaryEntrypointsChanged": false
+    },
+    "privacy": {
+      "baseCommit": "8f79ade634a14fa31f8428e84b01f71cecec8d7e",
+      "baseTree": "197eefb12a4fe2896df7c364a6018437317fe6b4",
+      "proposedTree": "109d09c512426a0c07fb3cd501b537ac0444e25b",
+      "overlayPath": "functions/src/family-story-share-issued-review.ts",
+      "overlayBlob": "c46b1885e378e50ff381c199c8887ef33a845230",
+      "overlaySha256": "c6e5fc0bdb6ad49e71312eef5df11e1ead2c157361dddaa3156d9f8fa892bc89",
+      "lockSha256": {
+        "root": "a8d721970aafede06a026237c248a8f954498d95c14f7fec0ff4d759100ba70a",
+        "functions": "f5c4161c02a5a7d62d221bab5a1935aac8c004421a0f7cb9b67930a64a07d6be"
+      },
+      "ordinaryEntrypointsChanged": false
+    }
+  },
+  "harnessSha256": {
+    "CONTRACT.md": "b4e63106798cc4fa97b441dd6961cc7254d49b338b3f57ae555efdb89aea21ca",
+    "run-family-issued-emulators.py": "c4b8906a1c5bcc57772aab61463b1e8f8fda20508169f3491111fe4249b8a89b",
+    "start-review-detached.py": "9c48c3c29e085c3deedec2206b27cde94d7eeb45e52e2b64f973b123c7ff67f0",
+    "firebase.issued-review.emulators.json": "6138c1986dc49b1678b1ea869afbfca87fce0f70b9d748fab15034d7eb1359b9",
+    "fixture/functions/index.cjs": "2d7eb55b888da11dcdfe2e0d7ab0c8710e4f8cee4fb46e23bd876502ee58d334",
+    "fixture/functions/package.json": "9918cbaa9bd7142137c34e1e57c5f760bf10476d8f6145774eea4affa49affbc",
+    "tests/family-issued-path.emulator.cjs": "3c962530e46b0aec319813209b52c0349fe2cd57a5d23b9a6c24a59f3530a690",
+    "tests/default-off.preflight.cjs": "9d899ae6e1a20207942bdf17178bf9751b08dda42ae02deb203ffb5a2e7eb59a"
+  }
+}
