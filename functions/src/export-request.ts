@@ -318,12 +318,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         artifactCleanupPendingPaths: FieldValue.delete()
       });
       tx.update(claim.requestRef, { status: "completed", updatedAt: FieldValue.serverTimestamp() });
-      tx.set(exportLeaseRef, {
-        exportProcessingJobId: FieldValue.delete(),
-        exportProcessingLeaseExpiresAt: FieldValue.delete(),
-        exportProcessingBy: FieldValue.delete(),
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
+      tx.delete(exportLeaseRef);
     });
 
     const auditId = await writeAudit({
@@ -359,12 +354,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       });
       tx.update(claim.requestRef, { status: "failed", updatedAt: FieldValue.serverTimestamp() });
       if (exportLease.data()?.exportProcessingJobId === jobId) {
-        tx.set(exportLeaseRef, {
-          exportProcessingJobId: FieldValue.delete(),
-          exportProcessingLeaseExpiresAt: FieldValue.delete(),
-          exportProcessingBy: FieldValue.delete(),
-          updatedAt: FieldValue.serverTimestamp()
-        }, { merge: true });
+        tx.delete(exportLeaseRef);
       }
     });
     const auditId = await writeAudit({

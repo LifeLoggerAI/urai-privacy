@@ -64,10 +64,8 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   assert.equal(phantomAccount.exists,false,'Export completion must not manufacture an account deletion fence');
   checks.push('completed-export-leaves-no-account-fence');
   const leaseSnapshot=(await db.collection('exportProcessingLeases').doc(a.user.uid).get());
-  assert.ok(leaseSnapshot.exists,'Export must use a dedicated non-deletion lease');
-  assert.equal(leaseSnapshot.data().exportProcessingJobId,undefined);
-  assert.equal(leaseSnapshot.data().exportProcessingLeaseExpiresAt,undefined);
-  checks.push('dedicated-export-lease-released-after-publication');
+  assert.equal(leaseSnapshot.exists,false,'Completed export must delete its temporary lease document');
+  checks.push('dedicated-export-lease-deleted-after-publication');
   const [exportBytes,manifestBytes]=await Promise.all([
    bucket.file(job.exportPackagePath).download().then(x=>x[0]),
    bucket.file(job.exportManifestPath).download().then(x=>x[0])
@@ -106,6 +104,28 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   // manifest, SHA256 and foreign denial were verified above.
   const ownerUrl='not-attempted-no-trusted-signer';
   checks.push('signed-url-issuance-intentionally-held');
+  // The local deletion adapter must find abandoned per-owner export leases.
+  // This uses a separate disposable account; no production or live lifecycle.
+  const abandonedUid='r1608-stale-export-'+randomBytes(6).toString('hex');
+  await auth.createUser({uid:abandonedUid,email:abandonedUid+'@example.test',password:'DisposableOnly123!'});
+  await db.collection('exportProcessingLeases').doc(abandonedUid).set({uid:abandonedUid,exportProcessingJobId:'abandoned-export',exportProcessingLeaseExpiresAt:new Date(1),fixture:'r1608'});
+  const registry=require('../../functions/lib/deletion-source-registry.js');
+  assert.ok(registry.DELETION_FIRESTORE_SOURCES.some(s=>s.collection==='exportProcessingLeases'&&s.subjectField==='uid'));
+  checks.push('subject-deletion-registry-includes-stale-export-leases');
+  const defaultAdmin=adminApp({projectId:project,storageBucket:project+'.appspot.com'});
+  try {
+    const localDelete=require('../../functions/lib/deletion-local-executor.js');
+    const before=await localDelete.verifyLocalDeletion(abandonedUid);
+    assert.equal(before.verified,false);
+    assert.equal(before.firestoreRemaining.exportProcessingLeases,1);
+    checks.push('stale-lease-makes-subject-deletion-incomplete');
+    const removal=await localDelete.executeLocalDeletion(abandonedUid);
+    assert.equal(removal.firestoreRemoved.exportProcessingLeases,1);
+    const after=await localDelete.verifyLocalDeletion(abandonedUid);
+    assert.equal(after.verified,true);
+    assert.equal(after.firestoreRemaining.exportProcessingLeases,0);
+    checks.push('local-deletion-adapter-removes-abandoned-export-lease');
+  } finally { await deleteAdminApp(defaultAdmin) }
   assert.ok(checks.length>=9);
   console.log('R1606_EXPORT_LEASE_ISOLATION_EMULATOR_PASS '+JSON.stringify({checksPassed:checks.length,checks,source:process.env.URAI_EXACT_SHA,ownerUrl,bytes:exportBytes.length,manifestBytes:manifestBytes.length,hostedSignerVerified:false,productionWrites:false,iamApproved:false,destructiveDeletionExecuted:false}));
  } finally {await deleteAdminApp(admin)}
