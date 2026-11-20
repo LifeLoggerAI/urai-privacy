@@ -226,25 +226,29 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
 
     const requestRef = db.collection("privacyRequests").doc(requestId);
     const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(uid);
-    const [requestSnap, deletionFence] = await Promise.all([
-      tx.get(requestRef),
-      tx.get(deletionFenceRef)
+    const accountFenceRef = db.collection("accountDeletionFences").doc(uid);
+    // Export leases are not deletion tombstones. Their presence must never
+    // trigger the permanent owner-deleted guard in other products.
+    const exportLeaseRef = db.collection("exportProcessingLeases").doc(uid);
+    const [requestSnap, deletionFence, accountFence, exportLease] = await Promise.all([
+      tx.get(requestRef), tx.get(deletionFenceRef),
+      tx.get(accountFenceRef), tx.get(exportLeaseRef)
     ]);
     if (!requestSnap.exists || requestSnap.data()?.uid !== uid || requestSnap.data()?.type !== "export") {
       throw new HttpsError("failed-precondition", "Export request linkage is invalid.");
     }
-    if (deletionFence.data()?.active === true) {
+    if (deletionFence.exists || accountFence.exists) {
       throw new HttpsError("failed-precondition", "Account deletion is fenced; export processing is blocked.");
     }
     if (
-      deletionFence.data()?.exportProcessingJobId !== jobId &&
-      processingLeaseIsActive(deletionFence.data()?.exportProcessingLeaseExpiresAt)
+      exportLease.data()?.exportProcessingJobId !== jobId &&
+      processingLeaseIsActive(exportLease.data()?.exportProcessingLeaseExpiresAt)
     ) {
       throw new HttpsError("failed-precondition", "Another export is processing for this account.");
     }
 
     const processingLeaseExpiresAt = Timestamp.fromMillis(Date.now() + EXPORT_PROCESSING_LEASE_MS);
-    tx.set(deletionFenceRef, {
+    tx.set(exportLeaseRef, {
       uid,
       exportProcessingJobId: jobId,
       exportProcessingLeaseExpiresAt: processingLeaseExpiresAt,
@@ -282,11 +286,15 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
 
     await db.runTransaction(async (tx) => {
       const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(claim.uid);
-      const deletionFence = await tx.get(deletionFenceRef);
+      const accountFenceRef = db.collection("accountDeletionFences").doc(claim.uid);
+      const exportLeaseRef = db.collection("exportProcessingLeases").doc(claim.uid);
+      const [deletionFence, accountFence, exportLease] = await Promise.all([
+        tx.get(deletionFenceRef), tx.get(accountFenceRef), tx.get(exportLeaseRef)
+      ]);
       if (
-        deletionFence.data()?.active === true ||
-        deletionFence.data()?.exportProcessingJobId !== jobId ||
-        !processingLeaseIsActive(deletionFence.data()?.exportProcessingLeaseExpiresAt)
+        deletionFence.exists || accountFence.exists ||
+        exportLease.data()?.exportProcessingJobId !== jobId ||
+        !processingLeaseIsActive(exportLease.data()?.exportProcessingLeaseExpiresAt)
       ) {
         throw new HttpsError("aborted", "Export processing lost its deletion-fence lease before publication.");
       }
@@ -310,7 +318,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         artifactCleanupPendingPaths: FieldValue.delete()
       });
       tx.update(claim.requestRef, { status: "completed", updatedAt: FieldValue.serverTimestamp() });
-      tx.set(deletionFenceRef, {
+      tx.set(exportLeaseRef, {
         exportProcessingJobId: FieldValue.delete(),
         exportProcessingLeaseExpiresAt: FieldValue.delete(),
         exportProcessingBy: FieldValue.delete(),
@@ -333,8 +341,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     const cleanupStatus = cleanup.pendingPaths.length > 0 ? "incomplete" : "completed";
 
     await db.runTransaction(async (tx) => {
-      const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(claim.uid);
-      const deletionFence = await tx.get(deletionFenceRef);
+      const exportLeaseRef = db.collection("exportProcessingLeases").doc(claim.uid);
+      const exportLease = await tx.get(exportLeaseRef);
       tx.update(jobRef, {
         status: "failed",
         updatedAt: FieldValue.serverTimestamp(),
@@ -350,8 +358,8 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
         artifactCleanupLeaseExpiresAt: FieldValue.delete()
       });
       tx.update(claim.requestRef, { status: "failed", updatedAt: FieldValue.serverTimestamp() });
-      if (deletionFence.data()?.exportProcessingJobId === jobId) {
-        tx.set(deletionFenceRef, {
+      if (exportLease.data()?.exportProcessingJobId === jobId) {
+        tx.set(exportLeaseRef, {
           exportProcessingJobId: FieldValue.delete(),
           exportProcessingLeaseExpiresAt: FieldValue.delete(),
           exportProcessingBy: FieldValue.delete(),
