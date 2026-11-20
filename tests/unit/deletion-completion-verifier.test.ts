@@ -6,6 +6,7 @@ import {
 } from "../../functions/src/deletion-completion-verifier";
 
 import { DELETION_ADAPTERS, deletionEcosystemCompletionBlockReason } from "../../functions/src/deletion-contract";
+import { DELETION_FIRESTORE_SOURCES } from "../../functions/src/deletion-source-registry";
 
 const deletionMutationGuard = readFileSync(
   "functions/src/deletion-mutation-guard.ts",
@@ -26,6 +27,7 @@ function residuals(
       users: [],
       privacyRequests: [],
       exportJobs: [],
+      exportProcessingLeases: [],
       consentRecords: [],
       dataAccessEvents: []
     },
@@ -48,6 +50,26 @@ describe("deletion completion residual policy", () => {
         users: [],
         privacyRequests: ["new-request"],
         exportJobs: [],
+        consentRecords: [],
+        dataAccessEvents: []
+      },
+      totalResidualTargets: 1
+    }))).toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("does not silently omit a stale export-processing lease from completion", () => {
+    expect(DELETION_FIRESTORE_SOURCES.some(
+      (source) => source.collection === "exportProcessingLeases" && source.subjectField === "uid"
+    )).toBe(true);
+    expect(deletionCompletionVerifier).toContain("DELETION_FIRESTORE_SOURCES.map");
+    expect(deletionCompletionVerifier).toContain("source.subjectField");
+    expect(deletionCompletionVerifier).not.toContain("DELETABLE_COLLECTIONS");
+    expect(deletionCompletionBlockReason(residuals({
+      firestoreTargets: {
+        users: [],
+        privacyRequests: [],
+        exportJobs: [],
+        exportProcessingLeases: ["abandoned-lease"],
         consentRecords: [],
         dataAccessEvents: []
       },

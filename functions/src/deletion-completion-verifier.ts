@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { FieldPath, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { DELETION_FIRESTORE_SOURCES } from "./deletion-source-registry";
 
 const QUERY_PAGE_LIMIT = 450;
-const DELETABLE_COLLECTIONS = ["privacyRequests", "exportJobs", "consentRecords", "dataAccessEvents"] as const;
 
 export type DeletionCompletionResiduals = {
   uid: string;
@@ -38,13 +38,13 @@ export function deletionCompletionBlockReason(
   return null;
 }
 
-async function listScopedIds(collectionName: string, uid: string): Promise<string[]> {
+async function listScopedIds(collectionName: string, subjectField: string, uid: string): Promise<string[]> {
   const db = getFirestore();
   const ids: string[] = [];
   let cursor: string | null = null;
   while (true) {
     let query = db.collection(collectionName)
-      .where("uid", "==", uid)
+      .where(subjectField, "==", uid)
       .orderBy(FieldPath.documentId())
       .limit(QUERY_PAGE_LIMIT);
     if (cursor) query = query.startAfter(cursor);
@@ -90,9 +90,9 @@ export async function collectDeletionCompletionResiduals(
   const bucket = getStorage().bucket();
 
   const userDocPromise = db.collection("users").doc(uid).get();
-  const collectionPromises = DELETABLE_COLLECTIONS.map(async (collectionName) => [
-    collectionName,
-    await listScopedIds(collectionName, uid)
+  const collectionPromises = DELETION_FIRESTORE_SOURCES.map(async (source) => [
+    source.collection,
+    await listScopedIds(source.collection, source.subjectField, uid)
   ] as const);
   const deletionPlanPrefix = `privacy-deletion-plans/${createHash("sha256").update(uid).digest("hex")}/`;
   const storagePromise = Promise.all([
