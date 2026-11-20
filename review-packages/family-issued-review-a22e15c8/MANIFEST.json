@@ -1,0 +1,153 @@
+{
+  "schemaVersion": "family-issued-review-package-v1",
+  "sourceBaseCommits": {
+    "privacy": "8f79ade634a14fa31f8428e84b01f71cecec8d7e",
+    "storytime": "cc0baee8a4b2bafc452b3e097b1f8770227d4cb7"
+  },
+  "successfulAttempt": "evidence/attempt-02",
+  "historicalFailure": "evidence/attempt-01",
+  "production": "HOLD_NO_GO",
+  "privateMemoryWrites": "OFF",
+  "files": [
+    {
+      "path": "CONTRACT.md",
+      "bytes": 7481,
+      "sha256": "b4e63106798cc4fa97b441dd6961cc7254d49b338b3f57ae555efdb89aea21ca"
+    },
+    {
+      "path": "EVIDENCE.md",
+      "bytes": 11675,
+      "sha256": "514bd78478740d3de7229257f6d24379349060ca928f98a99e0002329cf54f7e"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6009,
+      "sha256": "4c04d8f274b4c018b07350bad898571b5adbe3a703936b00f063f476838ab9a4"
+    },
+    {
+      "path": "evidence/attempt-01/cleanup.json",
+      "bytes": 543,
+      "sha256": "346fe508bbd93d09d2fcfd831c93baf7c55362081505f314650aaef37a71e79c"
+    },
+    {
+      "path": "evidence/attempt-01/family-issued-path-gates.json",
+      "bytes": 4132,
+      "sha256": "adfa16555a3a7b92fe233ea1bd00bc7903c90c743421594e867532d8a7787f50"
+    },
+    {
+      "path": "evidence/attempt-01/issued-path-run.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "evidence/attempt-01/issued-path-run.log",
+      "bytes": 21099,
+      "sha256": "db8283d7a3a5640f64efd7bd400ea0adcd30215c039d57d1cfbb2f4beb886b25"
+    },
+    {
+      "path": "evidence/attempt-01/source-manifest.json",
+      "bytes": 2318,
+      "sha256": "3e5444015f0b0ee241ae7bb161560af899ac735fb0d02a55bcda3281f7ea6fc1"
+    },
+    {
+      "path": "evidence/attempt-01/steps.json",
+      "bytes": 732,
+      "sha256": "a9a9aa18485d1fe21b3157a9e2acbbb9a63729067a95f6d9050fb410a009ae2e"
+    },
+    {
+      "path": "evidence/attempt-01/supervisor-errors.log",
+      "bytes": 352,
+      "sha256": "8dfd2ba412e0774a7875d0ec112b5dca271576d55371dfc57c61ee8ffdce493f"
+    },
+    {
+      "path": "evidence/attempt-01/supervisor-result.json",
+      "bytes": 201,
+      "sha256": "359beea7b0b5e7a7b8253d2b955ce9f21a9ca35c3e7130000f7ea872ca3e762d"
+    },
+    {
+      "path": "evidence/attempt-02/cleanup.json",
+      "bytes": 655,
+      "sha256": "6c65a18980ea7d6ad7b3345c6d3bf2d0f195f7476b2e9987d004b5599075f126"
+    },
+    {
+      "path": "evidence/attempt-02/family-issued-path-gates.json",
+      "bytes": 4262,
+      "sha256": "c640651b2a6fdd0f3ff3292814d8a3af6903b34ce99af600b8970f9f3cb2557c"
+    },
+    {
+      "path": "evidence/attempt-02/issued-path-run.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "evidence/attempt-02/issued-path-run.log",
+      "bytes": 43472,
+      "sha256": "7971225d0ab8960ee55548bb3a94524783aab321e9ae5e43bbb41bcab9e664f4"
+    },
+    {
+      "path": "evidence/attempt-02/source-manifest.json",
+      "bytes": 2318,
+      "sha256": "5c48d7d8a12d5b9b80a4c988e0e8f806aa773ff89405b5abe15e8d1a1d47e98d"
+    },
+    {
+      "path": "evidence/attempt-02/steps.json",
+      "bytes": 732,
+      "sha256": "265b647e24c829a78d2d74d7ad2d88ce429f7cb879d41793440d78494e609d96"
+    },
+    {
+      "path": "evidence/attempt-02/supervisor-result.json",
+      "bytes": 201,
+      "sha256": "959718ad50aa5e96aca385f0aad48261f79f2e3a7314c41f54b134d57af08c97"
+    },
+    {
+      "path": "firebase.issued-review.emulators.json",
+      "bytes": 684,
+      "sha256": "6138c1986dc49b1678b1ea869afbfca87fce0f70b9d748fab15034d7eb1359b9"
+    },
+    {
+      "path": "fixture/functions/index.cjs",
+      "bytes": 2041,
+      "sha256": "2d7eb55b888da11dcdfe2e0d7ab0c8710e4f8cee4fb46e23bd876502ee58d334"
+    },
+    {
+      "path": "fixture/functions/package.json",
+      "bytes": 208,
+      "sha256": "9918cbaa9bd7142137c34e1e57c5f760bf10476d8f6145774eea4affa49affbc"
+    },
+    {
+      "path": "prepare-isolated-review.py",
+      "bytes": 5614,
+      "sha256": "fffdf6b74b00176fdcdd2ed472e0d4ea79dac6937526a8d7e230bf737779875d"
+    },
+    {
+      "path": "privacy/functions/src/family-story-share-issued-review.ts",
+      "bytes": 29096,
+      "sha256": "c6e5fc0bdb6ad49e71312eef5df11e1ead2c157361dddaa3156d9f8fa892bc89"
+    },
+    {
+      "path": "run-family-issued-emulators.py",
+      "bytes": 5220,
+      "sha256": "c4b8906a1c5bcc57772aab61463b1e8f8fda20508169f3491111fe4249b8a89b"
+    },
+    {
+      "path": "start-review-detached.py",
+      "bytes": 931,
+      "sha256": "9c48c3c29e085c3deedec2206b27cde94d7eeb45e52e2b64f973b123c7ff67f0"
+    },
+    {
+      "path": "storytime/functions/src/family-privacy-delivery-review.ts",
+      "bytes": 25994,
+      "sha256": "219c5d5426f2730345a5769b28f88e4c483afc5e84e63903aec8639f24f817c0"
+    },
+    {
+      "path": "tests/default-off.preflight.cjs",
+      "bytes": 1418,
+      "sha256": "9d899ae6e1a20207942bdf17178bf9751b08dda42ae02deb203ffb5a2e7eb59a"
+    },
+    {
+      "path": "tests/family-issued-path.emulator.cjs",
+      "bytes": 30940,
+      "sha256": "3c962530e46b0aec319813209b52c0349fe2cd57a5d23b9a6c24a59f3530a690"
+    }
+  ]
+}

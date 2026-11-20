@@ -1,0 +1,24 @@
+{
+  "checkedAtUtc": "2026-11-20T02:23:02.637171+00:00",
+  "privateTestKeyRemoved": true,
+  "ports": {
+    "30001": "closed",
+    "30080": "closed",
+    "30099": "closed",
+    "30150": "closed",
+    "30199": "closed",
+    "30440": "closed",
+    "30450": "closed"
+  },
+  "processesInIsolation": [],
+  "baseTrackedChanges": {
+    "storytime": [],
+    "privacy": []
+  },
+  "overlayHashes": {
+    "storytime": "219c5d5426f2730345a5769b28f88e4c483afc5e84e63903aec8639f24f817c0",
+    "privacy": "c6e5fc0bdb6ad49e71312eef5df11e1ead2c157361dddaa3156d9f8fa892bc89"
+  },
+  "nodeVersion": "v22.23.5",
+  "javaVersion": "openjdk version \"21.0.13.1\" 2026-11-17 LTS"
+}

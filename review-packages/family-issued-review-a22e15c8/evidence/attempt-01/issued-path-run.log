@@ -1,0 +1,348 @@
+
+REVIEW_STEP storytime-functions-build
+
+REVIEW_STEP privacy-functions-build
+
+REVIEW_STEP default-off-canonical-denial
+DEFAULT_OFF_AND_CANONICAL_DENIAL_PASS: 6 callables guarded; canonical PURPOSE_UNREGISTERED
+
+REVIEW_STEP ephemeral-test-key
+
+REVIEW_STEP native-issued-family-path
+i  emulators: Starting emulators: auth, functions, firestore, storage
+i  emulators: Detected demo project ID "demo-urai-family-issued-review", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+⚠  eventarc: Error when trying to check port 9299 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9299
+⚠  eventarc: Port 9299 is available on 127.0.0.1 but not ::1. This may cause issues with some clients.
+⚠  eventarc: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json
+⚠  tasks: Error when trying to check port 9499 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9499
+⚠  tasks: Port 9499 is available on 127.0.0.1 but not ::1. This may cause issues with some clients.
+⚠  tasks: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator was started in standard edition.
+✔  firestore: Firestore Emulator UI websocket is running on 30150.
+i  functions: Watching "/workspace/r1586-forward/family-issued-review-a22e15c8-01/fixture/functions" for Cloud Functions...
+⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory.
+⚠  functions: Please note that there will be breaking changes when you upgrade.
+✔  functions: Using node@22 from host.
+Serving at port 8961
+
+Error: EXACT_ISOLATED_FAMILY_ISSUED_FIXTURE_REQUIRED
+    at Object.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/fixture/functions/index.cjs:13:41)
+    at Module._compile (node:internal/modules/cjs/loader:1781:14)
+    at Object..js (node:internal/modules/cjs/loader:1913:10)
+    at Module.load (node:internal/modules/cjs/loader:1505:32)
+    at Function._load (node:internal/modules/cjs/loader:1309:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at Module.require (node:internal/modules/cjs/loader:1527:12)
+    at require (node:internal/modules/helpers:147:16)
+    at loadModule (/workspace/r1586-forward/family-stories-storytime-review/functions/node_modules/firebase-functions/lib/runtime/loader.js:40:16)
+    at loadStack (/workspace/r1586-forward/family-stories-storytime-review/functions/node_modules/firebase-functions/lib/runtime/loader.js:157:23)
+
+⬢  functions: Failed to load function definition from source: FirebaseError: Functions codebase could not be analyzed successfully. It may have a syntax or runtime error
+i  Running script: node tests/family-issued-path.emulator.cjs
+TAP version 13
+# Subtest: verified relatives share family claims but an unissued source grants no access
+not ok 1 - verified relatives share family claims but an unissued source grants no access
+  ---
+  duration_ms: 1512.073059
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: `Unexpected token 'F', "Function u"... is not valid JSON`
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    parseJSONFromBytes (node:internal/deps/undici/undici:5959:19)
+    successSteps (node:internal/deps/undici/undici:5940:27)
+    fullyReadBody (node:internal/deps/undici/undici:4832:9)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async consumeBody (node:internal/deps/undici/undici:5949:7)
+    async post (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:105:43)
+    async denied (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:151:20)
+    async /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:317:3
+    async TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:7)
+  ...
+# Subtest: unchanged canonical Privacy set and evaluate APIs still reject family purpose
+not ok 2 - unchanged canonical Privacy set and evaluate APIs still reject family purpose
+  ---
+  duration_ms: 87.524012
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: `Unexpected token 'F', "Function u"... is not valid JSON`
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    parseJSONFromBytes (node:internal/deps/undici/undici:5959:19)
+    successSteps (node:internal/deps/undici/undici:5940:27)
+    fullyReadBody (node:internal/deps/undici/undici:4832:9)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async consumeBody (node:internal/deps/undici/undici:5949:7)
+    async post (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:105:43)
+    async denied (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:151:20)
+    async /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:325:18
+    async TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:7)
+  ...
+# Subtest: concurrent identical owner issuance converges on one receipt and event before delivery enables Mom's exact view
+not ok 3 - concurrent identical owner issuance converges on one receipt and event before delivery enables Mom's exact view
+  ---
+  duration_ms: 5.120406
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: `Unexpected token 'F', "Function u"... is not valid JSON`
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    parseJSONFromBytes (node:internal/deps/undici/undici:5959:19)
+    successSteps (node:internal/deps/undici/undici:5940:27)
+    fullyReadBody (node:internal/deps/undici/undici:4832:9)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async consumeBody (node:internal/deps/undici/undici:5949:7)
+    async post (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:105:43)
+    async success (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:144:20)
+    async Promise.all (index 0)
+    async issuedVisible (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:215:23)
+  ...
+# Subtest: exact issue and delivery retries are idempotent while conflicting issuance is denied
+not ok 4 - exact issue and delivery retries are idempotent while conflicting issuance is denied
+  ---
+  duration_ms: 0.565025
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'input')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:351:88
+    TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: same-family cousin, outsider, second story and foreign-owner issuance deny
+not ok 5 - same-family cousin, outsider, second story and foreign-owner issuance deny
+  ---
+  duration_ms: 3.37868
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: `Unexpected token 'F', "Function u"... is not valid JSON`
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    parseJSONFromBytes (node:internal/deps/undici/undici:5959:19)
+    successSteps (node:internal/deps/undici/undici:5940:27)
+    fullyReadBody (node:internal/deps/undici/undici:4832:9)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async consumeBody (node:internal/deps/undici/undici:5949:7)
+    async post (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:105:43)
+    async denied (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:151:20)
+    async /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:364:3
+    async TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:7)
+  ...
+# Subtest: ordinary users cannot dispatch or accept an otherwise valid signed event
+not ok 6 - ordinary users cannot dispatch or accept an otherwise valid signed event
+  ---
+  duration_ms: 0.276588
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'issued')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:376:75
+    TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: delivery requires its exact UID and current account claim rather than a copied token claim
+not ok 7 - delivery requires its exact UID and current account claim rather than a copied token claim
+  ---
+  duration_ms: 0.37754
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'issued')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:384:26
+    TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: altered public envelope cannot replace the immutable delivered event
+not ok 8 - altered public envelope cannot replace the immutable delivered event
+  ---
+  duration_ms: 0.38015
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'issued')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:396:90
+    TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: same-version content change invalidates the issued projection until the source is restored
+not ok 9 - same-version content change invalidates the issued projection until the source is restored
+  ---
+  duration_ms: 26.832869
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: `Unexpected token 'F', "Function u"... is not valid JSON`
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    parseJSONFromBytes (node:internal/deps/undici/undici:5959:19)
+    successSteps (node:internal/deps/undici/undici:5940:27)
+    fullyReadBody (node:internal/deps/undici/undici:4832:9)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async consumeBody (node:internal/deps/undici/undici:5949:7)
+    async post (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:105:43)
+    async denied (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:151:20)
+    async /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:413:5
+    async TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:7)
+  ...
+# Subtest: owner withdrawal is issued and delivered, terminal, idempotent and replay resistant
+not ok 10 - owner withdrawal is issued and delivered, terminal, idempotent and replay resistant
+  ---
+  duration_ms: 0.607856
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'issued')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:423:88
+    TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: withdrawal delivered before delayed grant prevents any later authorization
+not ok 11 - withdrawal delivered before delayed grant prevents any later authorization
+  ---
+  duration_ms: 3.456102
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: `Unexpected token 'F', "Function u"... is not valid JSON`
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    parseJSONFromBytes (node:internal/deps/undici/undici:5959:19)
+    successSteps (node:internal/deps/undici/undici:5940:27)
+    fullyReadBody (node:internal/deps/undici/undici:4832:9)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async consumeBody (node:internal/deps/undici/undici:5949:7)
+    async post (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:105:43)
+    async success (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:144:20)
+    async /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:444:18
+    async TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:7)
+  ...
+# Subtest: actual owner deletion propagates a fence and purges scoped authority without deleting foreign sources
+not ok 12 - actual owner deletion propagates a fence and purges scoped authority without deleting foreign sources
+  ---
+  duration_ms: 2.294691
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: `Unexpected token 'F', "Function u"... is not valid JSON`
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    parseJSONFromBytes (node:internal/deps/undici/undici:5959:19)
+    successSteps (node:internal/deps/undici/undici:5940:27)
+    fullyReadBody (node:internal/deps/undici/undici:4832:9)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async consumeBody (node:internal/deps/undici/undici:5949:7)
+    async post (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:105:43)
+    async success (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:144:20)
+    async issuedVisible (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:238:14)
+    async /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:461:25
+  ...
+FAMILY_ISSUED_GATE_REPORT {"executionComplete":false,"passedCheckCount":0,"failedCheckCount":14,"syntheticIssuer":false,"syntheticDelivery":false,"syntheticStoryScopedWithdrawalPropagation":false,"syntheticFamilyAuthorityDeletionPropagation":false,"canonicalProductionIssuance":false,"cloudServiceIdentity":false,"automaticOutboxScheduling":false,"currentCanonicalReadRecheck":false,"ownerWideWithdrawal":false,"globalDeletionComplete":false}
+# Subtest: actual recipient deletion purges its authority while preserving someone else's story and grants
+not ok 13 - actual recipient deletion purges its authority while preserving someone else's story and grants
+  ---
+  duration_ms: 2.396283
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: `Unexpected token 'F', "Function u"... is not valid JSON`
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    parseJSONFromBytes (node:internal/deps/undici/undici:5959:19)
+    successSteps (node:internal/deps/undici/undici:5940:27)
+    fullyReadBody (node:internal/deps/undici/undici:4832:9)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async consumeBody (node:internal/deps/undici/undici:5949:7)
+    async post (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:105:43)
+    async success (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:144:20)
+    async issuedVisible (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:238:14)
+    async /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:479:26
+  ...
+# Subtest: delayed grant replays and delete retries cannot restore deleted owner or recipient authority
+not ok 14 - delayed grant replays and delete retries cannot restore deleted owner or recipient authority
+  ---
+  duration_ms: 0.356599
+  type: 'test'
+  location: '/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:280:3'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'issued')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    /workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:502:26
+    TestContext.<anonymous> (/workspace/r1586-forward/family-issued-review-a22e15c8-01/tests/family-issued-path.emulator.cjs:284:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 0
+# fail 14
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3411.644353
+⚠  Script exited unsuccessfully (code 1)
+i  emulators: Shutting down emulators.
+i  functions: Stopping Functions Emulator
+i  firestore: Stopping Firestore Emulator
+i  auth: Stopping Authentication Emulator
+i  storage: Stopping Storage Emulator
+i  eventarc: Stopping Eventarc Emulator
+i  tasks: Stopping Cloud Tasks Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator
+
+Error: Script "node tests/family-issued-path.emulator.cjs" exited with code 1

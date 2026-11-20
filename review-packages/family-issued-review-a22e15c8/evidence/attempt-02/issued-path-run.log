@@ -1,0 +1,439 @@
+
+REVIEW_STEP storytime-functions-build
+
+REVIEW_STEP privacy-functions-build
+
+REVIEW_STEP default-off-canonical-denial
+DEFAULT_OFF_AND_CANONICAL_DENIAL_PASS: 6 callables guarded; canonical PURPOSE_UNREGISTERED
+
+REVIEW_STEP ephemeral-test-key
+
+REVIEW_STEP native-issued-family-path
+i  emulators: Starting emulators: auth, functions, firestore, storage
+i  emulators: Detected demo project ID "demo-urai-family-issued-review", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+⚠  eventarc: Error when trying to check port 9299 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9299
+⚠  eventarc: Port 9299 is available on 127.0.0.1 but not ::1. This may cause issues with some clients.
+⚠  eventarc: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json
+⚠  tasks: Error when trying to check port 9499 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9499
+⚠  tasks: Port 9499 is available on 127.0.0.1 but not ::1. This may cause issues with some clients.
+⚠  tasks: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator was started in standard edition.
+✔  firestore: Firestore Emulator UI websocket is running on 30150.
+i  functions: Watching "/workspace/r1586-forward/family-issued-review-a22e15c8-02/fixture/functions" for Cloud Functions...
+⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory.
+⚠  functions: Please note that there will be breaking changes when you upgrade.
+✔  functions: Using node@22 from host.
+Serving at port 8666
+
+✔  functions: Loaded functions definitions from source: privacySetCanonicalConsent, privacyEvaluateCanonicalConsent, reviewAcceptFamilyEvent, grantFamilyStoryView, getFamilyStoryView, revokeFamilyStoryView, reviewIssueFamilyGrant, reviewWithdrawFamilyGrant, reviewDeleteFamilySubject, reviewDispatchFamilyEvent.
+✔  functions[us-central1-privacySetCanonicalConsent]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/privacySetCanonicalConsent).
+✔  functions[us-central1-privacyEvaluateCanonicalConsent]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/privacyEvaluateCanonicalConsent).
+✔  functions[us-central1-reviewAcceptFamilyEvent]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/reviewAcceptFamilyEvent).
+✔  functions[us-central1-grantFamilyStoryView]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/grantFamilyStoryView).
+✔  functions[us-central1-getFamilyStoryView]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/getFamilyStoryView).
+✔  functions[us-central1-revokeFamilyStoryView]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/revokeFamilyStoryView).
+✔  functions[us-central1-reviewIssueFamilyGrant]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/reviewIssueFamilyGrant).
+✔  functions[us-central1-reviewWithdrawFamilyGrant]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/reviewWithdrawFamilyGrant).
+✔  functions[us-central1-reviewDeleteFamilySubject]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/reviewDeleteFamilySubject).
+✔  functions[us-central1-reviewDispatchFamilyEvent]: http function initialized (http://127.0.0.1:30001/demo-urai-family-issued-review/us-central1/reviewDispatchFamilyEvent).
+i  Running script: node tests/family-issued-path.emulator.cjs
+TAP version 13
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 191.93865ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 167.256548ms
+# Subtest: verified relatives share family claims but an unissued source grants no access
+ok 1 - verified relatives share family claims but an unissued source grants no access
+  ---
+  duration_ms: 4706.975127
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-privacySetCanonicalConsent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-privacySetCanonicalConsent" in 15.218742ms
+i  functions: Beginning execution of "us-central1-privacyEvaluateCanonicalConsent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-privacyEvaluateCanonicalConsent" in 14.187395ms
+# Subtest: unchanged canonical Privacy set and evaluate APIs still reject family purpose
+ok 2 - unchanged canonical Privacy set and evaluate APIs still reject family purpose
+  ---
+  duration_ms: 2631.008274
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 498.269331ms
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 480.02744ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 224.112ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 1871.582045ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 67.722509ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 64.069273ms
+# Subtest: concurrent identical owner issuance converges on one receipt and event before delivery enables Mom's exact view
+ok 3 - concurrent identical owner issuance converges on one receipt and event before delivery enables Mom's exact view
+  ---
+  duration_ms: 5295.628826
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 57.218112ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 44.854094ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 94.017374ms
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 39.498013ms
+# Subtest: exact issue and delivery retries are idempotent while conflicting issuance is denied
+ok 4 - exact issue and delivery retries are idempotent while conflicting issuance is denied
+  ---
+  duration_ms: 223.491023
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 34.037929ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 25.36424ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 25.346989ms
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 37.231594ms
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 7.088817ms
+# Subtest: same-family cousin, outsider, second story and foreign-owner issuance deny
+ok 5 - same-family cousin, outsider, second story and foreign-owner issuance deny
+  ---
+  duration_ms: 146.034007
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 8.213597ms
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 7.689353ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 7.691413ms
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 7.19396ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 6.490261ms
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 6.908372ms
+# Subtest: ordinary users cannot dispatch or accept an otherwise valid signed event
+ok 6 - ordinary users cannot dispatch or accept an otherwise valid signed event
+  ---
+  duration_ms: 62.48703
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 6.564584ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 6.349318ms
+# Subtest: delivery requires its exact UID and current account claim rather than a copied token claim
+ok 7 - delivery requires its exact UID and current account claim rather than a copied token claim
+  ---
+  duration_ms: 26.8941
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 11.536585ms
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 9.584924ms
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 13.399234ms
+# Subtest: altered public envelope cannot replace the immutable delivered event
+ok 8 - altered public envelope cannot replace the immutable delivered event
+  ---
+  duration_ms: 63.760424
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 34.243255ms
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 42.464641ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 47.353441ms
+# Subtest: same-version content change invalidates the issued projection until the source is restored
+ok 9 - same-version content change invalidates the issued projection until the source is restored
+  ---
+  duration_ms: 147.816335
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewWithdrawFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewWithdrawFamilyGrant" in 303.577089ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 69.212608ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 111.67515ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 35.162819ms
+i  functions: Beginning execution of "us-central1-reviewWithdrawFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewWithdrawFamilyGrant" in 42.203715ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 56.993895ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 99.704194ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 46.598301ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 86.34672ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 29.693464ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 29.52114ms
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 42.733779ms
+# Subtest: owner withdrawal is issued and delivered, terminal, idempotent and replay resistant
+ok 10 - owner withdrawal is issued and delivered, terminal, idempotent and replay resistant
+  ---
+  duration_ms: 2153.979504
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 61.038912ms
+i  functions: Beginning execution of "us-central1-reviewWithdrawFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewWithdrawFamilyGrant" in 43.017896ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 53.518544ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 88.349763ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 36.609947ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 72.051943ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 31.179333ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 23.150071ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 33.866555ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 71.425537ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 27.121846ms
+# Subtest: withdrawal delivered before delayed grant prevents any later authorization
+ok 11 - withdrawal delivered before delayed grant prevents any later authorization
+  ---
+  duration_ms: 458.310716
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 52.24195ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 50.270378ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 83.091554ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 39.555405ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 41.364783ms
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 42.529414ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 50.070402ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 85.261732ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 39.582486ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 42.054101ms
+i  functions: Beginning execution of "us-central1-reviewDeleteFamilySubject"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDeleteFamilySubject" in 294.561041ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 163.579751ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 200.973018ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 21.477458ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 34.989734ms
+# Subtest: actual owner deletion propagates a fence and purges scoped authority without deleting foreign sources
+ok 12 - actual owner deletion propagates a fence and purges scoped authority without deleting foreign sources
+  ---
+  duration_ms: 2425.194827
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 50.086053ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 56.601705ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 90.46753ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 41.197188ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 44.153787ms
+i  functions: Beginning execution of "us-central1-reviewDeleteFamilySubject"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDeleteFamilySubject" in 38.297031ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 176.084191ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 207.186913ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 23.148581ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 35.316063ms
+# Subtest: actual recipient deletion purges its authority while preserving someone else's story and grants
+ok 13 - actual recipient deletion purges its authority while preserving someone else's story and grants
+  ---
+  duration_ms: 625.498301
+  type: 'test'
+  ...
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 31.288537ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 61.445663ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 39.40594ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 26.432649ms
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 27.733752ms
+i  functions: Beginning execution of "us-central1-reviewDeleteFamilySubject"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDeleteFamilySubject" in 32.668643ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 114.209157ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 145.689598ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 28.00246ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 55.971439ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 32.851718ms
+i  functions: Beginning execution of "us-central1-grantFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-grantFamilyStoryView" in 21.174509ms
+i  functions: Beginning execution of "us-central1-reviewIssueFamilyGrant"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewIssueFamilyGrant" in 28.303857ms
+i  functions: Beginning execution of "us-central1-reviewDeleteFamilySubject"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewDeleteFamilySubject" in 24.579359ms
+i  functions: Beginning execution of "us-central1-reviewDispatchFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-reviewAcceptFamilyEvent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-reviewAcceptFamilyEvent" in 110.029046ms
+i  functions: Finished "us-central1-reviewDispatchFamilyEvent" in 139.134875ms
+i  functions: Beginning execution of "us-central1-getFamilyStoryView"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getFamilyStoryView" in 40.569992ms
+FAMILY_ISSUED_GATE_REPORT {"executionComplete":true,"passedCheckCount":14,"failedCheckCount":0,"syntheticIssuer":true,"syntheticDelivery":true,"syntheticStoryScopedWithdrawalPropagation":true,"syntheticFamilyAuthorityDeletionPropagation":true,"canonicalProductionIssuance":false,"cloudServiceIdentity":false,"automaticOutboxScheduling":false,"currentCanonicalReadRecheck":false,"ownerWideWithdrawal":false,"globalDeletionComplete":false}
+# Subtest: delayed grant replays and delete retries cannot restore deleted owner or recipient authority
+ok 14 - delayed grant replays and delete retries cannot restore deleted owner or recipient authority
+  ---
+  duration_ms: 791.2558
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 19790.116585
+✔  Script exited successfully (code 0)
+i  emulators: Shutting down emulators.
+i  functions: Stopping Functions Emulator
+i  firestore: Stopping Firestore Emulator
+i  auth: Stopping Authentication Emulator
+i  storage: Stopping Storage Emulator
+i  eventarc: Stopping Eventarc Emulator
+i  tasks: Stopping Cloud Tasks Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator
