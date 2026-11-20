@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import {
   FieldPath,
   FieldValue,
@@ -53,6 +54,36 @@ function requireOwnerOrAdmin(auth: RequestAuth | undefined, ownerUid: string) {
   return { actorUid: auth.uid, actorRole: auth.uid === ownerUid ? "user" : "admin" };
 }
 
+// Any owner-wide deletion marker invalidates new export URL issuance, even if
+// its payload claims to be inactive. A prior completed export is not exemption.
+// A previously verified request token cannot stand in for a current owner
+// account status. Fail closed on disabled/deleted/unreadable owner identity.
+async function assertExportOwnerAuthActive(uid: string) {
+  let owner;
+  try {
+    owner = await getAuth(app).getUser(uid);
+  } catch {
+    throw new HttpsError("failed-precondition", "Export owner account status could not be verified.");
+  }
+  if (owner.disabled) {
+    throw new HttpsError("failed-precondition", "Export owner account is disabled.");
+  }
+}
+
+async function assertNoOwnerDeletionFence(uid: string) {
+  const fences = [
+    db.collection("accountDeletionFences").doc(uid),
+    db.collection("privacyDeletionTombstones").doc(uid)
+  ];
+  const snapshots = await Promise.all(fences.map((ref) => ref.get()));
+  if (snapshots.some((snapshot) => snapshot.exists)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Owner deletion fence is present; export download is denied."
+    );
+  }
+}
+
 async function writeAudit(args: {
   actorUid: string;
   actorRole: string;
@@ -93,6 +124,8 @@ export const getExportDownloadUrl = onCall(async (request) => {
   }
 
   const actor = requireOwnerOrAdmin(request.auth, uid);
+  await assertNoOwnerDeletionFence(uid);
+  await assertExportOwnerAuthActive(uid);
   const packageExpiresAt = resolveExportPackageExpiry(job);
   if (!packageExpiresAt) {
     throw new HttpsError("failed-precondition", "Export package expiry is unavailable.");
@@ -110,11 +143,16 @@ export const getExportDownloadUrl = onCall(async (request) => {
   const [exists] = await object.exists();
   if (!exists) throw new HttpsError("not-found", "Export package file is missing.");
 
+  // Recheck before signing: Storage existence is an awaited external boundary.
+  await assertNoOwnerDeletionFence(uid);
   const signedUrlExpiresAt = Math.min(
     Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS,
     packageExpiresAt
   );
   const [url] = await object.getSignedUrl({ action: "read", expires: signedUrlExpiresAt });
+  // Signing is asynchronous; recheck owner authority before metadata writes.
+  await assertNoOwnerDeletionFence(uid);
+  await assertExportOwnerAuthActive(uid);
 
   if (!job.packageExpiresAt) {
     await jobRef.update({ packageExpiresAt: Timestamp.fromMillis(packageExpiresAt) });
@@ -128,6 +166,11 @@ export const getExportDownloadUrl = onCall(async (request) => {
     requestId,
     metadata: { jobId, file, path, signedUrlExpiresAt, packageExpiresAt }
   });
+
+  // Final read after the asynchronous audit: do not return a signed URL if
+  // an account-disable or deletion fence appeared while logging the request.
+  await assertNoOwnerDeletionFence(uid);
+  await assertExportOwnerAuthActive(uid);
 
   return {
     jobId,
