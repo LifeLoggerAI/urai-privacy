@@ -37,15 +37,16 @@
     "verify:release": "bash scripts/verify-release.sh",
     "final:production-lock": "bash scripts/final-production-lock.sh",
     "test:export:contract": "node scripts/check-complete-export-contract.mjs",
-    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs"
+    "test:deletion:contract": "node scripts/check-deletion-orchestration-contract.mjs",
+    "test:r1512:canonical-emulator": "npm --prefix functions run build && GCLOUD_PROJECT=urai-privacy-r1512-disposable firebase emulators:exec --config firebase.emulators.json --project urai-privacy-r1512-disposable --only auth,functions,firestore,storage \"node tests/integration/r1512-canonical-privacy-callable.emulator.cjs\""
   },
   "dependencies": {
     "firebase": "^12.13.0",
-    "next": "16.3.6",
+    "next": "16.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.13.3",
-    "zod": "^3.23.8"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
@@ -55,7 +56,7 @@
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
     "eslint": "^9.39.1",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.4.5",
     "firebase-admin": "^13.10.0",
     "firebase-tools": "15.24.0",
     "typescript": "5.9.3",

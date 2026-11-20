@@ -62,8 +62,13 @@ describe("export redaction and processing lease", () => {
     const deletionSource = readFileSync(new URL("../../functions/src/index.ts", import.meta.url), "utf8");
 
     expect(exportSource).toMatch(/exportProcessingJobId/);
+    expect(exportSource).toMatch(/collection\("exportProcessingLeases"\)/);
+    expect(exportSource).toMatch(/deletionFence\.exists \|\| accountFence\.exists/);
+    expect(exportSource).not.toMatch(/tx\.set\(deletionFenceRef/);
+    expect(deletionSource).toMatch(/tx\.get\(exportLeaseRef\)/);
+    expect(deletionSource).toMatch(/timestampMillis\(exportLease\.data\(\)\?\.exportProcessingLeaseExpiresAt\)/);
     expect(exportSource).toMatch(/Export processing lost its deletion-fence lease before publication/);
-    expect(exportSource).toMatch(/deletionFence\.data\(\)\?\.active === true/);
+    expect(exportSource).not.toMatch(/tx\.set\(deletionFenceRef/);
     expect(deletionSource).toMatch(/Deletion is blocked while an export worker holds the subject fence/);
     expect(deletionSource).toMatch(/Account deletion is already fenced; another request cannot recreate subject data/);
     expect(deletionSource).not.toMatch(/markedForDeletion: true/);

@@ -83,11 +83,15 @@ require_pattern "tests/unit/deletion-completion-authority.test.ts" 'rejects a su
 require_pattern "tests/unit/deletion-completion-authority.test.ts" 'rejects an expired or malformed lease' "lease expiry regression test"
 require_pattern "tests/unit/deletion-completion-authority.test.ts" 'rejects verification that is no longer pending' "verification-state regression test"
 
+require_pattern "functions/src/deletion-contract.ts" 'deletionEcosystemCompletionBlockReason' "ecosystem completion cannot rely on local-only residuals"
+require_pattern "functions/src/deletion-mutation-guard.ts" 'const downstreamReason = deletionEcosystemCompletionBlockReason' "downstream completion admission before completed status"
+require_pattern "tests/unit/deletion-completion-verifier.test.ts" 'cross-system deletion completion authority' "downstream completion regression tests"
+
 echo "[security-gate] Full npm audit visibility (non-blocking)"
 npm audit --omit=dev || true
 npm --prefix functions audit --omit=dev || true
 
-echo "[security-gate] Enforcing critical vulnerability gate"
+echo "[security-gate] Enforcing patched Next.js/Zod lockfile floors"\nnode --test scripts/check-release-dependency-pins.test.mjs\nnode scripts/check-release-dependency-pins.mjs\n\necho "[security-gate] Enforcing critical vulnerability gate"
 npm audit --audit-level=critical --omit=dev
 npm --prefix functions audit --audit-level=critical --omit=dev
 

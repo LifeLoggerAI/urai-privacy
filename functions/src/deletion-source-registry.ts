@@ -1,6 +1,9 @@
 export const DELETION_FIRESTORE_SOURCES = [
   { collection: "privacyRequests", subjectField: "uid" },
   { collection: "exportJobs", subjectField: "uid" },
+  // A crashed export can leave an owner-scoped lease; deletion must inventory
+  // and purge it rather than silently declaring the subject fully deleted.
+  { collection: "exportProcessingLeases", subjectField: "uid" },
   { collection: "consentRecords", subjectField: "uid" },
   { collection: "dataAccessEvents", subjectField: "uid" }
 ] as const;

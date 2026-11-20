@@ -3,7 +3,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { selectConsentRevocationSource } from "./consent-revocation-transition";
+import { classifyRevocationOutboxReplay, priorGrantReceiptEvidence, selectConsentRevocationSource } from "./consent-revocation-transition";
 
 const db = getFirestore();
 const REVOCATION_SCHEMA_VERSION = "consent.revoked.v1";
@@ -39,6 +39,7 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
   const after = event.data?.after.exists ? event.data.after.data() ?? null : null;
   const source = selectConsentRevocationSource(before, after);
   if (!source) return;
+  const priorGrant = priorGrantReceiptEvidence(before);
 
   const uid = typeof source.uid === "string" ? source.uid : "";
   const purpose = typeof source.purpose === "string" ? source.purpose : "";
@@ -60,27 +61,87 @@ export const publishConsentRevocation = onDocumentWritten("consentRecords/{recor
     receiptHash
   });
   const outboxRef = db.collection("consentRevocationOutbox").doc(eventId);
+  const immutableEvent = {
+    schemaVersion: REVOCATION_SCHEMA_VERSION,
+    eventId,
+    consentRecordId: recordId,
+    uid,
+    purpose,
+    consentTier,
+    policyVersion,
+    sourceReceiptHash: receiptHash,
+    ...priorGrant,
+    integrityHash: digest({ eventId, recordId, uid, purpose, ...priorGrant })
+  };
 
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(outboxRef);
-    if (existing.exists) return;
+    if (existing.exists) {
+      const verdict = classifyRevocationOutboxReplay(existing.data() ?? null, immutableEvent);
+      if (verdict !== "identical") {
+        // Never mutate or silently backfill prior events; quarantine/repair
+        // requires a separately reviewed versioned reconciliation path.
+        throw new Error(`Revocation outbox replay refused: ${verdict}`);
+      }
+      return;
+    }
     transaction.create(outboxRef, {
-      schemaVersion: REVOCATION_SCHEMA_VERSION,
-      eventId,
-      consentRecordId: recordId,
-      uid,
-      purpose,
-      consentTier,
-      policyVersion,
-      sourceReceiptHash: receiptHash,
+      ...immutableEvent,
       status: "pending",
       attempts: 0,
       createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-      integrityHash: digest({ eventId, recordId, uid, purpose })
+      updatedAt: FieldValue.serverTimestamp()
     });
   });
 });
+
+/**
+ * R1584: an ACK can only describe an internally consistent canonical outbox,
+ * never a sparse or corrupted administrator-seeded placeholder. A digest is
+ * NOT authentication of the publisher and does NOT prove downstream effects.
+ * Privileged mutation custody still requires IAM and independent admission.
+ */
+function hasCanonicalRevocationOutboxEvidence(
+  row: Record<string, unknown>, expectedEventId: string
+): boolean {
+  const str = (value: unknown): value is string =>
+    typeof value === "string" && value.length > 0;
+  const hex = (value: unknown): value is string =>
+    typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+  if (row.schemaVersion !== REVOCATION_SCHEMA_VERSION ||
+      row.eventId !== expectedEventId ||
+      !str(row.consentRecordId) || !str(row.uid) || !str(row.purpose) ||
+      !str(row.consentTier) || !str(row.policyVersion) ||
+      !hex(row.sourceReceiptHash) || !hex(row.integrityHash)) {
+    return false;
+  }
+  const state = row.priorGrantEvidenceState;
+  const prior = row.priorGrantReceiptHash;
+  if (state === "present" ? !hex(prior) :
+      (state === "not_applicable" || state === "missing_or_invalid") ? prior !== null :
+      true) {
+    return false;
+  }
+  const eventId = digest({
+    schemaVersion: REVOCATION_SCHEMA_VERSION,
+    recordId: row.consentRecordId,
+    uid: row.uid,
+    purpose: row.purpose,
+    consentTier: row.consentTier,
+    policyVersion: row.policyVersion,
+    receiptHash: row.sourceReceiptHash
+  });
+  if (eventId !== expectedEventId) return false;
+  const integrityHash = digest({
+    eventId,
+    recordId: row.consentRecordId,
+    uid: row.uid,
+    purpose: row.purpose,
+    priorGrantReceiptHash: prior,
+    priorGrantEvidenceState: state
+  });
+  return row.integrityHash === integrityHash;
+}
 
 export const acknowledgeConsentRevocation = onCall(async (request) => {
   const authority = boundConsumerAuthority(request);
@@ -100,7 +161,7 @@ export const acknowledgeConsentRevocation = onCall(async (request) => {
 
     if (!outbox.exists) throw new HttpsError("not-found", "Revocation event was not found.");
     const outboxData = outbox.data() ?? {};
-    if (outboxData.eventId !== parsed.data.eventId || outboxData.schemaVersion !== REVOCATION_SCHEMA_VERSION) {
+    if (!hasCanonicalRevocationOutboxEvidence(outboxData, parsed.data.eventId)) {
       throw new HttpsError("failed-precondition", "Revocation event integrity metadata is invalid.");
     }
 

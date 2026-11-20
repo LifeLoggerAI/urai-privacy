@@ -720,9 +720,9 @@ export const executeDeletionRequest = onCall(async (request) => {
 
   await db.runTransaction(async (tx) => {
     const tombstoneRef = db.collection("privacyDeletionTombstones").doc(uid);
-    const [current, tombstone] = await Promise.all([
-      tx.get(ref),
-      tx.get(tombstoneRef)
+    const exportLeaseRef = db.collection("exportProcessingLeases").doc(uid);
+    const [current, tombstone, exportLease] = await Promise.all([
+      tx.get(ref), tx.get(tombstoneRef), tx.get(exportLeaseRef)
     ]);
     if (!current.exists) throw new HttpsError("not-found", "Deletion request not found.");
     const state = current.data() ?? {};
@@ -730,7 +730,10 @@ export const executeDeletionRequest = onCall(async (request) => {
     if (tombstoneState.active === true && tombstoneState.requestId !== requestId) {
       throw new HttpsError("failed-precondition", "Account deletion is already fenced by another deletion request.");
     }
-    if (timestampMillis(tombstoneState.exportProcessingLeaseExpiresAt) > Date.now()) {
+    // Check both the new export-only lease and legacy tombstone-embedded
+    // leases. Never allow subject deletion to race an in-flight export.
+    if (timestampMillis(tombstoneState.exportProcessingLeaseExpiresAt) > Date.now() ||
+        timestampMillis(exportLease.data()?.exportProcessingLeaseExpiresAt) > Date.now()) {
       throw new HttpsError("aborted", "Deletion is blocked while an export worker holds the subject fence.");
     }
     const planningToken = typeof tombstoneState.deletionPlanningLeaseToken === "string"

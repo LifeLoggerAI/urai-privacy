@@ -51,7 +51,13 @@ beforeEach(async ({ skip }) => {
     await setDoc(doc(db, "privacyRequests/preq-a"), { uid: "user-a", type: "export", status: "pending" });
     await setDoc(doc(db, "exportJobs/export-a"), { uid: "user-a", requestId: "preq-a", status: "pending" });
     await setDoc(doc(db, "deletionRequests/del-a"), { uid: "user-a", status: "pending" });
-    await setDoc(doc(db, "consentRecords/consent-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
+    // R1582: use a complete synthetic canonical grant so clearing the rules fixture
+    // does not invoke revocation against a malformed legacy consent record.
+    await setDoc(doc(db, "consentRecords/consent-a"), {
+      uid: "user-a", status: "granted", purpose: "ai.personalization",
+      consentTier: "standard", policyVersion: "rules-fixture-v1",
+      receiptHash: "a".repeat(64), // Test-only sentinel; not a production signature.
+    });
     await setDoc(doc(db, "consentEvents/consent-event-a"), { uid: "user-a", status: "granted", purpose: "ai.personalization" });
     await setDoc(doc(db, "consentRevocationOutbox/revoke-a"), { uid: "user-a", purpose: "ai.personalization", status: "pending" });
     await setDoc(doc(db, "consentRevocationOutbox/revoke-a/acknowledgements/consumer-a"), { consumerId: "consumer-a", status: "acknowledged" });

@@ -1,0 +1,37 @@
+{
+  "schema": "URAI_R30_CURRENT_SOURCE_DENIAL_EMULATOR_PINS_V1",
+  "privacy_repository": "LifeLoggerAI/urai-privacy",
+  "privacy_base_sha": "fbdc590376376b758be968f174d71709f326c61f",
+  "privacy_base_branch": "integration/r27-r20-scoped-life-movie-verifier-denial-only-20261109",
+  "privacy_expected_sha": "Set dynamically by the workflow to the exact PR #258 head; runner refuses mismatch.",
+  "jobs_repository": "LifeLoggerAI/urai-jobs",
+  "jobs_pr": 390,
+  "jobs_branch": "review/chalk-r932-real-zod-studio-envelope-20261109",
+  "jobs_sha": "e8ba07fc26f154169f2e065d9aa65e77014635d2",
+  "jobs_state": "open-draft-unmerged",
+  "jobs_note": "Use #390 exact head; do NOT pin PR #391 head. PR #391 is based on #390 parent commit e8ba... but compare reports its head as one ahead and two behind the #390 base (diverged), so #391 omits two current #390 commits. #391 is a test-only regex correction and remains a separate divergent child. R30 uses full current #390 source.",
+  "verified_identical_jobs_blobs": {
+    "functions/src/privacy/lifeMovieJobsPrivacyClient.ts": "73d65b003f4141cd471db1e6a0edff9d7a1c747f",
+    "functions/src/privacy/lifeMovieConsentTransport.ts": "c1bdbb0f196f2f678bdf2d377d1aa0eea0cc56ae",
+    "functions/src/privacy/lifeMovieJobsTokenProvider.ts": "648225708e055592ee697e0dc342bfcf1bc144e4",
+    "functions/src/privacy/lifeMovieBoundedResponse.ts": "88b5c3117b9c8d5d8d903efc015b58bc17590b0d",
+    "functions/src/privacy/lifeMovieConsentDecision.ts": "67d0ed28abdbfd33e537b45b262bf4ce4509c2e3"
+  },
+  "runner": {
+    "historical_source_pr": "LifeLoggerAI/urai-privacy#224",
+    "historical_head": "f9e7786854f7ec70cab9a6e22d2c90ad95b834ed",
+    "historical_jobs_pin": "14c7c0482833a915ed6b33da7836b536d4585f18",
+    "r30_jobs_pin": "e8ba07fc26f154169f2e065d9aa65e77014635d2",
+    "mode": "denial-only; disposable Firebase Auth/Firestore/Functions/Storage emulators",
+    "no_production_credentials": true,
+    "no_external_network_except_allowlisted_local_emulator_redirects": true,
+    "no_grants": true,
+    "no_render": true
+  },
+  "verification": {
+    "Jobs #390 reported direct pnpm functions test": "exit 0 at exact e8ba07fc26f154169f2e065d9aa65e77014635d2",
+    "Jobs #390 cross-contract tests": "15/15 PASS at exact e8ba07fc26f154169f2e065d9aa65e77014635d2",
+    "These results": "historical Jobs-only evidence; not R30 cross-repo emulator acceptance",
+    "Privacy R30 emulator": "NOT YET EXECUTED"
+  }
+}

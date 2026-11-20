@@ -1,0 +1,98 @@
+⚠  emulators: You are not currently authenticated so some features may not work correctly. Please run firebase login to authenticate the CLI.
+i  emulators: Starting emulators: auth, functions, firestore, storage
+⚠  tasks: Error when trying to check port 9499 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9499
+⚠  tasks: Port 9499 is available on 127.0.0.1 but not ::1. This may cause issues with some clients.
+⚠  tasks: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json
+⚠  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, database, hosting, pubsub, dataconnect
+⚠  functions: Unable to fetch project Admin SDK configuration, Admin SDK behavior in Cloud Functions emulator may be incorrect.
+⚠  It appears you are running in a CI environment. You can avoid downloading the Firestore Emulator repeatedly by caching the /workspace/r1546/home/.cache/firebase/emulators directory.
+i  firestore: downloading cloud-firestore-emulator-v1.21.0.jar...
+
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator was started in standard edition.
+✔  firestore: Firestore Emulator UI websocket is running on 9150.
+⚠  It appears you are running in a CI environment. You can avoid downloading the Storage Emulator repeatedly by caching the /workspace/r1546/home/.cache/firebase/emulators directory.
+i  storage: downloading cloud-storage-rules-runtime-v1.1.3.jar...
+
+i  functions: Watching "/workspace/r1546/repo/functions" for Cloud Functions...
+⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory.
+⚠  functions: Please note that there will be breaking changes when you upgrade.
+✔  functions: Using node@22 from host.
+Serving at port 8652
+
+✔  functions: Loaded functions definitions from source: createExportRequest, createDeletionRequest, writeAuditLog, recordAdminAction, getPrivacyHealthReport, getExportDownloadUrl, cleanupExpiredExportPackages, processDeletionRequest, executeDeletionRequest, processExportRequest, setCanonicalConsent, evaluateCanonicalConsent, verifyLifeMovieRenderConsent, publishConsentRevocation, acknowledgeConsentRevocation.
+✔  functions[us-central1-createExportRequest]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/createExportRequest).
+✔  functions[us-central1-createDeletionRequest]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/createDeletionRequest).
+✔  functions[us-central1-writeAuditLog]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/writeAuditLog).
+✔  functions[us-central1-recordAdminAction]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/recordAdminAction).
+✔  functions[us-central1-getPrivacyHealthReport]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/getPrivacyHealthReport).
+✔  functions[us-central1-getExportDownloadUrl]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/getExportDownloadUrl).
+i  functions[us-central1-cleanupExpiredExportPackages]: function ignored because the pubsub emulator does not exist or is not running.
+✔  functions[us-central1-processDeletionRequest]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/processDeletionRequest).
+✔  functions[us-central1-executeDeletionRequest]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/executeDeletionRequest).
+✔  functions[us-central1-processExportRequest]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/processExportRequest).
+✔  functions[us-central1-setCanonicalConsent]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/setCanonicalConsent).
+✔  functions[us-central1-evaluateCanonicalConsent]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/evaluateCanonicalConsent).
+✔  functions[us-central1-verifyLifeMovieRenderConsent]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/verifyLifeMovieRenderConsent).
+✔  functions[us-central1-publishConsentRevocation]: firestore function initialized.
+✔  functions[us-central1-acknowledgeConsentRevocation]: http function initialized (http://127.0.0.1:5001/urai-privacy-r1512-disposable/us-central1/acknowledgeConsentRevocation).
+i  Running script: node tests/integration/r1545-canonical-privacy-lifecycle.emulator.cjs
+i  functions: Beginning execution of "us-central1-setCanonicalConsent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-setCanonicalConsent" in 371.248073ms
+i  functions: Beginning execution of "us-central1-evaluateCanonicalConsent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-publishConsentRevocation"
+i  functions: Finished "us-central1-publishConsentRevocation" in 13.292046ms
+i  functions: Finished "us-central1-evaluateCanonicalConsent" in 305.435802ms
+i  functions: Beginning execution of "us-central1-evaluateCanonicalConsent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-evaluateCanonicalConsent" in 5.296506ms
+i  functions: Beginning execution of "us-central1-setCanonicalConsent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-publishConsentRevocation"
+i  functions: Finished "us-central1-setCanonicalConsent" in 35.234646ms
+i  functions: Beginning execution of "us-central1-evaluateCanonicalConsent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-evaluateCanonicalConsent" in 31.440759ms
+i  functions: Finished "us-central1-publishConsentRevocation" in 306.571305ms
+i  functions: Beginning execution of "us-central1-createExportRequest"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-createExportRequest" in 304.302037ms
+i  functions: Beginning execution of "us-central1-processExportRequest"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-processExportRequest" in 14.686509ms
+i  functions: Beginning execution of "us-central1-processExportRequest"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-processExportRequest" in 564.764065ms
+i  functions: Beginning execution of "us-central1-getExportDownloadUrl"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-getExportDownloadUrl" in 320.817078ms
+i  functions: Beginning execution of "us-central1-createDeletionRequest"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-createDeletionRequest" in 299.759201ms
+i  functions: Beginning execution of "us-central1-processDeletionRequest"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-processDeletionRequest" in 453.757722ms
+i  functions: Beginning execution of "us-central1-executeDeletionRequest"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-executeDeletionRequest" in 503.642375ms
+i  functions: Beginning execution of "us-central1-executeDeletionRequest"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Beginning execution of "us-central1-publishConsentRevocation"
+i  functions: Finished "us-central1-publishConsentRevocation" in 5.091517ms
+i  functions: Finished "us-central1-executeDeletionRequest" in 290.064756ms
+i  functions: Beginning execution of "us-central1-setCanonicalConsent"
+>  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"}
+i  functions: Finished "us-central1-setCanonicalConsent" in 18.463136ms
+R1545_CANONICAL_PRIVACY_LIFECYCLE_RESULT {"outcome":"PARTIAL","checksPassed":7,"checks":["distinct-authenticated-identities-and-emulator-operator-claim","owner-and-foreign-records-seeded-and-read-back","consent-grant-owner-isolation-and-revocation-denial","export-terminal-records-package-hashes-content-redaction-and-foreign-denial","deletion-approved-plan-includes-seeded-record-and-export","terminal-deletion-readback-linked-audit-tombstone-and-residuals-verified","post-deletion-consent-recreation-denied"],"source":"2a3ae01e6353bea95d83166b88f28d74f061436b","harnessSha256":"446a08b85279ea551c207e09f088a11618b02ab68415b49cd76e64471f0aa020","helperSha256":"50b7e5b7f963544c12a56fe7ec594dd93288c10327961aaba244d3c88f97e894","sourceIdentityBasis":"Git HEAD matched to runner pin; clean tracked checkout; independent build custody still required","requestVsCompletion":{"exportRequest":"completed","exportPackage":"completed-and-admin-storage-bytes-verified","deletionRequest":"completed","deletionMutation":"completed","deletion":"completed-verified-for-canonical-emulator-scope","postDeletionFence":"consent-recreation-denied"},"downloadUrl":{"status":"not-attempted","reason":"no-authorized-provider-signer-in-emulator-scope"},"authorizedUserDownload":"not-tested","adminStorageReadIsUserDownload":false,"productionWrites":false,"independentCloudIAMVerified":false,"independentSecurityCertification":false,"releaseApproved":false}
+✔  Script exited successfully (code 0)
+i  emulators: Shutting down emulators.
+i  functions: Stopping Functions Emulator
+i  firestore: Stopping Firestore Emulator
+i  auth: Stopping Authentication Emulator
+i  storage: Stopping Storage Emulator
+i  eventarc: Stopping Eventarc Emulator
+i  tasks: Stopping Cloud Tasks Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectConsentRevocationSource } from "../../functions/src/consent-revocation-transition";
+import { classifyRevocationOutboxReplay, priorGrantReceiptEvidence, selectConsentRevocationSource } from "../../functions/src/consent-revocation-transition";
 
 const granted = {
   uid: "subject-1",
@@ -25,9 +25,125 @@ describe("consent revocation transition selection", () => {
     expect(selectConsentRevocationSource(null, revoked)).toEqual(revoked);
   });
 
+  it.each([
+    ["owner", "uid", "subject-other"],
+    ["purpose", "purpose", "data.export"],
+    ["tier", "consentTier", "C7"],
+    ["policy version", "policyVersion", "1.1.0"]
+  ])("revokes the preceding owner-bound grant when %s changes", (_label, field, value) => {
+    for (const status of ["granted", "denied", "revoked"]) {
+      const replacement = { ...granted, [field]: value, status, receiptHash: "e".repeat(64) };
+      expect(selectConsentRevocationSource(granted, replacement)).toEqual(granted);
+    }
+  });
+
+  it("uses the new receipt only for same-identity grant-to-denied transitions", () => {
+    const replacement = { ...granted, status: "denied", receiptHash: "f".repeat(64) };
+    expect(selectConsentRevocationSource(granted, replacement)).toEqual(replacement);
+  });
+
+  it("does not interpret unchanged-identity grant renewal as revocation", () => {
+    const replacement = { ...granted, status: "granted", receiptHash: "f".repeat(64) };
+    expect(selectConsentRevocationSource(granted, replacement)).toBeNull();
+  });
+
   it("suppresses replay of an unchanged non-grant and unrelated deletions", () => {
     const revoked = { ...granted, status: "revoked", receiptHash: "d".repeat(64) };
     expect(selectConsentRevocationSource(revoked, { ...revoked })).toBeNull();
     expect(selectConsentRevocationSource({ ...granted, status: "denied" }, null)).toBeNull();
+  });
+});
+
+describe("prior granted receipt evidence", () => {
+  it("preserves the original approved receipt when the new denial has a different receipt", () => {
+    const denied = { ...granted, status: "denied", receiptHash: "b".repeat(64) };
+    expect(selectConsentRevocationSource(granted, denied)).toEqual(denied);
+    expect(priorGrantReceiptEvidence(granted)).toEqual({
+      priorGrantReceiptHash: "a".repeat(64),
+      priorGrantEvidenceState: "present"
+    });
+  });
+
+  it("preserves the original owner receipt when the replacement changes owner", () => {
+    const replacement = { ...granted, uid: "subject-2", status: "revoked", receiptHash: "b".repeat(64) };
+    expect(selectConsentRevocationSource(granted, replacement)).toEqual(granted);
+    expect(priorGrantReceiptEvidence(granted).priorGrantReceiptHash).toEqual("a".repeat(64));
+  });
+
+  it.each([null, { ...granted, status: "denied" }, { ...granted, status: "revoked" }])(
+    "does not invent a prior grant for missing/non-granted records",
+    (before) => {
+      expect(priorGrantReceiptEvidence(before)).toEqual({
+        priorGrantReceiptHash: null,
+        priorGrantEvidenceState: "not_applicable"
+      });
+    }
+  );
+
+  it.each([null, "", "Z".repeat(64), "a".repeat(63), 999, {}])(
+    "flags absent, malformed or noncanonical prior hashes without certifying them: %s",
+    (receiptHash) => {
+      expect(priorGrantReceiptEvidence({ ...granted, receiptHash })).toEqual({
+        priorGrantReceiptHash: null,
+        priorGrantEvidenceState: "missing_or_invalid"
+      });
+    }
+  );
+
+  it("retains the old receipt through a granted-to-granted identity replacement", () => {
+    const replacement = { ...granted, purpose: "data.export", receiptHash: "b".repeat(64) };
+    expect(selectConsentRevocationSource(granted, replacement)).toEqual(granted);
+    expect(priorGrantReceiptEvidence(granted).priorGrantReceiptHash).toBe(granted.receiptHash);
+  });
+});
+
+describe("immutable revocation outbox replay admission", () => {
+  const event = {
+    schemaVersion: "consent.revoked.v1",
+    eventId: "a".repeat(64),
+    consentRecordId: "subject-1_memory_storage",
+    uid: "subject-1",
+    purpose: "memory.storage",
+    consentTier: "C1",
+    policyVersion: "2026-07-06",
+    sourceReceiptHash: "b".repeat(64),
+    priorGrantReceiptHash: "c".repeat(64),
+    priorGrantEvidenceState: "present",
+    integrityHash: "d".repeat(64)
+  };
+
+  it("accepts identical immutable facts despite mutable ACK bookkeeping", () => {
+    expect(classifyRevocationOutboxReplay({
+      ...event, status: "done", attempts: 8, lastAcknowledgementStatus: "applied"
+    }, event)).toBe("identical");
+  });
+
+  it("does not silently mark a legacy event missing both prior-grant fields as identical", () => {
+    const existing = { ...event };
+    delete (existing as Partial<typeof event>).priorGrantReceiptHash;
+    delete (existing as Partial<typeof event>).priorGrantEvidenceState;
+    expect(classifyRevocationOutboxReplay(existing, event)).toBe("legacy_missing_lineage");
+  });
+
+  it.each(["priorGrantReceiptHash", "priorGrantEvidenceState", "sourceReceiptHash", "integrityHash", "uid"] as const)(
+    "rejects mismatched immutable field %s",
+    (key) => {
+      expect(classifyRevocationOutboxReplay({ ...event, [key]: "tampered" }, event)).toBe("conflicting");
+    }
+  );
+
+  it("rejects a prior-grant collision at an identical v1 event ID", () => {
+    const old = { ...event, priorGrantReceiptHash: "e".repeat(64) };
+    expect(old.eventId).toBe(event.eventId);
+    expect(classifyRevocationOutboxReplay(old, event)).toBe("conflicting");
+  });
+
+  it("rejects partial lineage and missing identity fields", () => {
+    const partial = { ...event };
+    delete (partial as Partial<typeof event>).priorGrantReceiptHash;
+    expect(classifyRevocationOutboxReplay(partial, event)).toBe("conflicting");
+    const missingId = { ...event };
+    delete (missingId as Partial<typeof event>).eventId;
+    expect(classifyRevocationOutboxReplay(missingId, event)).toBe("conflicting");
   });
 });
