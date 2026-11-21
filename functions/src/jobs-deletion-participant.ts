@@ -4,6 +4,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from './life-movie-jobs-identity';
 import { jobsDeleteEvidenceHash, verifyJobsDeleteEvidence } from './jobs-deletion-evidence';
+import { verifyJobsDeletionOrigin } from './jobs-deletion-origin';
 
 const inputSchema = z.object({
   centralRequestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/),
@@ -53,6 +54,15 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
   const db = getFirestore();
   const requestRef = db.collection('deletionRequests').doc(parsed.data.centralRequestId);
   const evidenceRef = requestRef.collection('participantEvidence').doc('urai-jobs');
+  const initial = await requestRef.get();
+  if (!initial.exists) throw new HttpsError('not-found','Canonical deletion request not found.');
+  const owner = initial.data()?.uid;
+  if (typeof owner !== 'string' || initial.data()?.status !== 'processing')
+    throw new HttpsError('failed-precondition','Canonical deletion is not pending verification.');
+  const incoming = verifyJobsDeleteEvidence(parsed.data.receipt, owner, parsed.data.jobsRequestId);
+  if (!incoming) throw new HttpsError('failed-precondition','Invalid Jobs owner or request binding.');
+  const origin = await verifyJobsDeletionOrigin(owner, parsed.data.jobsRequestId, incoming);
+  if (!origin) throw new HttpsError('failed-precondition','Independent Jobs origin verification unavailable or mismatched.');
   const result = await db.runTransaction(async tx => {
     const [subject, prior] = await Promise.all([tx.get(requestRef), tx.get(evidenceRef)]);
     if (!subject.exists) throw new HttpsError('not-found','Canonical deletion request not found.');
@@ -63,6 +73,8 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
     }
     const receipt = verifyJobsDeleteEvidence(parsed.data.receipt,row.uid,parsed.data.jobsRequestId);
     if (!receipt) throw new HttpsError('failed-precondition','Jobs deletion evidence is not bound to current owner and request.');
+    if (row.uid !== owner || origin.sourceEvidenceHash !== jobsDeleteEvidenceHash(receipt))
+      throw new HttpsError('failed-precondition','Canonical Jobs source binding changed.');
     const hash = jobsDeleteEvidenceHash(receipt);
     if (prior.exists) {
       if (prior.data()?.evidenceHash !== hash ||
@@ -82,6 +94,9 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
       jobsResultDigest:receipt.resultDigest,
       serviceUid:request.auth?.uid,
       sourceState:receipt.terminalState,
+      sourceProject:origin.sourceProject,
+      sourceReceiptPath:origin.sourceReceiptPath,
+      originVerificationState:'independent-source-readback-matched',
       acknowledgmentState:'evidence-received-verification-pending',
       globalDeletionComplete:false,
       createdAt:FieldValue.serverTimestamp(),
@@ -91,5 +106,6 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
   return { accepted:true, idempotent:result.idempotent,
     evidenceHash:result.hash, participant:'urai-jobs',
     acknowledgmentState:'evidence-received-verification-pending',
+    originVerificationState:'independent-source-readback-matched',
     globalDeletionComplete:false };
 });
