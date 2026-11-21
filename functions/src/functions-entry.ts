@@ -14,3 +14,5 @@ export { publishConsentRevocation, acknowledgeConsentRevocation } from "./consen
 export { dispatchConsentRevocationToJobs } from "./consent-revocation-dispatch";
 
 export { reconcileNativeJobsRevocationAck } from "./jobs-revocation-ack-reconcile";
+
+export { recordJobsDeletionParticipantEvidence } from "./jobs-deletion-participant";
