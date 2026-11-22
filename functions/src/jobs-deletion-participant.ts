@@ -54,6 +54,7 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
   const db = getFirestore();
   const requestRef = db.collection('deletionRequests').doc(parsed.data.centralRequestId);
   const evidenceRef = requestRef.collection('participantEvidence').doc('urai-jobs');
+  const bindingRef = requestRef.collection('participantBindings').doc('urai-jobs');
   const initial = await requestRef.get();
   if (!initial.exists) throw new HttpsError('not-found','Canonical deletion request not found.');
   const owner = initial.data()?.uid;
@@ -64,13 +65,20 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
   const origin = await verifyJobsDeletionOrigin(owner, parsed.data.jobsRequestId, incoming);
   if (!origin) throw new HttpsError('failed-precondition','Independent Jobs origin verification unavailable or mismatched.');
   const result = await db.runTransaction(async tx => {
-    const [subject, prior] = await Promise.all([tx.get(requestRef), tx.get(evidenceRef)]);
+    const [subject, binding, prior] = await Promise.all([tx.get(requestRef), tx.get(bindingRef), tx.get(evidenceRef)]);
     if (!subject.exists) throw new HttpsError('not-found','Canonical deletion request not found.');
     const row = subject.data() ?? {};
     if (row.status !== 'processing' || typeof row.uid !== 'string' ||
         row.deletionCompletionVerified === true) {
       throw new HttpsError('failed-precondition','Canonical deletion is not pending verification.');
     }
+    const link=binding.data()||{};
+    if (!binding.exists || link.state!=='authorized-pending-verification' ||
+        link.centralRequestId!==parsed.data.centralRequestId ||
+        link.jobsRequestId!==parsed.data.jobsRequestId ||
+        link.ownerHash!==incoming.ownerHash || link.sourceProject!==origin.sourceProject ||
+        link.globalDeletionComplete!==false)
+      throw new HttpsError('failed-precondition','Canonical Privacy Jobs deletion binding unavailable or mismatched.');
     const receipt = verifyJobsDeleteEvidence(parsed.data.receipt,row.uid,parsed.data.jobsRequestId);
     if (!receipt) throw new HttpsError('failed-precondition','Jobs deletion evidence is not bound to current owner and request.');
     if (row.uid !== owner || origin.sourceEvidenceHash !== jobsDeleteEvidenceHash(receipt))
