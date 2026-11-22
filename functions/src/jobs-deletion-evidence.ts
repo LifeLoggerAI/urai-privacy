@@ -3,6 +3,19 @@ import { createHash } from 'node:crypto';
 const hex64 = /^[a-f0-9]{64}$/;
 const safeId = /^[A-Za-z0-9._:-]{8,160}$/;
 const sha256 = (x: string) => createHash('sha256').update(x).digest('hex');
+// Same canonical JSON digest contract as Jobs: stable even after Firestore map
+// field-order normalization. Never accept a caller-provided digest without
+// recomputing it from the received result.
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(record).sort().map(k => [k, canonical(record[k])]));
+  }
+  return value;
+}
+export const jobsResultDigest = (value: unknown): string => sha256(JSON.stringify(canonical(value)));
+
 export type JobsDeleteEvidence = {
   schemaVersion: 'urai-jobs-data-rights-execution-v1';
   event: 'DATA_RIGHTS_EXECUTION_FINISHED';
@@ -32,7 +45,7 @@ export function verifyJobsDeleteEvidence(value: unknown, ownerUid: string, jobsR
     !result.unresolvedDomains.includes('cross-system-data-owned-by-other-urai-services') ||
     !result.unresolvedDomains.includes('orphan-job-results-without-parent-job') ||
     result.unresolvedDomains.some(x => typeof x !== 'string' || x.length > 160)) return null;
-  if (sha256(JSON.stringify(result)) !== row.resultDigest) return null;
+  if (jobsResultDigest(result) !== row.resultDigest) return null;
   return row as JobsDeleteEvidence;
 }
 export function jobsDeleteEvidenceHash(evidence: JobsDeleteEvidence): string {
