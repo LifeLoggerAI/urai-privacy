@@ -42,12 +42,18 @@ export const authorizeJobsDeletionBinding=onCall(async request=>{
   const central=db.collection('deletionRequests').doc(centralRequestId);
   const binding=central.collection('participantBindings').doc('urai-jobs');
   const jobRef=source.collection('dataRightsRequests').doc(jobsRequestId);
-  const [centralSnap,jobSnap]=await Promise.all([central.get(),jobRef.get()]);
+  const submittedRef=jobRef.collection('audit').doc('submitted');
+  const [centralSnap,jobSnap,submittedSnap]=await Promise.all([central.get(),jobRef.get(),submittedRef.get()]);
   if (!centralSnap.exists || !jobSnap.exists)
     throw new HttpsError('not-found','Canonical or Jobs deletion request unavailable.');
   const owner=centralSnap.data()?.uid;
   const job=jobSnap.data()||{};
+  const submission=submittedSnap.data()||{};
   if (typeof owner!=='string' || !owner.trim() ||
+      centralSnap.data()?.scope!=='account' || !centralSnap.data()?.createdAt ||
+      !submittedSnap.exists || submission.event!=='DATA_RIGHTS_REQUEST_SUBMITTED' ||
+      submission.actorUid!==owner || submission.status!=='PENDING' ||
+      !submission.createdAt || job.requestId!==jobsRequestId || !job.createdAt ||
       centralSnap.data()?.status!=='processing' ||
       centralSnap.data()?.deletionCompletionVerified===true ||
       job.ownerUid!==owner || job.requestType!=='DELETE' ||
