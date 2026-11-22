@@ -16,3 +16,4 @@ export { dispatchConsentRevocationToJobs } from "./consent-revocation-dispatch";
 export { reconcileNativeJobsRevocationAck } from "./jobs-revocation-ack-reconcile";
 
 export { recordJobsDeletionParticipantEvidence } from "./jobs-deletion-participant";
+export { authorizeJobsDeletionBinding } from './jobs-deletion-binding';
