@@ -19,6 +19,7 @@ import {
   EXPORT_DOWNLOAD_URL_TTL_MS,
   EXPORT_PACKAGE_TTL_MS,
   currentExportDownloadMatches,
+  signedExportObjectGeneration,
   resolveExportPackageExpiry,
   timestampMillis,
   validExportObjectPath
@@ -155,16 +156,27 @@ export const getExportDownloadUrl = onCall(async (request) => {
   }
 
   const object = bucket.file(path as string);
-  const [exists] = await object.exists();
-  if (!exists) throw new HttpsError("not-found", "Export package file is missing.");
+  // Metadata includes the exact exported object generation and checksum.
+  // Existence alone is insufficient: a later write can replace the same path.
+  const [objectMetadata] = await object.getMetadata().catch(() => [null]);
+  if (!objectMetadata) throw new HttpsError("not-found", "Export package file is missing.");
+  const generation = signedExportObjectGeneration(job, file, objectMetadata);
+  if (!generation) {
+    throw new HttpsError("failed-precondition", "Export object does not match the completed package.");
+  }
 
-  // Recheck before signing: Storage existence is an awaited external boundary.
+  // Recheck before signing: Storage metadata is an awaited external boundary.
   await assertNoOwnerDeletionFence(uid);
   const signedUrlExpiresAt = Math.min(
     Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS,
     packageExpiresAt
   );
-  const [url] = await object.getSignedUrl({ action: "read", expires: signedUrlExpiresAt });
+  const [url] = await object.getSignedUrl({
+    action: "read",
+    version: "v4",
+    expires: signedUrlExpiresAt,
+    queryParams: { generation }
+  });
   // A concurrent cleanup or replacement must invalidate the just-signed URL.
   const afterSigning = await jobRef.get();
   if (!currentExportDownloadMatches(job, afterSigning.exists ? (afterSigning.data() ?? {}) : null)) {
@@ -198,6 +210,14 @@ export const getExportDownloadUrl = onCall(async (request) => {
   if (!currentExportDownloadMatches(job, beforeReturn.exists ? (beforeReturn.data() ?? {}) : null)) {
     throw new HttpsError("failed-precondition", "Export package changed before delivery.");
   }
+  // Metadata could also change while signing/auditing. Refuse to disclose
+  // the capability if its GCS generation or committed digest changed.
+  const [latestMetadata] = await object.getMetadata().catch(() => [null]);
+  if (signedExportObjectGeneration(job, file, latestMetadata) !== generation) {
+    throw new HttpsError("failed-precondition", "Export object changed before delivery.");
+  }
+  await assertNoOwnerDeletionFence(uid);
+  await assertActiveExportRequestCaller(request);
 
   return {
     jobId,
