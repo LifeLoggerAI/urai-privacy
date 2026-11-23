@@ -29,7 +29,21 @@ export function deletionCompletionBlockReason(
       message: "Deletion completion cannot be verified because an active legal hold exists."
     };
   }
-  if (residuals.totalResidualTargets > 0) {
+  // Completion must not trust a stale or inconsistent aggregate over the
+  // detailed Firestore, Storage, and Auth observations. A corrupted count
+  // must fail closed even when it incorrectly claims zero residuals.
+  const detailedCount = Object.values(residuals.firestoreTargets)
+    .reduce((total, ids) => total + ids.length, 0) +
+    residuals.storageObjects.length + (residuals.authUserExists ? 1 : 0);
+  if (!Number.isSafeInteger(residuals.totalResidualTargets) ||
+      residuals.totalResidualTargets < 0 ||
+      residuals.totalResidualTargets !== detailedCount) {
+    return {
+      code: "failed-precondition",
+      message: "Deletion completion residual count disagrees with the detailed inventory."
+    };
+  }
+  if (detailedCount > 0) {
     return {
       code: "failed-precondition",
       message: "Deletion completion verification found remaining or newly created targets. Re-run the dry run before continuing."
