@@ -18,6 +18,7 @@ import {
   EXPORT_CLEANUP_PAGE_SIZE,
   EXPORT_DOWNLOAD_URL_TTL_MS,
   EXPORT_PACKAGE_TTL_MS,
+  currentExportDownloadMatches,
   resolveExportPackageExpiry,
   timestampMillis,
   validExportObjectPath
@@ -164,6 +165,11 @@ export const getExportDownloadUrl = onCall(async (request) => {
     packageExpiresAt
   );
   const [url] = await object.getSignedUrl({ action: "read", expires: signedUrlExpiresAt });
+  // A concurrent cleanup or replacement must invalidate the just-signed URL.
+  const afterSigning = await jobRef.get();
+  if (!currentExportDownloadMatches(job, afterSigning.exists ? (afterSigning.data() ?? {}) : null)) {
+    throw new HttpsError("failed-precondition", "Export package changed during signing.");
+  }
   // Signing is asynchronous; recheck owner authority before metadata writes.
   await assertNoOwnerDeletionFence(uid);
   await assertExportOwnerAuthActive(uid);
@@ -186,6 +192,12 @@ export const getExportDownloadUrl = onCall(async (request) => {
   await assertNoOwnerDeletionFence(uid);
   await assertExportOwnerAuthActive(uid);
   await assertActiveExportRequestCaller(request);
+  // The audit and authority checks also await other services. Check again
+  // immediately before returning the private signed object capability.
+  const beforeReturn = await jobRef.get();
+  if (!currentExportDownloadMatches(job, beforeReturn.exists ? (beforeReturn.data() ?? {}) : null)) {
+    throw new HttpsError("failed-precondition", "Export package changed before delivery.");
+  }
 
   return {
     jobId,
