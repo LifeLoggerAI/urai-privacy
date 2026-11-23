@@ -53,6 +53,26 @@ export function resolveExportPackageExpiry(job: Record<string, unknown>) {
   return completedAt ? completedAt + EXPORT_PACKAGE_TTL_MS : null;
 }
 
+// Fail closed if an export was cleaned, replaced or reprocessed during signing.
+export function currentExportDownloadMatches(
+  original: Record<string, unknown>,
+  latest: Record<string, unknown> | null,
+  now = Date.now()
+) {
+  if (!latest || original.status !== "completed" || original.complete !== true ||
+      latest.status !== "completed" || latest.complete !== true) return false;
+  for (const name of [
+    "uid", "requestId", "exportPackagePath", "exportManifestPath",
+    "exportSha256", "manifestSha256"
+  ] as const) {
+    if (typeof original[name] !== "string" || !original[name] ||
+        original[name] !== latest[name]) return false;
+  }
+  const before = resolveExportPackageExpiry(original);
+  const after = resolveExportPackageExpiry(latest);
+  return before !== null && after === before && after > now;
+}
+
 export function isExportPackageExpired(job: Record<string, unknown>, now = Date.now()) {
   const expiresAt = resolveExportPackageExpiry(job);
   return expiresAt !== null && expiresAt <= now;

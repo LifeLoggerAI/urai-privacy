@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   EXPORT_DOWNLOAD_URL_TTL_MS,
   EXPORT_PACKAGE_TTL_MS,
+  currentExportDownloadMatches,
   isExportPackageExpired,
   resolveExportPackageExpiry,
   timestampMillis,
@@ -38,6 +39,31 @@ describe("export package lifecycle contract", () => {
     const expiresAt = Date.parse("2026-07-06T08:00:00.000Z");
     expect(isExportPackageExpired({ packageExpiresAt: expiresAt }, expiresAt - 1)).toBe(false);
     expect(isExportPackageExpired({ packageExpiresAt: expiresAt }, expiresAt)).toBe(true);
+  });
+
+  it("rejects stale signed export state after signing or audit", () => {
+    const now = Date.parse("2026-11-22T22:00:00Z");
+    const job = {
+      uid: "owner-a", requestId: "req-a", status: "completed", complete: true,
+      exportPackagePath: "exports/owner-a/job-a/export.json",
+      exportManifestPath: "exports/owner-a/job-a/manifest.json",
+      exportSha256: "a".repeat(64), manifestSha256: "b".repeat(64),
+      packageExpiresAt: now + 300000
+    };
+    expect(currentExportDownloadMatches(job, { ...job }, now)).toBe(true);
+    expect(currentExportDownloadMatches(job, { ...job,
+      packageExpiresAt: { toMillis: () => now + 300000 } }, now)).toBe(true);
+    for (const changed of [
+      null, { ...job, status: "expired" }, { ...job, complete: false },
+      { ...job, uid: "foreign" }, { ...job, requestId: "different" },
+      { ...job, exportPackagePath: "exports/owner-a/job-a/new.json" },
+      { ...job, exportManifestPath: "exports/owner-a/job-a/new-manifest.json" },
+      { ...job, exportSha256: "c".repeat(64) },
+      { ...job, manifestSha256: "d".repeat(64) },
+      { ...job, packageExpiresAt: now - 1 },
+      { ...job, packageExpiresAt: now + 400000 }
+    ]) expect(currentExportDownloadMatches(job, changed, now)).toBe(false);
+    expect(currentExportDownloadMatches(job, { ...job }, now + 300000)).toBe(false);
   });
 
   it("accepts only job-scoped export object paths", () => {
