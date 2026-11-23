@@ -77,6 +77,33 @@ describe("deletion completion residual policy", () => {
     }))).toMatchObject({ code: "failed-precondition" });
   });
 
+  it("fails closed on contradictory or invalid residual aggregates", () => {
+    const detailedFirestore = residuals({
+      firestoreTargets: {
+        users: [], privacyRequests: [], exportJobs: ["still-there"],
+        exportProcessingLeases: [], consentRecords: [], dataAccessEvents: []
+      },
+      totalResidualTargets: 0
+    });
+    const detailedStorage = residuals({
+      storageObjects: ["exports/user-1/job/export.json"],
+      totalResidualTargets: 0
+    });
+    const detailedAuth = residuals({ authUserExists: true, totalResidualTargets: 0 });
+    for (const contradictory of [
+      detailedFirestore, detailedStorage, detailedAuth,
+      residuals({ totalResidualTargets: -1 }),
+      residuals({ totalResidualTargets: Number.NaN }),
+      residuals({ totalResidualTargets: 1 })
+    ]) {
+      expect(deletionCompletionBlockReason(contradictory)).toEqual({
+        code: "failed-precondition",
+        message: "Deletion completion residual count disagrees with the detailed inventory."
+      });
+    }
+    expect(deletionCompletionBlockReason(residuals())).toBeNull();
+  });
+
   it("blocks completion when an export object remains", () => {
     expect(deletionCompletionBlockReason(residuals({
       storageObjects: ["exports/user-1/job/export.json"],
