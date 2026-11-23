@@ -23,6 +23,7 @@ import {
   validExportObjectPath
 } from "./export-lifecycle-contract";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
+import { verifyActiveExportCaller } from "./export-active-caller";
 
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
@@ -58,6 +59,18 @@ function requireOwnerOrAdmin(auth: RequestAuth | undefined, ownerUid: string) {
 // its payload claims to be inactive. A prior completed export is not exemption.
 // A previously verified request token cannot stand in for a current owner
 // account status. Fail closed on disabled/deleted/unreadable owner identity.
+async function assertActiveExportRequestCaller(request: {
+  auth?: { uid?: string };
+  rawRequest?: { headers: { authorization?: string } };
+}) {
+  const active = await verifyActiveExportCaller(
+    request.auth?.uid,
+    request.rawRequest?.headers.authorization,
+    (token, checkRevoked) => getAuth(app).verifyIdToken(token, checkRevoked)
+  );
+  if (!active) throw new HttpsError("permission-denied", "Current non-revoked caller authentication is required.");
+}
+
 async function assertExportOwnerAuthActive(uid: string) {
   let owner;
   try {
@@ -124,6 +137,7 @@ export const getExportDownloadUrl = onCall(async (request) => {
   }
 
   const actor = requireOwnerOrAdmin(request.auth, uid);
+  await assertActiveExportRequestCaller(request);
   await assertNoOwnerDeletionFence(uid);
   await assertExportOwnerAuthActive(uid);
   const packageExpiresAt = resolveExportPackageExpiry(job);
@@ -171,6 +185,7 @@ export const getExportDownloadUrl = onCall(async (request) => {
   // an account-disable or deletion fence appeared while logging the request.
   await assertNoOwnerDeletionFence(uid);
   await assertExportOwnerAuthActive(uid);
+  await assertActiveExportRequestCaller(request);
 
   return {
     jobId,
