@@ -11,6 +11,7 @@ const {initializeApp:adminApp,deleteApp:deleteAdminApp}=require('firebase-admin/
 const {getAuth:adminAuth}=require('firebase-admin/auth');
 const {getFirestore}=require('firebase-admin/firestore');
 const {getStorage}=require('firebase-admin/storage');
+const {signedExportObjectGeneration}=require('../../functions/lib/export-lifecycle-contract.js');
 
 const project='urai-privacy-r1512-disposable';
 assert.equal(process.env.GCLOUD_PROJECT,project);
@@ -68,6 +69,22 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   assert.equal(createHash('sha256').update(exportBytes).digest('hex'),job.exportSha256);
   assert.equal(createHash('sha256').update(manifestBytes).digest('hex'),job.manifestSha256);
   checks.push('storage-export-manifest-hashes-and-redaction');
+  const [exportMetadata,manifestMetadata]=await Promise.all([
+    bucket.file(job.exportPackagePath).getMetadata().then(x=>x[0]),
+    bucket.file(job.exportManifestPath).getMetadata().then(x=>x[0])
+  ]);
+  const exportGeneration=signedExportObjectGeneration(job,'export',exportMetadata);
+  const manifestGeneration=signedExportObjectGeneration(job,'manifest',manifestMetadata);
+  assert.match(exportGeneration,/^[1-9][0-9]*$/);
+  assert.match(manifestGeneration,/^[1-9][0-9]*$/);
+  checks.push('storage-generation-metadata-matches-committed-package-hashes');
+  assert.equal(signedExportObjectGeneration(job,'export',{
+    ...exportMetadata,metadata:{sha256:'0'.repeat(64)}
+  }),null);
+  assert.equal(signedExportObjectGeneration(job,'manifest',{
+    ...manifestMetadata,generation:'0'
+  }),null);
+  checks.push('storage-mutated-digest-and-generation-fail-closed');
   await assert.rejects(call(stranger,'getExportDownloadUrl',{jobId:request.exportJobId,file:'export'}));
   checks.push('completed-export-foreign-download-denied');
   // Signing belongs to independently controlled hosted identity; never touch
