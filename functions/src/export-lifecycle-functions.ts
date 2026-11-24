@@ -1,3 +1,4 @@
+import { once } from "node:events";
 import { createHash, randomUUID } from "node:crypto";
 import { getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -11,7 +12,7 @@ import {
 } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import {
   EXPORT_CLEANUP_MAX_PAGES,
@@ -25,7 +26,7 @@ import {
   validExportObjectPath
 } from "./export-lifecycle-contract";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
-import { verifyActiveExportCaller } from "./export-active-caller";
+import { exportBearerToken, verifyActiveExportCaller } from "./export-active-caller";
 import { requireExportConsent } from "./export-consent-authority";
 
 const app = getApps().length ? getApp() : initializeApp();
@@ -33,232 +34,249 @@ const db = getFirestore(app);
 const bucket = getStorage(app).bucket();
 const FAILED_ARTIFACT_CLEANUP_LEASE_MS = 15 * 60 * 1000;
 
-const downloadSchema = z.object({
-  jobId: z.string().trim().min(1).max(160),
-  file: z.enum(["export", "manifest"]).default("export")
-});
-
+const documentId = z.string().min(1).max(160).regex(/^[^/\s]+$/).refine(id => id !== "." && id !== "..");
+const downloadFile = z.enum(["export", "manifest"]);
+const downloadSchema = z.object({ jobId: documentId, file: downloadFile.default("export") }).strict();
+const deliverySchema = z.object({
+  jobId: documentId, file: downloadFile, auditId: documentId,
+  authorityHash: z.string().regex(/^[0-9a-f]{64}$/), expiresAt: z.string().regex(/^[1-9]\d{0,14}$/)
+}).strict();
+const DESCRIPTOR_SCHEMA = "urai-canonical-export-download-v1";
+// Gen 2 limits each streamed HTTP response to 10 MB.
+const MAX_EXPORT_BYTES = 10_000_000;
+const CHUNK_BYTES = 64 * 1024;
+type DownloadFile = z.infer<typeof downloadFile>;
 type RequestAuth = { uid?: string; token?: Record<string, unknown> };
 
 function digest(value: unknown) {
-  const serialized = JSON.stringify(value) ?? String(value);
-  return createHash("sha256").update(serialized).digest("hex");
+  return createHash("sha256").update(JSON.stringify(value) ?? String(value)).digest("hex");
 }
 
 function text(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function unavailable() {
+  return new HttpsError("failed-precondition", "Check current data export consent and request a fresh export package.");
+}
+
 function requireOwnerOrAdmin(auth: RequestAuth | undefined, ownerUid: string) {
   if (!auth?.uid) throw new HttpsError("unauthenticated", "Authentication is required.");
   const elevated = auth.token?.admin === true || auth.token?.role === "admin";
-  if (auth.uid !== ownerUid && !elevated) {
-    throw new HttpsError("permission-denied", "Owner or administrative access is required.");
-  }
+  if (auth.uid !== ownerUid && !elevated) throw new HttpsError("permission-denied", "Owner or administrative access is required.");
   return { actorUid: auth.uid, actorRole: auth.uid === ownerUid ? "user" : "admin" };
 }
 
-// Any owner-wide deletion marker invalidates new export URL issuance, even if
-// its payload claims to be inactive. A prior completed export is not exemption.
-// A previously verified request token cannot stand in for a current owner
-// account status. Fail closed on disabled/deleted/unreadable owner identity.
-async function assertActiveExportRequestCaller(request: {
-  auth?: { uid?: string };
-  rawRequest?: { headers: { authorization?: string } };
-}) {
-  const active = await verifyActiveExportCaller(
-    request.auth?.uid,
-    request.rawRequest?.headers.authorization,
-    (token, checkRevoked) => getAuth(app).verifyIdToken(token, checkRevoked)
-  );
-  if (!active) throw new HttpsError("permission-denied", "Current non-revoked caller authentication is required.");
+function localAuthEmulator() {
+  return process.env.FUNCTIONS_EMULATOR === "true" &&
+    /^(?:localhost|127\.0\.0\.1):[1-9]\d{0,4}$/.test(process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "");
 }
 
-async function assertExportOwnerAuthActive(uid: string) {
-  let owner;
-  try {
-    owner = await getAuth(app).getUser(uid);
-  } catch {
-    throw new HttpsError("failed-precondition", "Export owner account status could not be verified.");
+async function authenticatedActor(header: unknown, expectedUid?: string) {
+  const bearer = exportBearerToken(header, localAuthEmulator());
+  if (!bearer) throw new HttpsError("unauthenticated", "Current authentication is required.");
+  const token = await getAuth(app).verifyIdToken(bearer, true).catch(() => null);
+  if (!token?.uid || (expectedUid !== undefined && token.uid !== expectedUid)) {
+    throw new HttpsError("unauthenticated", "Current authentication is required.");
   }
-  if (owner.disabled) {
-    throw new HttpsError("failed-precondition", "Export owner account is disabled.");
+  return { uid: token.uid, token };
+}
+
+async function verifyAccounts(uid: string, actorUid: string) {
+  const owner = await getAuth(app).getUser(uid).catch(() => null);
+  if (!owner || owner.disabled) throw unavailable();
+  if (actorUid === uid) return;
+  const actor = await getAuth(app).getUser(actorUid).catch(() => null);
+  if (!actor || actor.disabled || !(actor.customClaims?.admin === true || actor.customClaims?.role === "admin")) {
+    throw new HttpsError("permission-denied", "Current administrative authority is required.");
   }
 }
 
-async function requireCurrentDownloadGrant(jobId: string, original: DocumentData, actorUid: string) {
-  const uid = text(original.uid);
-  const requestId = text(original.requestId);
-  if (actorUid !== uid) {
-    const user = await getAuth(app).getUser(actorUid);
-    if (user.disabled || !(user.customClaims?.admin === true || user.customClaims?.role === "admin")) {
-      throw new HttpsError("permission-denied", "Current administrative authority is required.");
-    }
-  }
-  return db.runTransaction(async tx => {
-    const [job, subjectRequest, consent] = await Promise.all([
-      tx.get(db.collection("exportJobs").doc(jobId)),
-      tx.get(db.collection("privacyRequests").doc(requestId)),
-      tx.get(db.collection("consentRecords").doc(`${uid}_data_export`))
-    ]);
-    const currentJob = job.data();
-    const parent = subjectRequest.data();
-    if (!currentJob || !currentExportDownloadMatches(original, currentJob) ||
-        parent?.uid !== uid || parent.type !== "export" || parent.status !== "completed") {
-      throw new HttpsError("failed-precondition", "Completed export request and current job must match.");
-    }
-    return requireExportConsent(uid, consent.data(), original, currentJob, parent);
-  }, { readOnly: true });
+async function readAuthority(tx: FirebaseFirestore.Transaction, jobId: string, file: DownloadFile, auth: RequestAuth) {
+  const job = (await tx.get(db.collection("exportJobs").doc(jobId))).data();
+  if (!job) throw new HttpsError("not-found", "Export job is unavailable.");
+  const uid = text(job.uid);
+  const requestId = text(job.requestId);
+  if (!documentId.safeParse(uid).success || !documentId.safeParse(requestId).success ||
+      job.status !== "completed" || job.complete !== true || !currentExportDownloadMatches(job, job)) throw unavailable();
+  const actor = requireOwnerOrAdmin(auth, uid);
+  const [parent, consent, accountFence, tombstone] = await Promise.all([
+    tx.get(db.collection("privacyRequests").doc(requestId)),
+    tx.get(db.collection("consentRecords").doc(`${uid}_data_export`)),
+    tx.get(db.collection("accountDeletionFences").doc(uid)),
+    tx.get(db.collection("privacyDeletionTombstones").doc(uid))
+  ]);
+  const subjectRequest = parent.data();
+  if (accountFence.exists || tombstone.exists || subjectRequest?.uid !== uid ||
+      subjectRequest.type !== "export" || subjectRequest.status !== "completed") throw unavailable();
+  const grant = requireExportConsent(uid, consent.data(), job, subjectRequest);
+  const packageExpiresAt = resolveExportPackageExpiry(job);
+  const path = file === "manifest" ? job.exportManifestPath : job.exportPackagePath;
+  if (!packageExpiresAt || packageExpiresAt <= Date.now() || !validExportObjectPath({ uid, jobId, path }) ||
+      typeof path !== "string" || !path.endsWith(`/${file}.json`)) throw unavailable();
+  const sha256 = text(file === "manifest" ? job.manifestSha256 : job.exportSha256);
+  const rowHash = digest([uid, requestId, jobId, job.exportPackagePath, job.exportManifestPath,
+    job.exportSha256, job.manifestSha256, packageExpiresAt, grant.consentReceiptHash, grant.exportConsentExpiresAt]);
+  return { uid, requestId, jobId, file, path: String(path), sha256, job, actor, rowHash,
+    packageExpiresAt, consentExpiresAt: Date.parse(grant.exportConsentExpiresAt) };
 }
 
-async function assertNoOwnerDeletionFence(uid: string) {
-  const fences = [
-    db.collection("accountDeletionFences").doc(uid),
-    db.collection("privacyDeletionTombstones").doc(uid)
-  ];
-  const snapshots = await Promise.all(fences.map((ref) => ref.get()));
-  if (snapshots.some((snapshot) => snapshot.exists)) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Owner deletion fence is present; export download is denied."
-    );
+type Authority = Awaited<ReturnType<typeof readAuthority>>;
+
+async function readObject(authority: Authority) {
+  const [metadata] = await bucket.file(authority.path).getMetadata().catch(() => [null]);
+  if (!metadata) throw new HttpsError("not-found", "Export package file is unavailable.");
+  const generation = signedExportObjectGeneration(authority.job, authority.file, metadata);
+  const size = String(metadata.size ?? "");
+  const byteLength = Number(size);
+  if (byteLength > MAX_EXPORT_BYTES) {
+    throw new HttpsError("resource-exhausted", "This export exceeds the 10 MB authenticated download limit.");
   }
+  // The Storage SDK converts generation to a JS number before sending it.
+  if (!generation || !Number.isSafeInteger(Number(generation)) || !/^[1-9]\d*$/.test(size) ||
+      !Number.isSafeInteger(byteLength) ||
+      metadata.contentType?.split(";")[0].trim().toLowerCase() !== "application/json") throw unavailable();
+  return { generation, byteLength };
+}
+
+function exportDownloadEndpoint(rawHost: string | undefined) {
+  const projectId = app.options.projectId ?? process.env.GCLOUD_PROJECT;
+  if (!projectId || !/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/.test(projectId)) throw unavailable();
+  if (process.env.FUNCTIONS_EMULATOR === "true") {
+    if (!rawHost || !/^(?:localhost|127\.0\.0\.1):[1-9]\d{0,4}$/.test(rawHost)) throw unavailable();
+    return `http://${rawHost}/${projectId}/us-central1/downloadExportPackage`;
+  }
+  return `https://us-central1-${projectId}.cloudfunctions.net/downloadExportPackage`;
+}
+
+function receiptIdentity(authority: Authority, object: { generation: string; byteLength: number }, auditId: string, expiresAt: number) {
+  return digest([DESCRIPTOR_SCHEMA, auditId, expiresAt, authority.actor.actorUid, authority.rowHash,
+    authority.file, authority.sha256, object.generation, object.byteLength]);
 }
 
 async function writeAudit(args: {
-  actorUid: string;
-  actorRole: string;
-  action: string;
-  targetUid: string;
-  requestId: string;
-  metadata: Record<string, unknown>;
+  actorUid: string; actorRole: string; action: string; targetUid: string;
+  requestId: string; metadata: Record<string, unknown>;
 }) {
   const ref = db.collection("auditLogs").doc();
-  await ref.set({
-    ...args,
-    source: "function",
-    timestamp: FieldValue.serverTimestamp(),
-    integrityHash: digest({ auditId: ref.id, ...args })
-  });
+  await ref.set({ ...args, source: "function", timestamp: FieldValue.serverTimestamp(), integrityHash: digest({ auditId: ref.id, ...args }) });
   return ref.id;
 }
 
 export const getExportDownloadUrl = onCall(async (request) => {
   const parsed = downloadSchema.safeParse(request.data ?? {});
-  if (!parsed.success) {
-    throw new HttpsError(
-      "invalid-argument",
-      parsed.error.issues.map((issue) => issue.message).join("; ")
-    );
-  }
-
+  if (!parsed.success) throw new HttpsError("invalid-argument", "A valid export job and file are required.");
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Authentication is required.");
   const { jobId, file } = parsed.data;
-  const jobRef = db.collection("exportJobs").doc(jobId);
-  const jobSnap = await jobRef.get();
-  if (!jobSnap.exists) throw new HttpsError("not-found", "Export job not found.");
-
-  const job = jobSnap.data() ?? {};
-  const uid = text(job.uid);
-  const requestId = text(job.requestId);
-  if (!uid || !requestId || job.status !== "completed" || job.complete !== true) {
-    throw new HttpsError("failed-precondition", "Export package is not available.");
-  }
-
-  const actor = requireOwnerOrAdmin(request.auth, uid);
-  await assertActiveExportRequestCaller(request);
-  await assertNoOwnerDeletionFence(uid);
-  await assertExportOwnerAuthActive(uid);
-  await requireCurrentDownloadGrant(jobId, job, actor.actorUid);
-  const packageExpiresAt = resolveExportPackageExpiry(job);
-  if (!packageExpiresAt) {
-    throw new HttpsError("failed-precondition", "Export package expiry is unavailable.");
-  }
-  if (packageExpiresAt <= Date.now()) {
-    throw new HttpsError("failed-precondition", "Export package has expired.");
-  }
-
-  const path = file === "manifest" ? job.exportManifestPath : job.exportPackagePath;
-  if (!validExportObjectPath({ uid, jobId, path })) {
-    throw new HttpsError("failed-precondition", "Export package path is invalid.");
-  }
-
-  const object = bucket.file(path as string);
-  // Metadata includes the exact exported object generation and checksum.
-  // Existence alone is insufficient: a later write can replace the same path.
-  const [objectMetadata] = await object.getMetadata().catch(() => [null]);
-  if (!objectMetadata) throw new HttpsError("not-found", "Export package file is missing.");
-  const generation = signedExportObjectGeneration(job, file, objectMetadata);
-  if (!generation) {
-    throw new HttpsError("failed-precondition", "Export object does not match the completed package.");
-  }
-
-  // Recheck before signing: Storage metadata is an awaited external boundary.
-  await assertNoOwnerDeletionFence(uid);
-  const grant = await requireCurrentDownloadGrant(jobId, job, actor.actorUid);
-  const signedUrlExpiresAt = Math.min(
-    Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS,
-    packageExpiresAt,
-    Date.parse(grant.exportConsentExpiresAt)
-  );
-  const [url] = await object.getSignedUrl({
-    action: "read",
-    version: "v4",
-    expires: signedUrlExpiresAt,
-    queryParams: { generation }
+  const header = request.rawRequest.headers.authorization;
+  const auth = await authenticatedActor(header, request.auth.uid);
+  const authority = await db.runTransaction(tx => readAuthority(tx, jobId, file, auth), { readOnly: true });
+  const { uid, requestId, packageExpiresAt, sha256 } = authority;
+  requireOwnerOrAdmin(request.auth, uid);
+  await verifyAccounts(uid, auth.uid);
+  const object = await readObject(authority);
+  const downloadExpiresAt = Math.min(Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS, packageExpiresAt, authority.consentExpiresAt);
+  const ref = db.collection("auditLogs").doc();
+  const authorityHash = receiptIdentity(authority, object, ref.id, downloadExpiresAt);
+  const url = new URL(exportDownloadEndpoint(request.rawRequest.get("host")));
+  url.search = new URLSearchParams({ jobId, file, expiresAt: String(downloadExpiresAt), authorityHash, auditId: ref.id }).toString();
+  const metadata = { schemaVersion: DESCRIPTOR_SCHEMA, transport: "authenticated-function", jobId, file,
+    authorityHash, packageExpiresAt, downloadExpiresAt, sha256, ...object };
+  await db.runTransaction(async tx => {
+    const current = await readAuthority(tx, jobId, file, auth);
+    if (current.rowHash !== authority.rowHash || downloadExpiresAt <= Date.now()) throw unavailable();
+    const audit = { ...current.actor, action: "export_download_url_created", targetUid: uid, requestId, metadata, source: "function" };
+    tx.create(ref, { ...audit, timestamp: FieldValue.serverTimestamp(), integrityHash: digest({ auditId: ref.id, ...audit }) });
   });
-  // A concurrent cleanup or replacement must invalidate the just-signed URL.
-  const afterSigning = await jobRef.get();
-  if (!currentExportDownloadMatches(job, afterSigning.exists ? (afterSigning.data() ?? {}) : null)) {
-    throw new HttpsError("failed-precondition", "Export package changed during signing.");
-  }
-  // Signing is asynchronous; recheck owner authority before metadata writes.
-  await assertNoOwnerDeletionFence(uid);
-  await assertExportOwnerAuthActive(uid);
+  const lastObject = await readObject(authority);
+  if (lastObject.generation !== object.generation || lastObject.byteLength !== object.byteLength) throw unavailable();
+  await verifyAccounts(uid, auth.uid);
+  const latest = await db.runTransaction(tx => readAuthority(tx, jobId, file, auth), { readOnly: true });
+  const currentCaller = await verifyActiveExportCaller(auth.uid, header, (token, revoked) => getAuth(app).verifyIdToken(token, revoked), localAuthEmulator());
+  if (!currentCaller || latest.rowHash !== authority.rowHash || downloadExpiresAt <= Date.now()) throw unavailable();
+  return { schemaVersion: DESCRIPTOR_SCHEMA, requiresAuthorization: true, uid, jobId, requestId, file, url: url.toString(),
+    downloadExpiresAt, packageExpiresAt, authorityHash, auditId: ref.id, sha256, ...object };
+});
 
-  if (!job.packageExpiresAt) {
-    await jobRef.update({ packageExpiresAt: Timestamp.fromMillis(packageExpiresAt) });
+export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540, memory: "1GiB", concurrency: 4 }, async (request, response) => {
+  response.set({ "Cache-Control": "private, no-store, no-transform", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" });
+  if (request.method !== "GET") { response.set("Allow", "GET").status(405).end(); return; }
+  try {
+    const query = deliverySchema.safeParse(request.query);
+    if (!query.success) throw new HttpsError("invalid-argument", "Invalid export download descriptor.");
+    const { jobId, file, auditId, authorityHash } = query.data;
+    const expiresAt = Number(query.data.expiresAt);
+    const header = request.get("authorization");
+    const original = await authenticatedActor(header);
+    const auditRef = db.collection("auditLogs").doc(auditId);
+    const checkConnection = () => {
+      if (Date.now() >= expiresAt || request.aborted || response.destroyed) throw unavailable();
+    };
+    const checkAuthority = async () => {
+      checkConnection();
+      const auth = await authenticatedActor(header, original.uid);
+      const current = await db.runTransaction(async tx => {
+        const authority = await readAuthority(tx, jobId, file, auth);
+        const audit = (await tx.get(auditRef)).data();
+        const meta = audit?.metadata;
+        if (audit?.source !== "function" || audit.action !== "export_download_url_created" ||
+            audit.actorUid !== original.uid || audit.targetUid !== authority.uid || audit.requestId !== authority.requestId ||
+            meta?.schemaVersion !== DESCRIPTOR_SCHEMA || meta.transport !== "authenticated-function" ||
+            meta.jobId !== jobId || meta.file !== file || meta.sha256 !== authority.sha256 || meta.authorityHash !== authorityHash ||
+            meta.downloadExpiresAt !== expiresAt || meta.packageExpiresAt !== authority.packageExpiresAt ||
+            expiresAt > Math.min(authority.packageExpiresAt, authority.consentExpiresAt) ||
+            receiptIdentity(authority, meta, auditId, expiresAt) !== authorityHash) throw unavailable();
+        return { authority, generation: text(meta.generation), byteLength: Number(meta.byteLength) };
+      }, { readOnly: true });
+      const object = await readObject(current.authority);
+      if (object.generation !== current.generation || object.byteLength !== current.byteLength) throw unavailable();
+      await verifyAccounts(current.authority.uid, original.uid);
+      // Storage and Auth are independent authorities. Reread C7 after their awaited
+      // checks, then verify the original bearer again before returning a chunk.
+      const latest = await db.runTransaction(tx => readAuthority(tx, jobId, file, auth), { readOnly: true });
+      if (latest.rowHash !== current.authority.rowHash) throw unavailable();
+      requireOwnerOrAdmin(await authenticatedActor(header, original.uid), current.authority.uid);
+      checkConnection();
+      return current;
+    };
+    const current = await checkAuthority();
+    const object = bucket.file(current.authority.path, { generation: current.generation });
+    const stream = object.createReadStream();
+    const disconnect = new AbortController();
+    const abort = () => {
+      if (!response.writableFinished) { disconnect.abort(); stream.destroy(); }
+    };
+    response.once("close", abort);
+    // Verify the actual content before releasing any bytes. No bearer Storage URL is issued.
+    const bytes = Buffer.alloc(current.byteLength);
+    let length = 0;
+    try {
+      for await (const part of stream) {
+        checkConnection();
+        const chunk = Buffer.isBuffer(part) ? part : Buffer.from(part);
+        if (chunk.length > bytes.length - length) throw unavailable();
+        chunk.copy(bytes, length);
+        length += chunk.length;
+      }
+      if (length !== bytes.length || createHash("sha256").update(bytes).digest("hex") !== current.authority.sha256) throw unavailable();
+      for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
+        await checkAuthority();
+        if (!offset) response.set({ "Content-Type": "application/json", "Content-Length": String(length), "Content-Encoding": "identity",
+          "Content-Disposition": `attachment; filename="urai-${file}.json"` });
+        const chunk = bytes.subarray(offset, offset + CHUNK_BYTES);
+        if (!response.write(chunk)) await once(response, "drain", { signal: disconnect.signal });
+      }
+      response.end();
+    } finally {
+      stream.destroy();
+      response.removeListener("close", abort);
+    }
+  } catch (error) {
+    if (response.destroyed) return;
+    if (response.headersSent) { response.destroy(); return; }
+    const codes: Record<string, number> = { "unauthenticated": 401, "permission-denied": 403, "not-found": 404, "invalid-argument": 400, "failed-precondition": 409, "resource-exhausted": 413 };
+    response.status(error instanceof HttpsError ? codes[error.code] ?? 500 : 500).json({ error: "export_download_unavailable" });
   }
-
-  const auditId = await writeAudit({
-    actorUid: actor.actorUid,
-    actorRole: actor.actorRole,
-    action: "export_download_url_created",
-    targetUid: uid,
-    requestId,
-    metadata: { jobId, file, path, signedUrlExpiresAt, packageExpiresAt }
-  });
-
-  // Final read after the asynchronous audit: do not return a signed URL if
-  // an account-disable or deletion fence appeared while logging the request.
-  await assertNoOwnerDeletionFence(uid);
-  await assertExportOwnerAuthActive(uid);
-  await assertActiveExportRequestCaller(request);
-  // The audit and authority checks also await other services. Check again
-  // immediately before returning the private signed object capability.
-  const beforeReturn = await jobRef.get();
-  if (!currentExportDownloadMatches(job, beforeReturn.exists ? (beforeReturn.data() ?? {}) : null)) {
-    throw new HttpsError("failed-precondition", "Export package changed before delivery.");
-  }
-  // Metadata could also change while signing/auditing. Refuse to disclose
-  // the capability if its GCS generation or committed digest changed.
-  const [latestMetadata] = await object.getMetadata().catch(() => [null]);
-  if (signedExportObjectGeneration(job, file, latestMetadata) !== generation) {
-    throw new HttpsError("failed-precondition", "Export object changed before delivery.");
-  }
-  await assertNoOwnerDeletionFence(uid);
-  await assertActiveExportRequestCaller(request);
-  await requireCurrentDownloadGrant(jobId, job, actor.actorUid);
-
-  return {
-    jobId,
-    requestId,
-    file,
-    url,
-    signedUrlExpiresAt,
-    packageExpiresAt,
-    expiresInSeconds: Math.max(0, Math.floor((signedUrlExpiresAt - Date.now()) / 1000)),
-    auditId
-  };
 });
 
 async function cleanupJob(document: QueryDocumentSnapshot<DocumentData>, now: number) {

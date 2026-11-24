@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
 import { verifyActiveExportCaller } from "../../functions/src/export-active-caller";
 const bearer = "Bearer abc.def.ghi";
 describe("current export download caller", () => {
@@ -23,17 +22,13 @@ describe("current export download caller", () => {
     expect(await verifyActiveExportCaller("owner", bearer, async () => { throw Error("revoked"); })).toBe(false);
     expect(await verifyActiveExportCaller("owner", bearer, async () => ({}))).toBe(false);
   });
-  it("rechecks before signing, after the audit and after the final object metadata read", () => {
-    const s = readFileSync(new URL("../../functions/src/export-lifecycle-functions.ts", import.meta.url), "utf8");
-    const segment = s.split("export const getExportDownloadUrl = onCall(async (request) => {")[1].split("\nasync function cleanupJob(")[0];
-    const checkCaller = "await assertActiveExportRequestCaller(request)";
-    const boundaries = [checkCaller, "await object.getSignedUrl(", "await writeAudit(", checkCaller,
-      "const [latestMetadata] = await object.getMetadata()", checkCaller, "return {"];
-    let cursor = 0;
-    for (const boundary of boundaries) {
-      const index = segment.indexOf(boundary, cursor);
-      expect(index, boundary).toBeGreaterThanOrEqual(cursor);
-      cursor = index + boundary.length;
-    }
+  it("accepts an unsigned Auth emulator token only when the loopback verifier is explicit", async () => {
+    const calls: string[] = [];
+    const verify = async (token: string, checkRevoked: boolean) => {
+      expect(checkRevoked).toBe(true); calls.push(token); return { uid: "owner" };
+    };
+    expect(await verifyActiveExportCaller("owner", "Bearer abc.def.", verify)).toBe(false);
+    expect(await verifyActiveExportCaller("owner", "Bearer abc.def.", verify, true)).toBe(true);
+    expect(calls).toEqual(["abc.def."]);
   });
 });

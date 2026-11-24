@@ -103,9 +103,82 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   checks.push('storage-mutated-digest-and-generation-fail-closed');
   await assert.rejects(call(stranger,'getExportDownloadUrl',{jobId:request.exportJobId,file:'export'}));
   checks.push('completed-export-foreign-download-denied');
-  // Signing belongs to independently controlled hosted identity; never touch
-  // metadata-server credentials from an emulator worker. Actual package bytes,
-  // manifest, SHA256 and foreign denial were verified above.
+  const descriptor = (who, file) => call(who, 'getExportDownloadUrl', {jobId:request.exportJobId, file});
+  const [ownerUrl,ownerManifest,adminUrl] = await Promise.all([
+    descriptor(owner,'export'), descriptor(owner,'manifest'), descriptor(operator,'export')
+  ]);
+  for (const [receipt,kind,bytes,generation] of [[ownerUrl,'export',exportBytes,exportGeneration],[ownerManifest,'manifest',manifestBytes,manifestGeneration]]) {
+    assert.equal(receipt.schemaVersion, 'urai-canonical-export-download-v1');
+    assert.equal(receipt.requiresAuthorization,true);
+    assert.equal(receipt.uid,a.user.uid); assert.equal(receipt.jobId,request.exportJobId);
+    assert.equal(receipt.requestId,request.requestId); assert.equal(receipt.file,kind);
+    assert.equal(receipt.generation,generation); assert.equal(receipt.byteLength,bytes.length);
+    assert.equal(receipt.sha256,createHash('sha256').update(bytes).digest('hex'));
+    const endpoint=new URL(receipt.url);
+    assert.equal(endpoint.origin,'http://127.0.0.1:25001');
+    assert.equal(endpoint.pathname,'/'+project+'/us-central1/downloadExportPackage');
+    assert.deepEqual([...endpoint.searchParams.keys()].sort(),['auditId','authorityHash','expiresAt','file','jobId']);
+    assert.equal(endpoint.searchParams.get('auditId'),receipt.auditId);
+    assert.equal(endpoint.searchParams.get('authorityHash'),receipt.authorityHash);
+    assert.equal(endpoint.searchParams.get('expiresAt'),String(receipt.downloadExpiresAt));
+    assert.ok(receipt.downloadExpiresAt<=receipt.packageExpiresAt);
+  }
+  checks.push('package-and-manifest-descriptors-bind-exact-issuer-row-object-size-digest-and-nonrenewable-expiry');
+  const ownerBearer=await a.user.getIdToken(true), otherBearer=await b.user.getIdToken(true), adminBearer=await o.user.getIdToken(true);
+  const receive=(url,token)=>fetch(url,{redirect:'error',headers: token ? {Authorization:'Bearer '+token} : {}});
+  for (const [receipt,token,expected] of [[ownerUrl,ownerBearer,exportBytes],[ownerManifest,ownerBearer,manifestBytes],[adminUrl,adminBearer,exportBytes]]) {
+    const result=await receive(receipt.url,token);
+    assert.equal(result.status,200); assert.match(result.headers.get('cache-control'),/no-store/);
+    assert.equal(result.headers.get('content-length'), String(expected.length));
+    assert.match(result.headers.get('content-type'),/^application\/json/);
+    assert.deepEqual(Buffer.from(await result.arrayBuffer()),expected);
+  }
+  checks.push('owner-package-owner-manifest-and-authorized-operator-receive-exact-native-http-bytes');
+  const preflight=await fetch(ownerUrl.url,{method:'OPTIONS',headers:{origin:'http://127.0.0.1:3000','access-control-request-method':'GET','access-control-request-headers':'authorization'}});
+  assert.equal(preflight.status,204); assert.ok(preflight.headers.get('access-control-allow-origin'));
+  checks.push('cross-origin-browser-bearer-preflight-accepted');
+  assert.equal((await receive(ownerUrl.url)).status,401);
+  assert.equal((await receive(ownerUrl.url,otherBearer)).status,403);
+  assert.equal((await receive(adminUrl.url,ownerBearer)).status,409);
+  assert.equal((await receive(ownerUrl.url,adminBearer)).status,409);
+  checks.push('current-actor-and-issued-descriptor-owner-binding');
+  for (const [field,value,code] of [['expiresAt',String(ownerUrl.downloadExpiresAt+1),409],['auditId','foreign-audit',409],['authorityHash','9'.repeat(64),409],['file','manifest',409],['extra','1',400]]) {
+    const url=new URL(ownerUrl.url); url.searchParams.set(field,value);
+    assert.equal((await receive(url,ownerBearer)).status,code);
+  }
+  checks.push('rewritten-deadline-audit-row-authority-file-and-extra-query-denied');
+  const jobRef=db.collection('exportJobs').doc(request.exportJobId);
+  const parentRef=db.collection('privacyRequests').doc(request.requestId);
+  for (const fence of ['accountDeletionFences','privacyDeletionTombstones']) {
+    const marker=db.collection(fence).doc(a.user.uid);
+    await marker.set({active:false}); assert.equal((await receive(ownerUrl.url,ownerBearer)).status,409);
+    await marker.delete();
+  }
+  checks.push('both-owner-deletion-markers-deny-an-existing-receipt-even-when-marked-inactive');
+  await parentRef.update({consentReceiptHash:'c'.repeat(64)});
+  assert.equal((await receive(ownerUrl.url,ownerBearer)).status,409);
+  await assert.rejects(descriptor(owner,'export'), e=>e.code==='functions/failed-precondition');
+  await parentRef.update({consentReceiptHash:replacement.receiptHash});
+  await jobRef.update({exportSha256:'legacy-unknown'});
+  await assert.rejects(descriptor(owner,'export'), e=>e.code==='functions/failed-precondition');
+  await jobRef.update({exportSha256:job.exportSha256});
+  checks.push('historical-unbound-parent-or-missing-object-integrity-cannot-issue-a-download');
+  await auth.setCustomUserClaims(o.user.uid,{});
+  assert.equal((await receive(adminUrl.url,adminBearer)).status,403);
+  checks.push('current-admin-removal-invalidates-original-operator-token');
+  const replacementBytes=Buffer.alloc(exportBytes.length,120);
+  await bucket.file(job.exportPackagePath).save(replacementBytes,{contentType:'application/json',metadata:{metadata:{sha256:job.exportSha256}}});
+  assert.equal((await receive(ownerUrl.url,ownerBearer)).status,409);
+  const corrupt=await descriptor(owner,'export');
+  assert.notEqual(corrupt.generation,ownerUrl.generation);
+  const refused=await receive(corrupt.url,ownerBearer); assert.equal(refused.status,409);
+  assert.deepEqual(Object.keys(await refused.json()),['error']);
+  checks.push('replaced-generation-and-corrupt-content-with-matching-metadata-refused-before-output');
+  await currentC7('revoked');
+  assert.equal((await receive(ownerManifest.url,ownerBearer)).status,409);
+  await currentC7('granted');
+  assert.equal((await receive(ownerManifest.url,ownerBearer)).status,409);
+  checks.push('canonical-withdrawal-and-regrant-deny-previously-issued-authenticated-bytes');
   const staleBearer=await getIdToken(owner.auth.currentUser,true);
   await new Promise(resolve=>setTimeout(resolve,1650));
   await auth.revokeRefreshTokens(a.user.uid);
@@ -122,9 +195,9 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   assert.equal(revokedResult.result, undefined);
   assert.ok(!JSON.stringify(revokedResult).includes('storage.googleapis.com'));
   checks.push('revoked-original-owner-bearer-is-denied-before-signing');
-  const ownerUrl='not-attempted-no-trusted-signer';
-  checks.push('signed-url-issuance-intentionally-held');
+  assert.equal((await receive(ownerManifest.url,staleBearer)).status,401);
+  checks.push('revoked-original-token-denied-by-byte-handler');
   assert.ok(checks.length>=9);
-  console.log('R1683_NATIVE_EXPORT_REVOCATION_RESULT '+JSON.stringify({checksPassed:checks.length,checks,source:process.env.URAI_EXACT_SHA,ownerUrl,bytes:exportBytes.length,manifestBytes:manifestBytes.length,hostedSignerVerified:false,productionWrites:false,iamApproved:false,destructiveDeletionExecuted:false}));
+  console.log('R1683_NATIVE_EXPORT_REVOCATION_RESULT '+JSON.stringify({checksPassed:checks.length,checks,source:process.env.URAI_EXACT_SHA,transport:'authenticated-function',bytes:exportBytes.length,manifestBytes:manifestBytes.length,hostedSignerVerified:false,productionWrites:false,iamApproved:false,destructiveDeletionExecuted:false}));
  } finally {await deleteAdminApp(admin)}
 })().catch(e=>{console.error('R1515_FAIL',e.stack||e);process.exitCode=1}).finally(async()=>{await Promise.all(clients.map(deleteApp));clearTimeout(deadline)});
