@@ -43,7 +43,7 @@ const deliverySchema = z.object({
 }).strict();
 const DESCRIPTOR_SCHEMA = "urai-canonical-export-download-v1";
 // Gen 2 limits each streamed HTTP response to 10 MB.
-const MAX_EXPORT_BYTES = 10_000_000;
+const SINGLE_RESPONSE_BYTES = 10_000_000;
 const CHUNK_BYTES = 64 * 1024;
 type DownloadFile = z.infer<typeof downloadFile>;
 type RequestAuth = { uid?: string; token?: Record<string, unknown> };
@@ -129,14 +129,68 @@ async function readObject(authority: Authority) {
   const generation = signedExportObjectGeneration(authority.job, authority.file, metadata);
   const size = String(metadata.size ?? "");
   const byteLength = Number(size);
-  if (byteLength > MAX_EXPORT_BYTES) {
-    throw new HttpsError("resource-exhausted", "This export exceeds the 10 MB authenticated download limit.");
-  }
   // The Storage SDK converts generation to a JS number before sending it.
   if (!generation || !Number.isSafeInteger(Number(generation)) || !/^[1-9]\d*$/.test(size) ||
       !Number.isSafeInteger(byteLength) ||
       metadata.contentType?.split(";")[0].trim().toLowerCase() !== "application/json") throw unavailable();
   return { generation, byteLength };
+}
+
+// One audit document can hold this bounded digest index. The current producer
+// serializes a single JSON string, well below the 16 GiB covered by the index.
+const RANGE_SIZE = 4 * 1024 * 1024;
+const MAX_RANGE_PARTS = 4096;
+
+async function indexRanges(authority: Authority, object: { generation: string; byteLength: number }, check: () => Promise<void>) {
+  if (object.byteLength <= SINGLE_RESPONSE_BYTES) return null;
+  if (Math.ceil(object.byteLength / RANGE_SIZE) > MAX_RANGE_PARTS) {
+    throw new HttpsError("resource-exhausted", "This export exceeds the authenticated range index capacity.");
+  }
+  const rangeHashes: string[] = [];
+  const full = createHash("sha256");
+  let partial = createHash("sha256");
+  let remaining = RANGE_SIZE;
+  let total = 0;
+  const stream = bucket.file(authority.path, { generation: object.generation }).createReadStream();
+  try {
+    for await (const part of stream) {
+      const chunk = Buffer.isBuffer(part) ? part : Buffer.from(part);
+      total += chunk.length;
+      if (total > object.byteLength) throw unavailable();
+      full.update(chunk);
+      let start = 0;
+      while (start < chunk.length) {
+        const size = Math.min(remaining, chunk.length - start);
+        partial.update(chunk.subarray(start, start + size));
+        start += size;
+        remaining -= size;
+        if (!remaining) {
+          rangeHashes.push(partial.digest("hex"));
+          partial = createHash("sha256");
+          remaining = RANGE_SIZE;
+          await check();
+        }
+      }
+    }
+    if (total !== object.byteLength || full.digest("hex") !== authority.sha256) throw unavailable();
+    if (remaining < RANGE_SIZE) rangeHashes.push(partial.digest("hex"));
+    return { rangeSize: RANGE_SIZE, rangeHashes, rangeRoot: digest(rangeHashes) };
+  } finally { stream.destroy(); }
+}
+
+function selectRange(header: string | undefined, total: number, hashes: unknown, sha256: string) {
+  if (total <= SINGLE_RESPONSE_BYTES) {
+    if (header !== undefined) throw new HttpsError("out-of-range", "The complete small package is required.");
+    return { start: 0, end: total - 1, checksum: sha256, partial: false };
+  }
+  const match = /^bytes=(0|[1-9]\d{0,15})-(0|[1-9]\d{0,15})$/.exec(header ?? "");
+  if (!match) throw new HttpsError("out-of-range", "A single aligned export byte range is required.");
+  const start = Number(match[1]), end = Number(match[2]);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start % RANGE_SIZE !== 0 ||
+      start >= total || end !== Math.min(start + RANGE_SIZE, total) - 1) throw new HttpsError("out-of-range", "Invalid export byte range.");
+  const checksum = Array.isArray(hashes) ? hashes[start / RANGE_SIZE] : undefined;
+  if (typeof checksum !== "string" || !/^[0-9a-f]{64}$/.test(checksum)) throw unavailable();
+  return { start, end, checksum, partial: true };
 }
 
 function exportDownloadEndpoint(rawHost: string | undefined) {
@@ -149,9 +203,9 @@ function exportDownloadEndpoint(rawHost: string | undefined) {
   return `https://us-central1-${projectId}.cloudfunctions.net/downloadExportPackage`;
 }
 
-function receiptIdentity(authority: Authority, object: { generation: string; byteLength: number }, auditId: string, expiresAt: number) {
+function receiptIdentity(authority: Authority, object: { generation: string; byteLength: number; rangeRoot?: string }, auditId: string, expiresAt: number) {
   return digest([DESCRIPTOR_SCHEMA, auditId, expiresAt, authority.actor.actorUid, authority.rowHash,
-    authority.file, authority.sha256, object.generation, object.byteLength]);
+    authority.file, authority.sha256, object.generation, object.byteLength, ...(object.rangeRoot ? [object.rangeRoot] : [])]);
 }
 
 async function writeAudit(args: {
@@ -163,7 +217,7 @@ async function writeAudit(args: {
   return ref.id;
 }
 
-export const getExportDownloadUrl = onCall(async (request) => {
+export const getExportDownloadUrl = onCall({ timeoutSeconds: 540, memory: "512MiB", concurrency: 4 }, async (request) => {
   const parsed = downloadSchema.safeParse(request.data ?? {});
   if (!parsed.success) throw new HttpsError("invalid-argument", "A valid export job and file are required.");
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Authentication is required.");
@@ -175,13 +229,20 @@ export const getExportDownloadUrl = onCall(async (request) => {
   requireOwnerOrAdmin(request.auth, uid);
   await verifyAccounts(uid, auth.uid);
   const object = await readObject(authority);
+  const verifyIssuance = async () => {
+    await verifyAccounts(uid, auth.uid);
+    const latest = await db.runTransaction(tx => readAuthority(tx, jobId, file, auth), { readOnly: true });
+    const valid = await verifyActiveExportCaller(auth.uid, header, (token, revoked) => getAuth(app).verifyIdToken(token, revoked), localAuthEmulator());
+    if (!valid || latest.rowHash !== authority.rowHash) throw unavailable();
+  };
+  const index = await indexRanges(authority, object, verifyIssuance);
   const downloadExpiresAt = Math.min(Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS, packageExpiresAt, authority.consentExpiresAt);
   const ref = db.collection("auditLogs").doc();
-  const authorityHash = receiptIdentity(authority, object, ref.id, downloadExpiresAt);
+  const authorityHash = receiptIdentity(authority, { ...object, rangeRoot: index?.rangeRoot }, ref.id, downloadExpiresAt);
   const url = new URL(exportDownloadEndpoint(request.rawRequest.get("host")));
   url.search = new URLSearchParams({ jobId, file, expiresAt: String(downloadExpiresAt), authorityHash, auditId: ref.id }).toString();
   const metadata = { schemaVersion: DESCRIPTOR_SCHEMA, transport: "authenticated-function", jobId, file,
-    authorityHash, packageExpiresAt, downloadExpiresAt, sha256, ...object };
+    authorityHash, packageExpiresAt, downloadExpiresAt, sha256, ...object, ...(index ?? {}) };
   await db.runTransaction(async tx => {
     const current = await readAuthority(tx, jobId, file, auth);
     if (current.rowHash !== authority.rowHash || downloadExpiresAt <= Date.now()) throw unavailable();
@@ -190,16 +251,15 @@ export const getExportDownloadUrl = onCall(async (request) => {
   });
   const lastObject = await readObject(authority);
   if (lastObject.generation !== object.generation || lastObject.byteLength !== object.byteLength) throw unavailable();
-  await verifyAccounts(uid, auth.uid);
-  const latest = await db.runTransaction(tx => readAuthority(tx, jobId, file, auth), { readOnly: true });
-  const currentCaller = await verifyActiveExportCaller(auth.uid, header, (token, revoked) => getAuth(app).verifyIdToken(token, revoked), localAuthEmulator());
-  if (!currentCaller || latest.rowHash !== authority.rowHash || downloadExpiresAt <= Date.now()) throw unavailable();
+  await verifyIssuance();
+  if (downloadExpiresAt <= Date.now()) throw unavailable();
   return { schemaVersion: DESCRIPTOR_SCHEMA, requiresAuthorization: true, uid, jobId, requestId, file, url: url.toString(),
-    downloadExpiresAt, packageExpiresAt, authorityHash, auditId: ref.id, sha256, ...object };
+    downloadExpiresAt, packageExpiresAt, authorityHash, auditId: ref.id, sha256, ...object, ...(index ? { rangeSize: RANGE_SIZE } : {}) };
 });
 
 export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540, memory: "1GiB", concurrency: 4 }, async (request, response) => {
-  response.set({ "Cache-Control": "private, no-store, no-transform", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" });
+  response.set({ "Cache-Control": "private, no-store, no-transform", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
+    "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, ETag, Content-Encoding" });
   if (request.method !== "GET") { response.set("Allow", "GET").status(405).end(); return; }
   try {
     const query = deliverySchema.safeParse(request.query);
@@ -226,7 +286,10 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
             meta.downloadExpiresAt !== expiresAt || meta.packageExpiresAt !== authority.packageExpiresAt ||
             expiresAt > Math.min(authority.packageExpiresAt, authority.consentExpiresAt) ||
             receiptIdentity(authority, meta, auditId, expiresAt) !== authorityHash) throw unavailable();
-        return { authority, generation: text(meta.generation), byteLength: Number(meta.byteLength) };
+        if (meta.byteLength > SINGLE_RESPONSE_BYTES && (meta.rangeSize !== RANGE_SIZE || !Array.isArray(meta.rangeHashes) ||
+            meta.rangeHashes.length !== Math.ceil(meta.byteLength / RANGE_SIZE) || digest(meta.rangeHashes) !== meta.rangeRoot)) throw unavailable();
+        return { authority, generation: text(meta.generation), byteLength: Number(meta.byteLength), rangeHashes: meta.rangeHashes };
+
       }, { readOnly: true });
       const object = await readObject(current.authority);
       if (object.generation !== current.generation || object.byteLength !== current.byteLength) throw unavailable();
@@ -241,14 +304,15 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
     };
     const current = await checkAuthority();
     const object = bucket.file(current.authority.path, { generation: current.generation });
-    const stream = object.createReadStream();
+    const range = selectRange(request.get("range"), current.byteLength, current.rangeHashes, current.authority.sha256);
+    const stream = range.partial ? object.createReadStream({ start: range.start, end: range.end, validation: false }) : object.createReadStream();
     const disconnect = new AbortController();
     const abort = () => {
       if (!response.writableFinished) { disconnect.abort(); stream.destroy(); }
     };
     response.once("close", abort);
     // Verify the actual content before releasing any bytes. No bearer Storage URL is issued.
-    const bytes = Buffer.alloc(current.byteLength);
+    const bytes = Buffer.alloc(range.end - range.start + 1);
     let length = 0;
     try {
       for await (const part of stream) {
@@ -258,10 +322,13 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
         chunk.copy(bytes, length);
         length += chunk.length;
       }
-      if (length !== bytes.length || createHash("sha256").update(bytes).digest("hex") !== current.authority.sha256) throw unavailable();
+      if (length !== bytes.length || createHash("sha256").update(bytes).digest("hex") !== range.checksum) throw unavailable();
       for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
         await checkAuthority();
-        if (!offset) response.set({ "Content-Type": "application/json", "Content-Length": String(length), "Content-Encoding": "identity",
+        if (!offset) response.status(range.partial ? 206 : 200).set({
+          "Accept-Ranges": range.partial ? "bytes" : "none", "ETag": `"${current.generation}"`,
+          ...(range.partial ? { "Content-Range": `bytes ${range.start}-${range.end}/${current.byteLength}` } : {}),
+          "Content-Type": "application/json", "Content-Length": String(length), "Content-Encoding": "identity",
           "Content-Disposition": `attachment; filename="urai-${file}.json"` });
         const chunk = bytes.subarray(offset, offset + CHUNK_BYTES);
         if (!response.write(chunk)) await once(response, "drain", { signal: disconnect.signal });
@@ -274,7 +341,7 @@ export const downloadExportPackage = onRequest({ cors: true, timeoutSeconds: 540
   } catch (error) {
     if (response.destroyed) return;
     if (response.headersSent) { response.destroy(); return; }
-    const codes: Record<string, number> = { "unauthenticated": 401, "permission-denied": 403, "not-found": 404, "invalid-argument": 400, "failed-precondition": 409, "resource-exhausted": 413 };
+    const codes: Record<string, number> = { "unauthenticated": 401, "permission-denied": 403, "not-found": 404, "invalid-argument": 400, "failed-precondition": 409, "resource-exhausted": 413, "out-of-range": 416 };
     response.status(error instanceof HttpsError ? codes[error.code] ?? 500 : 500).json({ error: "export_download_unavailable" });
   }
 });

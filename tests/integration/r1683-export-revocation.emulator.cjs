@@ -16,16 +16,20 @@ const {signedExportObjectGeneration}=require('../../functions/lib/export-lifecyc
 const project='urai-privacy-r1512-disposable';
 assert.equal(process.env.GCLOUD_PROJECT,project);
 for(const name of ['GOOGLE_APPLICATION_CREDENTIALS','FIREBASE_TOKEN','RUNPOD_API_KEY','VERCEL_TOKEN'])assert.ok(!process.env[name],name);
-for(const [name,value] of [['FIREBASE_AUTH_EMULATOR_HOST','127.0.0.1:29099'],['FIRESTORE_EMULATOR_HOST','127.0.0.1:28080'],['FIREBASE_STORAGE_EMULATOR_HOST','127.0.0.1:29199']])assert.equal(process.env[name],value);
+for(const name of ['FIREBASE_AUTH_EMULATOR_HOST','FIRESTORE_EMULATOR_HOST','FIREBASE_STORAGE_EMULATOR_HOST'])
+ assert.match(process.env[name]||'',/^127\.0\.0\.1:[1-9]\d{0,4}$/);
+const functionsPort=Number(process.env.URAI_REVIEW_FUNCTIONS_PORT || 25001);
+assert.ok(Number.isInteger(functionsPort) && functionsPort>0 && functionsPort<=65535);
+const functionsOrigin='http://127.0.0.1:'+functionsPort;
 const prefix='r1515_'+randomBytes(6).toString('hex');
 const clients=[],checks=[];
-const deadline=setTimeout(()=>{console.error('R1515_TIMEOUT');process.exit(2)},135000);
+const deadline=setTimeout(()=>{console.error('R1515_TIMEOUT');process.exit(2)},360000);
 deadline.unref();
 function client(label){
  const app=initializeApp({apiKey:'disposable-emulator-only',projectId:project,appId:'1:123:web:emulator'},prefix+label);
  clients.push(app);
- const auth=clientAuth(app);connectAuthEmulator(auth,'http://127.0.0.1:29099',{disableWarnings:true});
- const functions=getFunctions(app,'us-central1');connectFunctionsEmulator(functions,'127.0.0.1',25001);
+ const auth=clientAuth(app);connectAuthEmulator(auth,'http://'+process.env.FIREBASE_AUTH_EMULATOR_HOST,{disableWarnings:true});
+ const functions=getFunctions(app,'us-central1');connectFunctionsEmulator(functions,'127.0.0.1',functionsPort);
  return {auth,functions};
 }
 const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{timeout:90000})(data)).data;
@@ -115,7 +119,7 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
     assert.equal(receipt.generation,generation); assert.equal(receipt.byteLength,bytes.length);
     assert.equal(receipt.sha256,createHash('sha256').update(bytes).digest('hex'));
     const endpoint=new URL(receipt.url);
-    assert.equal(endpoint.origin,'http://127.0.0.1:25001');
+    assert.equal(endpoint.origin,functionsOrigin);
     assert.equal(endpoint.pathname,'/'+project+'/us-central1/downloadExportPackage');
     assert.deepEqual([...endpoint.searchParams.keys()].sort(),['auditId','authorityHash','expiresAt','file','jobId']);
     assert.equal(endpoint.searchParams.get('auditId'),receipt.auditId);
@@ -174,7 +178,54 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   const refused=await receive(corrupt.url,ownerBearer); assert.equal(refused.status,409);
   assert.deepEqual(Object.keys(await refused.json()),['error']);
   checks.push('replaced-generation-and-corrupt-content-with-matching-metadata-refused-before-output');
+  // Produce an ordinary export above Firebase's single streaming-response limit.
+  // Firestore documents are synthetic and stay below the individual document limit.
+  await auth.setCustomUserClaims(o.user.uid,{admin:true});
+  await o.user.getIdToken(true);
+  for(let i=0;i<12;i++) await db.collection('dataAccessEvents').doc(prefix+'part'+i).set(
+    {uid:a.user.uid, sample:String.fromCharCode(97+i).repeat(875000)});
+  const largeRequest=await call(owner,'createExportRequest');
+  const largeJobId=largeRequest.exportJobId;
+  await call(operator,'processExportRequest',{jobId:largeJobId});
+  const largeJob=(await db.collection('exportJobs').doc(largeJobId).get()).data();
+  const large=await call(owner,'getExportDownloadUrl',{jobId:largeJobId,file:'export'});
+  const partSize=4*1024*1024;
+  assert.ok(large.byteLength>10000000);assert.equal(large.rangeSize,partSize);
+  assert.equal(large.sha256,largeJob.exportSha256);
+  assert.equal((await receive(large.url,ownerBearer)).status,416);
+  const part=(start,end)=>fetch(large.url,{redirect:'error',headers:{Authorization:'Bearer '+ownerBearer,Range:'bytes='+start+'-'+end}});
+  for(const [start,end] of [[1,partSize],[0,partSize],[large.byteLength,large.byteLength+1]]) {
+    assert.equal((await part(start,end)).status,416);
+  }
+  const largeHash=createHash('sha256');
+  let received=0,parts=0;
+  for(let start=0;start<large.byteLength;start+=partSize) {
+    const end=Math.min(start+partSize,large.byteLength)-1;
+    const result=await part(start,end);
+    assert.equal(result.status,206);
+    assert.equal(result.headers.get('content-range'),'bytes '+start+'-'+end+'/'+large.byteLength);
+    assert.equal(result.headers.get('etag'),'"'+large.generation+'"');
+    assert.equal(result.headers.get('content-length'),String(end-start+1));
+    const bytes=Buffer.from(await result.arrayBuffer());assert.equal(bytes.length,end-start+1);
+    received+=bytes.length;largeHash.update(bytes);parts++;
+  }
+  assert.equal(received,large.byteLength);assert.equal(largeHash.digest('hex'),largeJob.exportSha256);assert.ok(parts>=3);
+  checks.push('native-generated-large-package-all-ranges-reassembled-with-exact-committed-sha256');
+  checks.push('missing-misaligned-and-out-of-bounds-ranges-denied');
+  const partial=await part(0,partSize-1);
+  assert.equal(partial.status,206);
+  const reader=partial.body.getReader();
+  const first=await reader.read();
+  assert.ok(!first.done && first.value.length>0);
   await currentC7('revoked');
+  let released=first.value.length,interrupted=false;
+  try {
+    while(true) { const next=await reader.read(); if(next.done)break; released+=next.value.length; }
+  } catch {interrupted=true;}
+  assert.ok(interrupted && released<partSize,'withdrawal must interrupt an active HTTP range before completion');
+  assert.equal((await part(partSize,2*partSize-1)).status,409);
+  checks.push('withdrawal-interrupts-active-native-range-and-denies-remainder');
+  console.log('RANGED_EXPORT_BYTES '+JSON.stringify({total:received,parts,rangeSize:partSize,receivedBeforeWithdrawal:released,fullSha256Matched:true}));
   assert.equal((await receive(ownerManifest.url,ownerBearer)).status,409);
   await currentC7('granted');
   assert.equal((await receive(ownerManifest.url,ownerBearer)).status,409);
@@ -183,7 +234,7 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   await new Promise(resolve=>setTimeout(resolve,1650));
   await auth.revokeRefreshTokens(a.user.uid);
   await assert.rejects(auth.verifyIdToken(staleBearer,true));
-  const revokedResponse=await fetch('http://127.0.0.1:25001/'+project+'/us-central1/getExportDownloadUrl',{
+  const revokedResponse=await fetch(functionsOrigin+'/'+project+'/us-central1/getExportDownloadUrl',{
     method:'POST',headers:{authorization:'Bearer '+staleBearer,'content-type':'application/json'},
     body:JSON.stringify({data:{jobId:request.exportJobId,file:'export'}})
   });

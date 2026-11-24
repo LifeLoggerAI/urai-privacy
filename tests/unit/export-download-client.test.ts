@@ -61,6 +61,33 @@ describe("authenticated export client", () => {
     fetcher.mockResolvedValueOnce(response(body, variant === "wrong-content-length" ? 1 : bytes.length, variant === "wrong-mime" ? "text/html" : "application/json"));
     await expect(fetchAuthorizedExport(args)).rejects.toThrow();
   });
+  it.each(["valid", "wrong range", "wrong generation", "wrong SHA", "loses authority"])("checks each ranged response: %s", async variant => {
+    const { args, fetcher, controller } = fixture();
+    const total = 10000001, partSize = 4 * 1024 * 1024;
+    const data = new Uint8Array(total).fill(107);
+    const sha256 = createHash("sha256").update(data).digest("hex");
+    const descriptor = { ...args.descriptor, byteLength: total, rangeSize: partSize, sha256 };
+    let start = 0;
+    fetcher.mockImplementation(async (_url, init) => {
+      const end = Math.min(start + partSize, total) - 1;
+      expect((init?.headers as Record<string, string>).Range).toBe(`bytes=${start}-${end}`);
+      const part = data.slice(start, end + 1);
+      if (variant === "wrong SHA") part[0] = 4;
+      if (variant === "loses authority" && start > 0) controller.abort();
+      const headers = { "Content-Type": "application/json", "Content-Length": String(part.length),
+        "Content-Range": `bytes ${start}-${end}/${variant === "wrong range" ? total + 1 : total}`,
+        ETag: variant === "wrong generation" ? '"other"' : '"123"' };
+      start = end + 1;
+      return new Response(part, { status: 206, headers });
+    });
+    const result = fetchAuthorizedExport({ ...args, descriptor, selection: { ...args.selection, sha256 } });
+    if (variant === "valid") {
+      const blob = await result;
+      expect(blob.size).toBe(total);
+      expect(createHash("sha256").update(Buffer.from(await blob.arrayBuffer())).digest("hex")).toBe(sha256);
+      expect(args.getIdToken).toHaveBeenCalledTimes(3);
+    } else { await expect(result).rejects.toThrow(); }
+  });
   it("discards the pending response when the issuing session is cancelled", async () => {
     const { args, fetcher, controller, response } = fixture();
     fetcher.mockImplementationOnce(async () => { controller.abort(); return response(); });

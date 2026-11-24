@@ -98,8 +98,8 @@ describe("registered export download callable with controlled provider dependenc
     expect(mocks.rows.has("auditLogs/test-audit")).toBe(false);
   });
 
-  it("declines an export above the streaming limit before issuing a receipt", async () => {
-    mocks.metadata.mockResolvedValue([{ ...metadata, size: "10000001" }]);
+  it("declines a package beyond the bounded digest-index capacity", async () => {
+    mocks.metadata.mockResolvedValue([{ ...metadata, size: String(4 * 1024 * 1024 * 4096 + 1) }]);
     await expect(invoke()).rejects.toMatchObject({ code: "resource-exhausted" });
     expect(mocks.rows.has("auditLogs/test-audit")).toBe(false);
   });
