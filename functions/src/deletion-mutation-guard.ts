@@ -17,6 +17,7 @@ import {
   type DeletionCompletionResiduals
 } from "./deletion-completion-verifier";
 import { deletionEcosystemCompletionBlockReason } from "./deletion-contract";
+import { JOBS_DELETION_EVIDENCE_STATE } from "./jobs-deletion-evidence";
 import {
   buildDeletionMutationLeasePatch,
   deletionMutationBlockReason,
@@ -142,26 +143,28 @@ async function writeCompletionVerification(args: {
   const action = args.verified
     ? "deletion_completion_verified"
     : "deletion_completion_reopened";
-  const auditEvent = {
-    actorUid: args.actorUid,
-    actorRole: "admin",
-    action,
-    targetUid: args.targetUid,
-    requestId: args.requestId,
-    source: "system",
-    metadata: {
-      verified: args.verified,
-      reason: args.reason ?? null,
-      residualSummary
-    }
-  };
-
   await db.runTransaction(async (tx: Transaction) => {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) {
       throw new HttpsError("not-found", "Deletion request disappeared during completion verification.");
     }
-    requireCompletionAuthority(snapshot.data() ?? {}, args);
+    const current = snapshot.data() ?? {};
+    requireCompletionAuthority(current, args);
+    const auditEvent = {
+      actorUid: args.actorUid,
+      actorRole: "admin",
+      action,
+      targetUid: args.targetUid,
+      requestId: args.requestId,
+      source: "system",
+      metadata: {
+        verified: args.verified,
+        reason: args.reason ?? null,
+        residualSummary,
+        jobsSourceReceiptMatchedAtIntake: current.scope === "account" &&
+          current.jobsDeletionEvidenceState === JOBS_DELETION_EVIDENCE_STATE
+      }
+    };
     const now = new Date();
     const tombstoneRef = db.collection("privacyDeletionTombstones").doc(args.targetUid);
     tx.update(ref, {

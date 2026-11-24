@@ -23,11 +23,17 @@ describe("current export download caller", () => {
     expect(await verifyActiveExportCaller("owner", bearer, async () => { throw Error("revoked"); })).toBe(false);
     expect(await verifyActiveExportCaller("owner", bearer, async () => ({}))).toBe(false);
   });
-  it("rechecks before signing and after asynchronous audit", () => {
+  it("rechecks before signing, after the audit and after the final object metadata read", () => {
     const s = readFileSync(new URL("../../functions/src/export-lifecycle-functions.ts", import.meta.url), "utf8");
     const segment = s.split("export const getExportDownloadUrl = onCall(async (request) => {")[1].split("\nasync function cleanupJob(")[0];
-    expect((segment.match(/await assertActiveExportRequestCaller\(request\)/g) ?? []).length).toBe(2);
-    expect(segment.indexOf("await assertActiveExportRequestCaller(request)")).toBeLessThan(segment.indexOf("getSignedUrl("));
-    expect(segment.lastIndexOf("await assertActiveExportRequestCaller(request)")).toBeGreaterThan(segment.indexOf("await writeAudit("));
+    const checkCaller = "await assertActiveExportRequestCaller(request)";
+    const boundaries = [checkCaller, "await object.getSignedUrl(", "await writeAudit(", checkCaller,
+      "const [latestMetadata] = await object.getMetadata()", checkCaller, "return {"];
+    let cursor = 0;
+    for (const boundary of boundaries) {
+      const index = segment.indexOf(boundary, cursor);
+      expect(index, boundary).toBeGreaterThanOrEqual(cursor);
+      cursor = index + boundary.length;
+    }
   });
 });

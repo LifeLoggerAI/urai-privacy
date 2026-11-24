@@ -1,4 +1,7 @@
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { DeletionRequestStatus } from "../../components/DeletionRequestStatus";
 import { describe, expect, it } from "vitest";
 
 const adminLayout = readFileSync("app/admin/layout.tsx", "utf8");
@@ -22,10 +25,28 @@ describe("protected route boundaries", () => {
   });
 
   it("does not display destructive deletion as final before residual verification", () => {
-    expect(privacyRequestsPage).toContain("deletionCompletionVerificationRequired");
-    expect(privacyRequestsPage).toContain("deletionCompletionVerified");
-    expect(privacyRequestsPage).toContain("completion verification required");
-    expect(privacyRequestsPage).toContain("deletion completion verified");
-    expect(privacyRequestsPage).toContain("verifiedComplete");
+    const ownerPage = readFileSync("app/privacy-center/delete/page.tsx", "utf8");
+    for (const page of [ownerPage, privacyRequestsPage]) {
+      expect(page).toContain("<DeletionRequestStatus request={request}");
+    }
+    for (const fields of [{}, { deletionCompletionVerified: false }, {
+      deletionCompletionVerified: true, deletionCompletionVerificationRequired: false
+    }]) {
+      const html = renderToStaticMarkup(createElement(DeletionRequestStatus, { request: { status: "completed", ...fields } }));
+      expect(html).toContain("verification pending");
+      expect(html).not.toContain("completed");
+    }
+  });
+
+  it("shows only the recognized Jobs evidence in the subject's account deletion status", () => {
+    const request = { status: "processing", scope: "account", jobsDeletionEvidenceState: "source-receipt-matched" };
+    const render = (fields: Record<string, unknown>) =>
+      renderToStaticMarkup(createElement(DeletionRequestStatus, { request: { ...request, ...fields } }));
+    expect(render({})).toContain("Privacy matched a Jobs processing receipt");
+    expect(render({})).toContain("requires verification across services");
+    expect(render({ status: "rejected", deletionCompletionVerificationRequired: true })).toContain(">rejected<");
+    expect(render({ jobsDeletionEvidenceState: undefined })).not.toContain("receipt");
+    expect(render({ jobsDeletionEvidenceState: true })).not.toContain("receipt");
+    expect(render({ scope: "privacy-data" })).not.toContain("receipt");
   });
 });

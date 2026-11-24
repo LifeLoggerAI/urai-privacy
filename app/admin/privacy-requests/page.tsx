@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { DeletionRequestStatus } from "@/components/DeletionRequestStatus";
 import { callPrivacyFunction, executeDeletionRequest, subscribeAdminCollection } from "@/lib/firebase-privacy-client";
 
 const statuses = ["approved", "processing", "rejected", "failed"] as const;
@@ -46,8 +47,10 @@ function AdminRequestsTable() {
     setMessage("");
     try {
       const result = await executeDeletionRequest({ requestId, mode, expectedPlanHash });
-      const suffix = mode === "dryRun" ? ` Plan hash: ${String(result.planHash ?? "missing")}` : " Residual verification passed.";
-      setMessage(`Deletion ${mode} completed for ${String(result.requestId ?? requestId)} -> ${String(result.status ?? "unknown")}.${suffix}`);
+      const message = mode === "dryRun"
+        ? `Dry run finished for ${String(result.requestId ?? requestId)}. Plan hash ${String(result.planHash ?? "missing")}.`
+        : `Execution returned for ${String(result.requestId ?? requestId)}. Check the request for verification progress.`;
+      setMessage(message);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : `Deletion ${mode} failed`);
     } finally {
@@ -78,28 +81,23 @@ function AdminRequestsTable() {
       </article>
       <article className="card">
         <h3>Deletion requests</h3>
-        <p className="muted">Run dry-run first. Execute requires the latest stable plan hash. Completion is final only after an independent residual scan confirms no supported Firestore, export-object, Auth, or legal-hold target remains.</p>
+        <p className="muted">Execution requires the latest dry-run plan hash. Account deletion also requires a local residual scan and verified dispositions from every participating service.</p>
         {deletionRequests.length === 0 ? <p className="muted">No deletion requests found.</p> : deletionRequests.map((request) => {
           const requestId = String(request.id);
           const planHash = typeof request.planHash === "string" ? request.planHash : undefined;
           const rawStatus = String(request.status);
           const completionRequired = request.deletionCompletionVerificationRequired === true;
-          const completionVerified = request.deletionCompletionVerified === true;
-          const verifiedComplete = rawStatus === "completed" && completionVerified && !completionRequired;
-          const displayStatus = rawStatus === "completed" && !verifiedComplete
-            ? "completion verification required"
-            : rawStatus;
+          const terminal = ["completed", "rejected", "failed"].includes(rawStatus);
           return (
             <div key={requestId} className="panel">
               <strong>{requestId}</strong>
-              <p className="muted">{String(request.uid)} · {displayStatus}</p>
+              <div className="muted">{String(request.uid)} · <DeletionRequestStatus request={request} /></div>
               {request.destructiveDeletionBlocked ? <p><span className="status warn">destructive deletion gated</span></p> : null}
               {completionRequired ? <p><span className="status warn">completion is not yet verified</span></p> : null}
-              {verifiedComplete ? <p><span className="status ok">deletion completion verified</span></p> : null}
               {planHash ? <p className="muted">Plan hash: <code>{planHash}</code></p> : null}
-              {statuses.map((status) => <button className="button" type="button" disabled={busyId !== null || verifiedComplete} key={status} onClick={() => processDeletion(requestId, status)}>{status}</button>)}
-              <button className="button primary" type="button" disabled={busyId !== null || verifiedComplete} onClick={() => runDeletionExecutor(requestId, "dryRun")}>Dry run</button>
-              <button className="button" type="button" disabled={busyId !== null || !planHash || rawStatus === "completed"} onClick={() => runDeletionExecutor(requestId, "execute", planHash)}>Execute deletion</button>
+              {statuses.map((status) => <button className="button" type="button" disabled={busyId !== null || terminal} key={status} onClick={() => processDeletion(requestId, status)}>{status}</button>)}
+              <button className="button primary" type="button" disabled={busyId !== null || terminal} onClick={() => runDeletionExecutor(requestId, "dryRun")}>Dry run</button>
+              <button className="button" type="button" disabled={busyId !== null || !planHash || terminal} onClick={() => runDeletionExecutor(requestId, "execute", planHash)}>Execute deletion</button>
             </div>
           );
         })}
