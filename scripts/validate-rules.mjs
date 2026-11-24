@@ -28,14 +28,13 @@ const firestoreChecks = [
 ];
 const storageChecks = [
   "match /exports/{uid}/{jobId}/{fileName}",
-  "activeExportPackage(uid, jobId)",
-  "packageExpiresAt > request.time",
   "match /evidence/{allPaths=**}",
   "request.auth.token.admin == true",
   "request.auth.token.role == 'admin'"
 ];
 
 for (const check of firestoreChecks) if (!firestore.includes(check)) failures.push(`firestore missing ${check}`);
+if (!/match \/exports\/\{uid\}\/\{jobId\}\/\{fileName\}\s*\{\s*allow read, write: if false;\s*\}/.test(storage)) failures.push("export objects must be server-only");
 for (const check of storageChecks) if (!storage.includes(check)) failures.push(`storage missing ${check}`);
 if (!firestore.includes("match /{document=**}")) failures.push("firestore missing fallback match");
 if (!storage.includes("match /{allPaths=**}")) failures.push("storage missing fallback match");

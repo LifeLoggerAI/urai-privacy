@@ -86,6 +86,8 @@ async function run() {
   assert.equal((await call(owner, 'evaluateCanonicalConsent', { purpose: 'memory.storage', correlationId: prefix + '-revoked' })).allowed, false)
   checks.push('consent-grant-owner-isolation-and-revocation-denial')
 
+  const exportGrant = await call(owner, 'setCanonicalConsent', { purpose: 'data.export', status: 'granted', surface: 'r1545-lifecycle' })
+  assert.match(exportGrant.receiptHash, /^[0-9a-f]{64}$/)
   const exportRequest = await call(owner, 'createExportRequest')
   assert.equal(exportRequest.status, 'pending')
   assert.ok(exportRequest.exportJobId)

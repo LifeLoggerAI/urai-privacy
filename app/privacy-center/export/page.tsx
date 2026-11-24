@@ -57,7 +57,7 @@ function ExportRequestPanel({ user }: { user: User }) {
     <div className="grid">
       <article className="card">
         <h3>Create request</h3>
-        <p className="muted">Signed in as {user.email ?? user.uid}. No demo user is used.</p>
+        <p className="muted">Signed in as {user.email ?? user.uid}. Grant Data export in <a href="/privacy-center/consent">Consent settings</a> before requesting a package.</p>
         <button className="button primary" type="button" disabled={busy} onClick={submit}>{busy ? "Submitting..." : "Request export"}</button>
         {message ? <p className="muted" aria-live="polite">{message}</p> : null}
       </article>

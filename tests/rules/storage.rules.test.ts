@@ -82,14 +82,14 @@ async function seedCompletedExport(uid: string, jobId: string, expiresAt = Date.
 }
 
 describe("Storage export and evidence rules", () => {
-  it("allows owners and both supported admin claim shapes to read user export paths", async ({ skip }) => {
+  it("requires the export service even for owners and both supported admin claim shapes", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await seedStorage("exports/user-a/export-1/manifest.json");
     await seedCompletedExport("user-a", "export-1");
 
-    await assertSucceeds(getBytes(ref(storageFor("user-a"), "exports/user-a/export-1/manifest.json")));
-    await assertSucceeds(getBytes(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-1/manifest.json")));
-    await assertSucceeds(getBytes(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("user-a"), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-1/manifest.json")));
+    await assertFails(getBytes(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-1/manifest.json")));
   });
 
   it("denies direct owner reads after package expiry", async ({ skip }) => {
@@ -107,11 +107,11 @@ describe("Storage export and evidence rules", () => {
     await assertFails(getBytes(ref(anonStorage(), "exports/user-a/export-1/manifest.json")));
   });
 
-  it("allows only either supported admin claim shape to write export and evidence objects", async ({ skip }) => {
+  it("reserves export object writes for the server and evidence writes for admins", async ({ skip }) => {
     if (!storageRulesAvailable) return skip();
     await assertFails(uploadString(ref(storageFor("user-a"), "exports/user-a/export-2/manifest.json"), "{}"));
-    await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-2/manifest.json"), "{}"));
-    await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-role-admin/manifest.json"), "{}"));
+    await assertFails(uploadString(ref(storageFor("admin-a", { admin: true }), "exports/user-a/export-2/manifest.json"), "{}"));
+    await assertFails(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "exports/user-a/export-role-admin/manifest.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("admin-a", { admin: true }), "evidence/release-lock.json"), "{}"));
     await assertSucceeds(uploadString(ref(storageFor("role-admin-a", { role: "admin" }), "evidence/role-release-lock.json"), "{}"));
     await assertFails(uploadString(ref(storageFor("user-a"), "evidence/release-lock.json"), "{}"));

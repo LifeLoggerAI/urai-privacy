@@ -26,6 +26,7 @@ import {
 } from "./export-lifecycle-contract";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { verifyActiveExportCaller } from "./export-active-caller";
+import { requireExportConsent } from "./export-consent-authority";
 
 const app = getApps().length ? getApp() : initializeApp();
 const db = getFirestore(app);
@@ -85,6 +86,31 @@ async function assertExportOwnerAuthActive(uid: string) {
   }
 }
 
+async function requireCurrentDownloadGrant(jobId: string, original: DocumentData, actorUid: string) {
+  const uid = text(original.uid);
+  const requestId = text(original.requestId);
+  if (actorUid !== uid) {
+    const user = await getAuth(app).getUser(actorUid);
+    if (user.disabled || !(user.customClaims?.admin === true || user.customClaims?.role === "admin")) {
+      throw new HttpsError("permission-denied", "Current administrative authority is required.");
+    }
+  }
+  return db.runTransaction(async tx => {
+    const [job, subjectRequest, consent] = await Promise.all([
+      tx.get(db.collection("exportJobs").doc(jobId)),
+      tx.get(db.collection("privacyRequests").doc(requestId)),
+      tx.get(db.collection("consentRecords").doc(`${uid}_data_export`))
+    ]);
+    const currentJob = job.data();
+    const parent = subjectRequest.data();
+    if (!currentJob || !currentExportDownloadMatches(original, currentJob) ||
+        parent?.uid !== uid || parent.type !== "export" || parent.status !== "completed") {
+      throw new HttpsError("failed-precondition", "Completed export request and current job must match.");
+    }
+    return requireExportConsent(uid, consent.data(), original, currentJob, parent);
+  }, { readOnly: true });
+}
+
 async function assertNoOwnerDeletionFence(uid: string) {
   const fences = [
     db.collection("accountDeletionFences").doc(uid),
@@ -142,6 +168,7 @@ export const getExportDownloadUrl = onCall(async (request) => {
   await assertActiveExportRequestCaller(request);
   await assertNoOwnerDeletionFence(uid);
   await assertExportOwnerAuthActive(uid);
+  await requireCurrentDownloadGrant(jobId, job, actor.actorUid);
   const packageExpiresAt = resolveExportPackageExpiry(job);
   if (!packageExpiresAt) {
     throw new HttpsError("failed-precondition", "Export package expiry is unavailable.");
@@ -167,9 +194,11 @@ export const getExportDownloadUrl = onCall(async (request) => {
 
   // Recheck before signing: Storage metadata is an awaited external boundary.
   await assertNoOwnerDeletionFence(uid);
+  const grant = await requireCurrentDownloadGrant(jobId, job, actor.actorUid);
   const signedUrlExpiresAt = Math.min(
     Date.now() + EXPORT_DOWNLOAD_URL_TTL_MS,
-    packageExpiresAt
+    packageExpiresAt,
+    Date.parse(grant.exportConsentExpiresAt)
   );
   const [url] = await object.getSignedUrl({
     action: "read",
@@ -218,6 +247,7 @@ export const getExportDownloadUrl = onCall(async (request) => {
   }
   await assertNoOwnerDeletionFence(uid);
   await assertActiveExportRequestCaller(request);
+  await requireCurrentDownloadGrant(jobId, job, actor.actorUid);
 
   return {
     jobId,

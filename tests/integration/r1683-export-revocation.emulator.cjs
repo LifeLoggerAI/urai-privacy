@@ -46,6 +46,16 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   const record=db.collection('users').doc(a.user.uid);
   await record.set({uid:a.user.uid,displayName:'Disposable synthetic export owner',secretToken:'SYNTHETIC_MUST_NOT_EXPORT',memo:'R1515_SYNTHETIC_EXPORT_FIXTURE'});
   checks.push('seed-disposable-user-record');
+  const currentC7 = status => call(owner, 'setCanonicalConsent', {purpose:'data.export',status,surface:'privacy-center-export',jurisdiction:'test'});
+  await assert.rejects(call(owner,'createExportRequest'), error => error.code === 'functions/failed-precondition');
+  const firstGrant = await currentC7('granted');
+  const retired = await call(owner, 'createExportRequest');
+  await currentC7('revoked');
+  await assert.rejects(call(operator, 'processExportRequest',{jobId:retired.exportJobId}), error => error.code === 'functions/failed-precondition');
+  const replacement = await currentC7('granted');
+  assert.notEqual(replacement.receiptHash, firstGrant.receiptHash);
+  await assert.rejects(call(operator, 'processExportRequest',{jobId:retired.exportJobId}), error => error.code === 'functions/failed-precondition');
+  checks.push('absent-revoked-and-replaced-canonical-C7-cannot-produce-an-export');
   const request=await call(owner,'createExportRequest');
   assert.equal(request.status,'pending');
   checks.push('owner-request-pending');
@@ -57,6 +67,12 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   const job=(await db.collection('exportJobs').doc(request.exportJobId).get()).data();
   assert.equal(job.uid,a.user.uid);assert.equal(job.status,'completed');assert.equal(job.complete,true);
   assert.ok(job.exportPackagePath);assert.ok(job.exportManifestPath);
+  const canonicalRequest=(await db.collection('privacyRequests').doc(request.requestId).get()).data();
+  assert.equal(canonicalRequest.consentReceiptHash,replacement.receiptHash);
+  assert.equal(job.consentReceiptHash,replacement.receiptHash);
+  assert.equal(job.exportConsentExpiresAt,canonicalRequest.exportConsentExpiresAt);
+  assert.equal(job.exportConsentExpiresAt,replacement.expiresAt);
+  checks.push('completed-request-and-job-bind-the-exact-canonical-owner-grant-and-expiry');
   checks.push('completed-job-owner-and-paths');
   const [exportBytes,manifestBytes]=await Promise.all([
    bucket.file(job.exportPackagePath).download().then(x=>x[0]),
@@ -99,8 +115,11 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
     body:JSON.stringify({data:{jobId:request.exportJobId,file:'export'}})
   });
   const revokedResult=await revokedResponse.json();
-  assert.equal(revokedResponse.status,403,'Revoked original bearer must not issue signed download');
-  assert.equal(revokedResult.error?.status,'PERMISSION_DENIED');
+  // Callable middleware can reject the revoked ID before the handler runs.
+  const denial = {401:'UNAUTHENTICATED', 403:'PERMISSION_DENIED'}[revokedResponse.status];
+  assert.ok(denial, 'Revoked original bearer must be rejected');
+  assert.equal(revokedResult.error?.status, denial);
+  assert.equal(revokedResult.result, undefined);
   assert.ok(!JSON.stringify(revokedResult).includes('storage.googleapis.com'));
   checks.push('revoked-original-owner-bearer-is-denied-before-signing');
   const ownerUrl='not-attempted-no-trusted-signer';

@@ -12,7 +12,7 @@
     "lint": "node scripts/lint-existing.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run tests/unit",
+    "test:unit": "vitest run tests/unit functions/tests",
     "test:integration": "vitest run tests/integration --passWithNoTests",
     "test:integration:emulated": "vitest run tests/integration --pool=forks --maxWorkers=1 --minWorkers=1 --passWithNoTests",
     "test:e2e": "node scripts/smoke-routes.mjs",
