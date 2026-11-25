@@ -17,3 +17,4 @@ export { reconcileNativeJobsRevocationAck } from "./jobs-revocation-ack-reconcil
 
 export { recordJobsDeletionParticipantEvidence } from "./jobs-deletion-participant";
 export { authorizeJobsDeletionBinding } from './jobs-deletion-binding';
+export { reconcileDeletionParticipants } from './deletion-participant-reconcile';

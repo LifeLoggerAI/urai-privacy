@@ -1,0 +1,1 @@
+{"name":"genesis-jobs-privacy-local-review","private":true,"main":"index.cjs","engines":{"node":"22"},"dependencies":{"firebase-admin":"^13.10.0","firebase-functions":"^6.6.0"}}
