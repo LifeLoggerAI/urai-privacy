@@ -3,6 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldPath, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { DELETION_FIRESTORE_SOURCES } from "./deletion-source-registry";
+import { listDeletionDescendantResiduals } from "./deletion-descendant-residuals";
 
 const QUERY_PAGE_LIMIT = 450;
 
@@ -103,7 +104,9 @@ export async function collectDeletionCompletionResiduals(
   const db = getFirestore();
   const bucket = getStorage().bucket();
 
-  const userDocPromise = db.collection("users").doc(uid).get();
+  const userRef = db.collection("users").doc(uid);
+  const userDocPromise = userRef.get();
+  const userDescendantsPromise = listDeletionDescendantResiduals(userRef);
   const collectionPromises = DELETION_FIRESTORE_SOURCES.map(async (source) => [
     source.collection,
     await listScopedIds(source.collection, source.subjectField, uid)
@@ -116,8 +119,9 @@ export async function collectDeletionCompletionResiduals(
   const authPromise = authUserExists(uid);
   const legalHoldPromise = activeLegalHold(uid);
 
-  const [userDoc, collectionEntries, storageResults, authExists, legalHold] = await Promise.all([
+  const [userDoc, userDescendants, collectionEntries, storageResults, authExists, legalHold] = await Promise.all([
     userDocPromise,
+    userDescendantsPromise,
     Promise.all(collectionPromises),
     storagePromise,
     authPromise,
@@ -126,6 +130,7 @@ export async function collectDeletionCompletionResiduals(
 
   const firestoreTargets: Record<string, string[]> = {
     users: userDoc.exists ? [uid] : [],
+    userDescendants,
     ...Object.fromEntries(collectionEntries)
   };
   const storageObjects = storageResults.flatMap(([files]) => files.map((file) => file.name)).sort();

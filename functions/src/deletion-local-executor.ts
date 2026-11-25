@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { listDeletionDescendantResiduals } from "./deletion-descendant-residuals";
 import {
   DELETION_FIRESTORE_SOURCES,
   deletionStoragePaths
@@ -101,6 +102,7 @@ export async function verifyLocalDeletion(uid: string) {
     firestoreRemaining[source.collection] = count.data().count;
   }
   firestoreRemaining.users = (await db.collection("users").doc(uid).get()).exists ? 1 : 0;
+  firestoreRemaining.userDescendants = (await listDeletionDescendantResiduals(db.collection("users").doc(uid))).length;
 
   const storageRemaining: Record<string, number> = {};
   for (const prefix of deletionStoragePaths(uid)) {
