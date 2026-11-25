@@ -22,5 +22,6 @@ orphan descendants preventing local verification. Global completion remains
 false. The late-hold case is between dry-run and execution, not a proof of atomic
 legal-hold enforcement during every destructive write. This is local synthetic
 acceptance, not hosted/provider acceptance or independent approval.
-The recorded local run used host Node 24 despite the Functions Node 22 engine
-declaration; matching hosted-runtime verification remains separate.
+All eight checks also passed in a subsequent Node 22 emulator run, matching the
+Functions engine declaration. Hosted/provider verification remains separate.
+
