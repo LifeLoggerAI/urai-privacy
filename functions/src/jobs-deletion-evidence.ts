@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 const hex64 = /^[a-f0-9]{64}$/;
 const safeId = /^[A-Za-z0-9._:-]{8,160}$/;
 const sha256 = (x: string) => createHash('sha256').update(x).digest('hex');
+export const JOBS_DELETION_EVIDENCE_STATE = 'source-receipt-matched' as const;
 // Same canonical JSON digest contract as Jobs: stable even after Firestore map
 // field-order normalization. Never accept a caller-provided digest without
 // recomputing it from the received result.

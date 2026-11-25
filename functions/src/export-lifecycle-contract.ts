@@ -73,6 +73,27 @@ export function currentExportDownloadMatches(
   return before !== null && after === before && after > now;
 }
 
+// Never sign a mutable object path without tying it to the exact exported
+// generation and the SHA-256 committed in the completed export job.
+export function signedExportObjectGeneration(
+  job: Record<string, unknown>,
+  file: "export" | "manifest",
+  objectMetadata: Record<string, unknown> | null
+): string | null {
+  if (!objectMetadata) return null;
+  const expected = file === "export" ? job.exportSha256 : job.manifestSha256;
+  const custom = objectMetadata.metadata;
+  const actual = custom && typeof custom === "object"
+    ? (custom as Record<string, unknown>).sha256 : null;
+  if (typeof expected !== "string" || !/^[0-9a-f]{64}$/.test(expected) ||
+      actual !== expected) return null;
+  const generation = objectMetadata.generation;
+  const value = typeof generation === "string" ? generation :
+    typeof generation === "number" && Number.isSafeInteger(generation)
+      ? String(generation) : "";
+  return /^[1-9][0-9]*$/.test(value) ? value : null;
+}
+
 export function isExportPackageExpired(job: Record<string, unknown>, now = Date.now()) {
   const expiresAt = resolveExportPackageExpiry(job);
   return expiresAt !== null && expiresAt <= now;

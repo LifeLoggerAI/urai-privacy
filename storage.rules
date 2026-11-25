@@ -2,7 +2,6 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function signedIn() { return request.auth != null; }
-    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
     function isAdmin() {
       return signedIn() && (
         ('admin' in request.auth.token && request.auth.token.admin == true) ||
@@ -11,23 +10,9 @@ service firebase.storage {
     }
     function isCreateOrUpdate() { return request.resource != null; }
 
-    function exportJob(jobId) {
-      return firestore.get(/databases/(default)/documents/exportJobs/$(jobId));
-    }
-    function activeExportPackage(uid, jobId) {
-      return firestore.exists(/databases/(default)/documents/exportJobs/$(jobId))
-        && exportJob(jobId).data.uid == uid
-        && exportJob(jobId).data.status == "completed"
-        && exportJob(jobId).data.complete == true
-        && exportJob(jobId).data.packageExpiresAt is timestamp
-        && exportJob(jobId).data.packageExpiresAt > request.time;
-    }
-
+    // The authenticated export service checks current consent and request identity.
     match /exports/{uid}/{jobId}/{fileName} {
-      allow read: if (isOwner(uid) || isAdmin())
-        && fileName in ["export.json", "manifest.json"]
-        && activeExportPackage(uid, jobId);
-      allow write: if isAdmin() && isCreateOrUpdate();
+      allow read, write: if false;
     }
 
     match /evidence/{allPaths=**} {

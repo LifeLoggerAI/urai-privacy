@@ -6,6 +6,7 @@ import { z } from "zod";
 import { removeExportArtifacts } from "./export-artifact-cleanup";
 import { collectNestedRows, collectPaginatedRows } from "./export-pagination";
 import { EXPORT_PACKAGE_TTL_MS } from "./export-lifecycle-contract";
+import { requireExportConsent } from "./export-consent-authority";
 
 const exportCollections = [
   "users",
@@ -230,9 +231,10 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     // Export leases are not deletion tombstones. Their presence must never
     // trigger the permanent owner-deleted guard in other products.
     const exportLeaseRef = db.collection("exportProcessingLeases").doc(uid);
-    const [requestSnap, deletionFence, accountFence, exportLease] = await Promise.all([
+    const consentRef = db.collection("consentRecords").doc(`${uid}_data_export`);
+    const [requestSnap, deletionFence, accountFence, exportLease, consent] = await Promise.all([
       tx.get(requestRef), tx.get(deletionFenceRef),
-      tx.get(accountFenceRef), tx.get(exportLeaseRef)
+      tx.get(accountFenceRef), tx.get(exportLeaseRef), tx.get(consentRef)
     ]);
     if (!requestSnap.exists || requestSnap.data()?.uid !== uid || requestSnap.data()?.type !== "export") {
       throw new HttpsError("failed-precondition", "Export request linkage is invalid.");
@@ -240,6 +242,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
     if (deletionFence.exists || accountFence.exists) {
       throw new HttpsError("failed-precondition", "Account deletion is fenced; export processing is blocked.");
     }
+    const grant = requireExportConsent(uid, consent.data(), job, requestSnap.data() ?? {});
     if (
       exportLease.data()?.exportProcessingJobId !== jobId &&
       processingLeaseIsActive(exportLease.data()?.exportProcessingLeaseExpiresAt)
@@ -265,7 +268,7 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       artifactCleanupLeaseExpiresAt: FieldValue.delete()
     });
     tx.update(requestRef, { status: "processing", updatedAt: FieldValue.serverTimestamp() });
-    return { uid, requestId, requestRef };
+    return { uid, requestId, requestRef, consentRef, grant };
   });
 
   const exportPath = `exports/${claim.uid}/${jobId}/export.json`;
@@ -288,8 +291,9 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       const deletionFenceRef = db.collection("privacyDeletionTombstones").doc(claim.uid);
       const accountFenceRef = db.collection("accountDeletionFences").doc(claim.uid);
       const exportLeaseRef = db.collection("exportProcessingLeases").doc(claim.uid);
-      const [deletionFence, accountFence, exportLease] = await Promise.all([
-        tx.get(deletionFenceRef), tx.get(accountFenceRef), tx.get(exportLeaseRef)
+      const [deletionFence, accountFence, exportLease, consent, currentJob, currentRequest] = await Promise.all([
+        tx.get(deletionFenceRef), tx.get(accountFenceRef), tx.get(exportLeaseRef),
+        tx.get(claim.consentRef), tx.get(jobRef), tx.get(claim.requestRef)
       ]);
       if (
         deletionFence.exists || accountFence.exists ||
@@ -298,6 +302,13 @@ export const processExportRequest = onCall({ timeoutSeconds: 540, memory: "1GiB"
       ) {
         throw new HttpsError("aborted", "Export processing lost its deletion-fence lease before publication.");
       }
+      const job = currentJob.data() ?? {};
+      const subjectRequest = currentRequest.data() ?? {};
+      if (job.uid !== claim.uid || job.requestId !== claim.requestId || job.status !== "processing" ||
+          subjectRequest.uid !== claim.uid || subjectRequest.type !== "export" || subjectRequest.status !== "processing") {
+        throw new HttpsError("aborted", "Export request changed before publication.");
+      }
+      requireExportConsent(claim.uid, consent.data(), claim.grant, job, subjectRequest);
       const completedAt = Date.now();
       tx.update(jobRef, {
         status: "completed",

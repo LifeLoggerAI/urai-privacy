@@ -3,7 +3,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import { isTrustedJobsConsentCaller, isTrustedActiveJobsConsentCaller } from './life-movie-jobs-identity';
-import { jobsDeleteEvidenceHash, verifyJobsDeleteEvidence } from './jobs-deletion-evidence';
+import { JOBS_DELETION_EVIDENCE_STATE, jobsDeleteEvidenceHash, verifyJobsDeleteEvidence } from './jobs-deletion-evidence';
 import { verifyJobsDeletionOrigin } from './jobs-deletion-origin';
 
 const inputSchema = z.object({
@@ -58,7 +58,7 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
   const initial = await requestRef.get();
   if (!initial.exists) throw new HttpsError('not-found','Canonical deletion request not found.');
   const owner = initial.data()?.uid;
-  if (typeof owner !== 'string' || initial.data()?.status !== 'processing')
+  if (typeof owner !== 'string' || initial.data()?.status !== 'processing' || initial.data()?.scope !== 'account')
     throw new HttpsError('failed-precondition','Canonical deletion is not pending verification.');
   const incoming = verifyJobsDeleteEvidence(parsed.data.receipt, owner, parsed.data.jobsRequestId);
   if (!incoming) throw new HttpsError('failed-precondition','Invalid Jobs owner or request binding.');
@@ -68,12 +68,13 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
     const [subject, binding, prior] = await Promise.all([tx.get(requestRef), tx.get(bindingRef), tx.get(evidenceRef)]);
     if (!subject.exists) throw new HttpsError('not-found','Canonical deletion request not found.');
     const row = subject.data() ?? {};
-    if (row.status !== 'processing' || typeof row.uid !== 'string' ||
+    if (row.status !== 'processing' || row.scope !== 'account' || !row.createdAt || typeof row.uid !== 'string' ||
         row.deletionCompletionVerified === true) {
       throw new HttpsError('failed-precondition','Canonical deletion is not pending verification.');
     }
     const link=binding.data()||{};
-    if (!binding.exists || link.state!=='authorized-pending-verification' ||
+    if (!binding.exists || link.schemaVersion!=='urai-privacy-jobs-deletion-binding-v1' ||
+        link.state!=='authorized-pending-verification' ||
         link.centralRequestId!==parsed.data.centralRequestId ||
         link.jobsRequestId!==parsed.data.jobsRequestId ||
         link.ownerHash!==incoming.ownerHash || link.sourceProject!==origin.sourceProject ||
@@ -84,16 +85,7 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
     if (row.uid !== owner || origin.sourceEvidenceHash !== jobsDeleteEvidenceHash(receipt))
       throw new HttpsError('failed-precondition','Canonical Jobs source binding changed.');
     const hash = jobsDeleteEvidenceHash(receipt);
-    if (prior.exists) {
-      if (prior.data()?.evidenceHash !== hash ||
-          prior.data()?.jobsRequestId !== parsed.data.jobsRequestId ||
-          prior.data()?.centralRequestId !== parsed.data.centralRequestId ||
-          prior.data()?.serviceUid !== request.auth?.uid) {
-        throw new HttpsError('already-exists','Conflicting immutable Jobs participant evidence.');
-      }
-      return { idempotent:true, hash };
-    }
-    tx.create(evidenceRef, {
+    const receiptFields = {
       schemaVersion:'urai-jobs-privacy-participant-evidence-v1',
       centralRequestId:parsed.data.centralRequestId,
       jobsRequestId:parsed.data.jobsRequestId,
@@ -102,14 +94,32 @@ export const recordJobsDeletionParticipantEvidence = onCall(async request => {
       jobsResultDigest:receipt.resultDigest,
       serviceUid:request.auth?.uid,
       sourceState:receipt.terminalState,
+      acknowledgmentState:'evidence-received-verification-pending',
+      globalDeletionComplete:false,
+    };
+    const originFields = {
       sourceProject:origin.sourceProject,
       sourceReceiptPath:origin.sourceReceiptPath,
       originVerificationState:'independent-source-readback-matched',
-      acknowledgmentState:'evidence-received-verification-pending',
-      globalDeletionComplete:false,
-      createdAt:FieldValue.serverTimestamp(),
-    });
-    return { idempotent:false, hash };
+    };
+    const progress = row.jobsDeletionEvidenceState;
+    if (progress !== undefined && (progress !== JOBS_DELETION_EVIDENCE_STATE || !prior.exists))
+      throw new HttpsError('failed-precondition','Inconsistent Jobs deletion progress.');
+    if (prior.exists) {
+      const saved = prior.data() ?? {};
+      // Early receipts predate all three source fields. A current independent
+      // source read can confirm them without rewriting their historical record.
+      const legacy = Object.keys(originFields).every(key => !(key in saved));
+      const expected = legacy ? receiptFields : { ...receiptFields, ...originFields };
+      if (!saved.createdAt || Object.entries(expected).some(([key, value]) => saved[key] !== value))
+        throw new HttpsError('already-exists','Conflicting immutable Jobs participant evidence.');
+    } else {
+      tx.create(evidenceRef, { ...receiptFields, ...originFields, createdAt:FieldValue.serverTimestamp() });
+    }
+    // Only this minimized observation is visible on the owner-scoped request.
+    // Replays repair older requests once, without copying service IDs or digests.
+    if (progress === undefined) tx.update(requestRef, { jobsDeletionEvidenceState:JOBS_DELETION_EVIDENCE_STATE });
+    return { idempotent:prior.exists, hash };
   });
   return { accepted:true, idempotent:result.idempotent,
     evidenceHash:result.hash, participant:'urai-jobs',

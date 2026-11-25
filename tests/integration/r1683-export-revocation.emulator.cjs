@@ -11,20 +11,25 @@ const {initializeApp:adminApp,deleteApp:deleteAdminApp}=require('firebase-admin/
 const {getAuth:adminAuth}=require('firebase-admin/auth');
 const {getFirestore}=require('firebase-admin/firestore');
 const {getStorage}=require('firebase-admin/storage');
+const {signedExportObjectGeneration}=require('../../functions/lib/export-lifecycle-contract.js');
 
 const project='urai-privacy-r1512-disposable';
 assert.equal(process.env.GCLOUD_PROJECT,project);
 for(const name of ['GOOGLE_APPLICATION_CREDENTIALS','FIREBASE_TOKEN','RUNPOD_API_KEY','VERCEL_TOKEN'])assert.ok(!process.env[name],name);
-for(const [name,value] of [['FIREBASE_AUTH_EMULATOR_HOST','127.0.0.1:29099'],['FIRESTORE_EMULATOR_HOST','127.0.0.1:28080'],['FIREBASE_STORAGE_EMULATOR_HOST','127.0.0.1:29199']])assert.equal(process.env[name],value);
+for(const name of ['FIREBASE_AUTH_EMULATOR_HOST','FIRESTORE_EMULATOR_HOST','FIREBASE_STORAGE_EMULATOR_HOST'])
+ assert.match(process.env[name]||'',/^127\.0\.0\.1:[1-9]\d{0,4}$/);
+const functionsPort=Number(process.env.URAI_REVIEW_FUNCTIONS_PORT || 25001);
+assert.ok(Number.isInteger(functionsPort) && functionsPort>0 && functionsPort<=65535);
+const functionsOrigin='http://127.0.0.1:'+functionsPort;
 const prefix='r1515_'+randomBytes(6).toString('hex');
 const clients=[],checks=[];
-const deadline=setTimeout(()=>{console.error('R1515_TIMEOUT');process.exit(2)},135000);
+const deadline=setTimeout(()=>{console.error('R1515_TIMEOUT');process.exit(2)},360000);
 deadline.unref();
 function client(label){
  const app=initializeApp({apiKey:'disposable-emulator-only',projectId:project,appId:'1:123:web:emulator'},prefix+label);
  clients.push(app);
- const auth=clientAuth(app);connectAuthEmulator(auth,'http://127.0.0.1:29099',{disableWarnings:true});
- const functions=getFunctions(app,'us-central1');connectFunctionsEmulator(functions,'127.0.0.1',25001);
+ const auth=clientAuth(app);connectAuthEmulator(auth,'http://'+process.env.FIREBASE_AUTH_EMULATOR_HOST,{disableWarnings:true});
+ const functions=getFunctions(app,'us-central1');connectFunctionsEmulator(functions,'127.0.0.1',functionsPort);
  return {auth,functions};
 }
 const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{timeout:90000})(data)).data;
@@ -45,6 +50,16 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   const record=db.collection('users').doc(a.user.uid);
   await record.set({uid:a.user.uid,displayName:'Disposable synthetic export owner',secretToken:'SYNTHETIC_MUST_NOT_EXPORT',memo:'R1515_SYNTHETIC_EXPORT_FIXTURE'});
   checks.push('seed-disposable-user-record');
+  const currentC7 = status => call(owner, 'setCanonicalConsent', {purpose:'data.export',status,surface:'privacy-center-export',jurisdiction:'test'});
+  await assert.rejects(call(owner,'createExportRequest'), error => error.code === 'functions/failed-precondition');
+  const firstGrant = await currentC7('granted');
+  const retired = await call(owner, 'createExportRequest');
+  await currentC7('revoked');
+  await assert.rejects(call(operator, 'processExportRequest',{jobId:retired.exportJobId}), error => error.code === 'functions/failed-precondition');
+  const replacement = await currentC7('granted');
+  assert.notEqual(replacement.receiptHash, firstGrant.receiptHash);
+  await assert.rejects(call(operator, 'processExportRequest',{jobId:retired.exportJobId}), error => error.code === 'functions/failed-precondition');
+  checks.push('absent-revoked-and-replaced-canonical-C7-cannot-produce-an-export');
   const request=await call(owner,'createExportRequest');
   assert.equal(request.status,'pending');
   checks.push('owner-request-pending');
@@ -56,6 +71,12 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   const job=(await db.collection('exportJobs').doc(request.exportJobId).get()).data();
   assert.equal(job.uid,a.user.uid);assert.equal(job.status,'completed');assert.equal(job.complete,true);
   assert.ok(job.exportPackagePath);assert.ok(job.exportManifestPath);
+  const canonicalRequest=(await db.collection('privacyRequests').doc(request.requestId).get()).data();
+  assert.equal(canonicalRequest.consentReceiptHash,replacement.receiptHash);
+  assert.equal(job.consentReceiptHash,replacement.receiptHash);
+  assert.equal(job.exportConsentExpiresAt,canonicalRequest.exportConsentExpiresAt);
+  assert.equal(job.exportConsentExpiresAt,replacement.expiresAt);
+  checks.push('completed-request-and-job-bind-the-exact-canonical-owner-grant-and-expiry');
   checks.push('completed-job-owner-and-paths');
   const [exportBytes,manifestBytes]=await Promise.all([
    bucket.file(job.exportPackagePath).download().then(x=>x[0]),
@@ -68,27 +89,166 @@ const call=async(who,name,data={})=>(await httpsCallable(who.functions,name,{tim
   assert.equal(createHash('sha256').update(exportBytes).digest('hex'),job.exportSha256);
   assert.equal(createHash('sha256').update(manifestBytes).digest('hex'),job.manifestSha256);
   checks.push('storage-export-manifest-hashes-and-redaction');
+  const [exportMetadata,manifestMetadata]=await Promise.all([
+    bucket.file(job.exportPackagePath).getMetadata().then(x=>x[0]),
+    bucket.file(job.exportManifestPath).getMetadata().then(x=>x[0])
+  ]);
+  const exportGeneration=signedExportObjectGeneration(job,'export',exportMetadata);
+  const manifestGeneration=signedExportObjectGeneration(job,'manifest',manifestMetadata);
+  assert.match(exportGeneration,/^[1-9][0-9]*$/);
+  assert.match(manifestGeneration,/^[1-9][0-9]*$/);
+  checks.push('storage-generation-metadata-matches-committed-package-hashes');
+  assert.equal(signedExportObjectGeneration(job,'export',{
+    ...exportMetadata,metadata:{sha256:'0'.repeat(64)}
+  }),null);
+  assert.equal(signedExportObjectGeneration(job,'manifest',{
+    ...manifestMetadata,generation:'0'
+  }),null);
+  checks.push('storage-mutated-digest-and-generation-fail-closed');
   await assert.rejects(call(stranger,'getExportDownloadUrl',{jobId:request.exportJobId,file:'export'}));
   checks.push('completed-export-foreign-download-denied');
-  // Signing belongs to independently controlled hosted identity; never touch
-  // metadata-server credentials from an emulator worker. Actual package bytes,
-  // manifest, SHA256 and foreign denial were verified above.
+  const descriptor = (who, file) => call(who, 'getExportDownloadUrl', {jobId:request.exportJobId, file});
+  const [ownerUrl,ownerManifest,adminUrl] = await Promise.all([
+    descriptor(owner,'export'), descriptor(owner,'manifest'), descriptor(operator,'export')
+  ]);
+  for (const [receipt,kind,bytes,generation] of [[ownerUrl,'export',exportBytes,exportGeneration],[ownerManifest,'manifest',manifestBytes,manifestGeneration]]) {
+    assert.equal(receipt.schemaVersion, 'urai-canonical-export-download-v1');
+    assert.equal(receipt.requiresAuthorization,true);
+    assert.equal(receipt.uid,a.user.uid); assert.equal(receipt.jobId,request.exportJobId);
+    assert.equal(receipt.requestId,request.requestId); assert.equal(receipt.file,kind);
+    assert.equal(receipt.generation,generation); assert.equal(receipt.byteLength,bytes.length);
+    assert.equal(receipt.sha256,createHash('sha256').update(bytes).digest('hex'));
+    const endpoint=new URL(receipt.url);
+    assert.equal(endpoint.origin,functionsOrigin);
+    assert.equal(endpoint.pathname,'/'+project+'/us-central1/downloadExportPackage');
+    assert.deepEqual([...endpoint.searchParams.keys()].sort(),['auditId','authorityHash','expiresAt','file','jobId']);
+    assert.equal(endpoint.searchParams.get('auditId'),receipt.auditId);
+    assert.equal(endpoint.searchParams.get('authorityHash'),receipt.authorityHash);
+    assert.equal(endpoint.searchParams.get('expiresAt'),String(receipt.downloadExpiresAt));
+    assert.ok(receipt.downloadExpiresAt<=receipt.packageExpiresAt);
+  }
+  checks.push('package-and-manifest-descriptors-bind-exact-issuer-row-object-size-digest-and-nonrenewable-expiry');
+  const ownerBearer=await a.user.getIdToken(true), otherBearer=await b.user.getIdToken(true), adminBearer=await o.user.getIdToken(true);
+  const receive=(url,token)=>fetch(url,{redirect:'error',headers: token ? {Authorization:'Bearer '+token} : {}});
+  for (const [receipt,token,expected] of [[ownerUrl,ownerBearer,exportBytes],[ownerManifest,ownerBearer,manifestBytes],[adminUrl,adminBearer,exportBytes]]) {
+    const result=await receive(receipt.url,token);
+    assert.equal(result.status,200); assert.match(result.headers.get('cache-control'),/no-store/);
+    assert.equal(result.headers.get('content-length'), String(expected.length));
+    assert.match(result.headers.get('content-type'),/^application\/json/);
+    assert.deepEqual(Buffer.from(await result.arrayBuffer()),expected);
+  }
+  checks.push('owner-package-owner-manifest-and-authorized-operator-receive-exact-native-http-bytes');
+  const preflight=await fetch(ownerUrl.url,{method:'OPTIONS',headers:{origin:'http://127.0.0.1:3000','access-control-request-method':'GET','access-control-request-headers':'authorization'}});
+  assert.equal(preflight.status,204); assert.ok(preflight.headers.get('access-control-allow-origin'));
+  checks.push('cross-origin-browser-bearer-preflight-accepted');
+  assert.equal((await receive(ownerUrl.url)).status,401);
+  assert.equal((await receive(ownerUrl.url,otherBearer)).status,403);
+  assert.equal((await receive(adminUrl.url,ownerBearer)).status,409);
+  assert.equal((await receive(ownerUrl.url,adminBearer)).status,409);
+  checks.push('current-actor-and-issued-descriptor-owner-binding');
+  for (const [field,value,code] of [['expiresAt',String(ownerUrl.downloadExpiresAt+1),409],['auditId','foreign-audit',409],['authorityHash','9'.repeat(64),409],['file','manifest',409],['extra','1',400]]) {
+    const url=new URL(ownerUrl.url); url.searchParams.set(field,value);
+    assert.equal((await receive(url,ownerBearer)).status,code);
+  }
+  checks.push('rewritten-deadline-audit-row-authority-file-and-extra-query-denied');
+  const jobRef=db.collection('exportJobs').doc(request.exportJobId);
+  const parentRef=db.collection('privacyRequests').doc(request.requestId);
+  for (const fence of ['accountDeletionFences','privacyDeletionTombstones']) {
+    const marker=db.collection(fence).doc(a.user.uid);
+    await marker.set({active:false}); assert.equal((await receive(ownerUrl.url,ownerBearer)).status,409);
+    await marker.delete();
+  }
+  checks.push('both-owner-deletion-markers-deny-an-existing-receipt-even-when-marked-inactive');
+  await parentRef.update({consentReceiptHash:'c'.repeat(64)});
+  assert.equal((await receive(ownerUrl.url,ownerBearer)).status,409);
+  await assert.rejects(descriptor(owner,'export'), e=>e.code==='functions/failed-precondition');
+  await parentRef.update({consentReceiptHash:replacement.receiptHash});
+  await jobRef.update({exportSha256:'legacy-unknown'});
+  await assert.rejects(descriptor(owner,'export'), e=>e.code==='functions/failed-precondition');
+  await jobRef.update({exportSha256:job.exportSha256});
+  checks.push('historical-unbound-parent-or-missing-object-integrity-cannot-issue-a-download');
+  await auth.setCustomUserClaims(o.user.uid,{});
+  assert.equal((await receive(adminUrl.url,adminBearer)).status,403);
+  checks.push('current-admin-removal-invalidates-original-operator-token');
+  const replacementBytes=Buffer.alloc(exportBytes.length,120);
+  await bucket.file(job.exportPackagePath).save(replacementBytes,{contentType:'application/json',metadata:{metadata:{sha256:job.exportSha256}}});
+  assert.equal((await receive(ownerUrl.url,ownerBearer)).status,409);
+  const corrupt=await descriptor(owner,'export');
+  assert.notEqual(corrupt.generation,ownerUrl.generation);
+  const refused=await receive(corrupt.url,ownerBearer); assert.equal(refused.status,409);
+  assert.deepEqual(Object.keys(await refused.json()),['error']);
+  checks.push('replaced-generation-and-corrupt-content-with-matching-metadata-refused-before-output');
+  // Produce an ordinary export above Firebase's single streaming-response limit.
+  // Firestore documents are synthetic and stay below the individual document limit.
+  await auth.setCustomUserClaims(o.user.uid,{admin:true});
+  await o.user.getIdToken(true);
+  for(let i=0;i<12;i++) await db.collection('dataAccessEvents').doc(prefix+'part'+i).set(
+    {uid:a.user.uid, sample:String.fromCharCode(97+i).repeat(875000)});
+  const largeRequest=await call(owner,'createExportRequest');
+  const largeJobId=largeRequest.exportJobId;
+  await call(operator,'processExportRequest',{jobId:largeJobId});
+  const largeJob=(await db.collection('exportJobs').doc(largeJobId).get()).data();
+  const large=await call(owner,'getExportDownloadUrl',{jobId:largeJobId,file:'export'});
+  const partSize=4*1024*1024;
+  assert.ok(large.byteLength>10000000);assert.equal(large.rangeSize,partSize);
+  assert.equal(large.sha256,largeJob.exportSha256);
+  assert.equal((await receive(large.url,ownerBearer)).status,416);
+  const part=(start,end)=>fetch(large.url,{redirect:'error',headers:{Authorization:'Bearer '+ownerBearer,Range:'bytes='+start+'-'+end}});
+  for(const [start,end] of [[1,partSize],[0,partSize],[large.byteLength,large.byteLength+1]]) {
+    assert.equal((await part(start,end)).status,416);
+  }
+  const largeHash=createHash('sha256');
+  let received=0,parts=0;
+  for(let start=0;start<large.byteLength;start+=partSize) {
+    const end=Math.min(start+partSize,large.byteLength)-1;
+    const result=await part(start,end);
+    assert.equal(result.status,206);
+    assert.equal(result.headers.get('content-range'),'bytes '+start+'-'+end+'/'+large.byteLength);
+    assert.equal(result.headers.get('etag'),'"'+large.generation+'"');
+    assert.equal(result.headers.get('content-length'),String(end-start+1));
+    const bytes=Buffer.from(await result.arrayBuffer());assert.equal(bytes.length,end-start+1);
+    received+=bytes.length;largeHash.update(bytes);parts++;
+  }
+  assert.equal(received,large.byteLength);assert.equal(largeHash.digest('hex'),largeJob.exportSha256);assert.ok(parts>=3);
+  checks.push('native-generated-large-package-all-ranges-reassembled-with-exact-committed-sha256');
+  checks.push('missing-misaligned-and-out-of-bounds-ranges-denied');
+  const partial=await part(0,partSize-1);
+  assert.equal(partial.status,206);
+  const reader=partial.body.getReader();
+  const first=await reader.read();
+  assert.ok(!first.done && first.value.length>0);
+  await currentC7('revoked');
+  let released=first.value.length,interrupted=false;
+  try {
+    while(true) { const next=await reader.read(); if(next.done)break; released+=next.value.length; }
+  } catch {interrupted=true;}
+  assert.ok(interrupted && released<partSize,'withdrawal must interrupt an active HTTP range before completion');
+  assert.equal((await part(partSize,2*partSize-1)).status,409);
+  checks.push('withdrawal-interrupts-active-native-range-and-denies-remainder');
+  console.log('RANGED_EXPORT_BYTES '+JSON.stringify({total:received,parts,rangeSize:partSize,receivedBeforeWithdrawal:released,fullSha256Matched:true}));
+  assert.equal((await receive(ownerManifest.url,ownerBearer)).status,409);
+  await currentC7('granted');
+  assert.equal((await receive(ownerManifest.url,ownerBearer)).status,409);
+  checks.push('canonical-withdrawal-and-regrant-deny-previously-issued-authenticated-bytes');
   const staleBearer=await getIdToken(owner.auth.currentUser,true);
   await new Promise(resolve=>setTimeout(resolve,1650));
   await auth.revokeRefreshTokens(a.user.uid);
   await assert.rejects(auth.verifyIdToken(staleBearer,true));
-  const revokedResponse=await fetch('http://127.0.0.1:25001/'+project+'/us-central1/getExportDownloadUrl',{
+  const revokedResponse=await fetch(functionsOrigin+'/'+project+'/us-central1/getExportDownloadUrl',{
     method:'POST',headers:{authorization:'Bearer '+staleBearer,'content-type':'application/json'},
     body:JSON.stringify({data:{jobId:request.exportJobId,file:'export'}})
   });
   const revokedResult=await revokedResponse.json();
-  assert.equal(revokedResponse.status,403,'Revoked original bearer must not issue signed download');
-  assert.equal(revokedResult.error?.status,'PERMISSION_DENIED');
+  // Callable middleware can reject the revoked ID before the handler runs.
+  const denial = {401:'UNAUTHENTICATED', 403:'PERMISSION_DENIED'}[revokedResponse.status];
+  assert.ok(denial, 'Revoked original bearer must be rejected');
+  assert.equal(revokedResult.error?.status, denial);
+  assert.equal(revokedResult.result, undefined);
   assert.ok(!JSON.stringify(revokedResult).includes('storage.googleapis.com'));
   checks.push('revoked-original-owner-bearer-is-denied-before-signing');
-  const ownerUrl='not-attempted-no-trusted-signer';
-  checks.push('signed-url-issuance-intentionally-held');
+  assert.equal((await receive(ownerManifest.url,staleBearer)).status,401);
+  checks.push('revoked-original-token-denied-by-byte-handler');
   assert.ok(checks.length>=9);
-  console.log('R1683_NATIVE_EXPORT_REVOCATION_RESULT '+JSON.stringify({checksPassed:checks.length,checks,source:process.env.URAI_EXACT_SHA,ownerUrl,bytes:exportBytes.length,manifestBytes:manifestBytes.length,hostedSignerVerified:false,productionWrites:false,iamApproved:false,destructiveDeletionExecuted:false}));
+  console.log('R1683_NATIVE_EXPORT_REVOCATION_RESULT '+JSON.stringify({checksPassed:checks.length,checks,source:process.env.URAI_EXACT_SHA,transport:'authenticated-function',bytes:exportBytes.length,manifestBytes:manifestBytes.length,hostedSignerVerified:false,productionWrites:false,iamApproved:false,destructiveDeletionExecuted:false}));
  } finally {await deleteAdminApp(admin)}
 })().catch(e=>{console.error('R1515_FAIL',e.stack||e);process.exitCode=1}).finally(async()=>{await Promise.all(clients.map(deleteApp));clearTimeout(deadline)});

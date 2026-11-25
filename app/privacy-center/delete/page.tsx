@@ -3,24 +3,15 @@
 import { useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { AuthGate } from "@/components/AuthGate";
+import { DeletionRequestStatus } from "@/components/DeletionRequestStatus";
 import { createDeletionRequest, subscribeUserCollection } from "@/lib/firebase-privacy-client";
-
-function deletionStatusLabel(request: Record<string, unknown>) {
-  if (
-    request.deletionCompletionVerificationRequired === true &&
-    request.deletionCompletionVerified !== true
-  ) {
-    return "verification pending";
-  }
-  return String(request.status ?? "unknown");
-}
 
 export default function DeletePage() {
   return (
     <section>
       <div className="eyebrow">Deletion request</div>
       <h1>Request account or privacy-data deletion</h1>
-      <p className="lede">Deletion requests are submitted through the authenticated Firebase callable workflow. Destructive erasure is never shown as complete until the residual Firestore, Storage, Auth, and legal-hold verifier records final completion.</p>
+      <p className="lede">Track your deletion request here. Verification covers your account, stored data, and each service that handled it.</p>
       <AuthGate>{(user) => <DeletionRequestPanel user={user} />}</AuthGate>
     </section>
   );
@@ -51,7 +42,7 @@ function DeletionRequestPanel({ user }: { user: User }) {
     <div className="grid">
       <article className="card">
         <h3>Create deletion request</h3>
-        <p className="muted">This creates an auditable deletion request. Final completion requires a successful post-mutation residual verification record.</p>
+        <p className="muted">We record your request and check for any legal hold before deletion can proceed.</p>
         <label htmlFor="reason">Reason</label>
         <textarea id="reason" value={reason} onChange={(event) => setReason(event.target.value)} />
         <button className="button primary" type="button" disabled={busy || reason.trim().length < 8} onClick={submit}>{busy ? "Submitting..." : "Request deletion"}</button>
@@ -66,7 +57,7 @@ function DeletionRequestPanel({ user }: { user: User }) {
               const verificationPending = request.deletionCompletionVerificationRequired === true && request.deletionCompletionVerified !== true;
               return (
                 <li key={String(request.id)}>
-                  <strong>{deletionStatusLabel(request)}</strong> · {String(request.scope ?? "account")}
+                  <span>{String(request.scope ?? "account")} · </span><DeletionRequestStatus request={request} />
                   {request.destructiveDeletionBlocked ? <span className="status warn">destructive deletion gated</span> : null}
                   {verificationPending ? <span className="status warn">residual verification required</span> : null}
                 </li>

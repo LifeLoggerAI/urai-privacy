@@ -4,6 +4,7 @@ import {
   EXPORT_DOWNLOAD_URL_TTL_MS,
   EXPORT_PACKAGE_TTL_MS,
   currentExportDownloadMatches,
+  signedExportObjectGeneration,
   isExportPackageExpired,
   resolveExportPackageExpiry,
   timestampMillis,
@@ -64,6 +65,25 @@ describe("export package lifecycle contract", () => {
       { ...job, packageExpiresAt: now + 400000 }
     ]) expect(currentExportDownloadMatches(job, changed, now)).toBe(false);
     expect(currentExportDownloadMatches(job, { ...job }, now + 300000)).toBe(false);
+  });
+
+  it("only signs the committed export object generation and digest", () => {
+    const digest = "a".repeat(64);
+    const manifest = "b".repeat(64);
+    const job = { exportSha256: digest, manifestSha256: manifest };
+    const meta = { generation: "1712345678901234", metadata: { sha256: digest } };
+    expect(signedExportObjectGeneration(job, "export", meta)).toBe(meta.generation);
+    expect(signedExportObjectGeneration(job, "manifest",
+      { generation: "99", metadata: { sha256: manifest } })).toBe("99");
+    for (const changed of [
+      null, { generation: "10", metadata: { sha256: "f".repeat(64) } },
+      { generation: "10", metadata: {} },
+      { generation: "0", metadata: { sha256: digest } },
+      { generation: "-1", metadata: { sha256: digest } },
+      { generation: "1.5", metadata: { sha256: digest } },
+      { generation: "abc", metadata: { sha256: digest } },
+      { generation: 9007199254740992, metadata: { sha256: digest } }
+    ]) expect(signedExportObjectGeneration(job, "export", changed)).toBeNull();
   });
 
   it("accepts only job-scoped export object paths", () => {
