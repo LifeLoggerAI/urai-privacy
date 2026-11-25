@@ -1,0 +1,40 @@
+'use strict';
+const assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
+const {initializeApp,deleteApp}=require('firebase/app');
+const {getAuth,connectAuthEmulator,createUserWithEmailAndPassword,getIdToken}=require('firebase/auth');
+const {getFunctions,connectFunctionsEmulator,httpsCallable}=require('firebase/functions');
+const dep=require('node:module').createRequire(require('node:path').resolve(__dirname,'../../functions/package.json'));
+const {initializeApp:adminInit,deleteApp:adminDelete}=dep('firebase-admin/app');
+const {getAuth:adminAuth}=dep('firebase-admin/auth'),{getFirestore}=dep('firebase-admin/firestore');
+const project='demo-urai-local-deletion';
+assert.equal(process.env.GCLOUD_PROJECT,project);
+for(const [key,value] of Object.entries({FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:19096',FIRESTORE_EMULATOR_HOST:'127.0.0.1:18086',FIREBASE_STORAGE_EMULATOR_HOST:'127.0.0.1:19206'}))assert.equal(process.env[key],value);
+for(const key of ['GOOGLE_APPLICATION_CREDENTIALS','FIREBASE_TOKEN','RUNPOD_API_KEY'])assert.ok(!process.env[key]);
+const sdk=adminInit({projectId:project,storageBucket:project+'.appspot.com'}),db=getFirestore(sdk),auth=adminAuth(sdk),clients=[],owners=[],checks=[];
+function client(){const app=initializeApp({projectId:project,apiKey:'demo-only',appId:'1:123:web:local'},randomUUID());clients.push(app);const a=getAuth(app);connectAuthEmulator(a,'http://127.0.0.1:19096',{disableWarnings:true});const fn=getFunctions(app);connectFunctionsEmulator(fn,'127.0.0.1',15006);return {auth:a,fn};}
+const call=async(c,name,data)=>(await httpsCallable(c.fn,name,{timeout:60000})(data)).data;
+async function owner(){const c=client();const u=await createUserWithEmailAndPassword(c.auth,randomUUID()+'@example.test','SyntheticOnly123!');owners.push(u.user.uid);await db.doc('users/'+u.user.uid).set({uid:u.user.uid});const req=await call(c,'createDeletionRequest',{reason:'Synthetic local deletion acceptance'});return {c,uid:u.user.uid,id:req.requestId};}
+(async()=>{
+ const operator=client();const op=await createUserWithEmailAndPassword(operator.auth,randomUUID()+'@example.test','SyntheticOnly123!');owners.push(op.user.uid);await auth.setCustomUserClaims(op.user.uid,{admin:true});await getIdToken(op.user,true);
+ const clean=await owner();await db.doc('exportProcessingLeases/'+clean.uid).set({uid:clean.uid,exportProcessingLeaseExpiresAt:new Date(1)});
+ await assert.rejects(call(clean.c,'executeDeletionRequest',{requestId:clean.id,mode:'dryRun'}));checks.push('owner-cannot-admin-delete');
+ const plan=await call(operator,'executeDeletionRequest',{requestId:clean.id,mode:'dryRun'});
+ assert.equal(plan.plan.counts.exportProcessingLeases,1,'active dry run must inventory stale lease');checks.push('stale-lease-in-active-plan');
+ await assert.rejects(call(operator,'executeDeletionRequest',{requestId:clean.id,mode:'execute',expectedPlanHash:plan.planHash}),e=>/downstream acknowledgements/.test(e.message));
+ assert.equal((await db.doc('exportProcessingLeases/'+clean.uid).get()).exists,false);checks.push('stale-lease-deleted-by-active-worker');
+ const done=(await db.doc('deletionRequests/'+clean.id).get()).data();assert.equal(done.deletionCompletionVerified,false);assert.equal(done.status,'processing');assert.equal(done.deletionCompletionResidualSummary.totalResidualTargets,0);checks.push('zero-local-residual-still-global-hold');
+ await assert.rejects(auth.getUser(clean.uid),e=>e.code==='auth/user-not-found');checks.push('auth-owner-removed');
+ const active=await owner();await db.doc('exportProcessingLeases/'+active.uid).set({uid:active.uid,exportProcessingLeaseExpiresAt:new Date(Date.now()+600000)});
+ const ap=await call(operator,'executeDeletionRequest',{requestId:active.id,mode:'dryRun'});
+ await assert.rejects(call(operator,'executeDeletionRequest',{requestId:active.id,mode:'execute',expectedPlanHash:ap.planHash}));
+ assert.equal((await db.doc('exportProcessingLeases/'+active.uid).get()).exists,true);assert.equal((await db.doc('users/'+active.uid).get()).exists,true);assert.equal((await auth.getUser(active.uid)).uid,active.uid);checks.push('active-export-lease-preserves-owner-and-lease');
+ const held=await owner();const hp=await call(operator,'executeDeletionRequest',{requestId:held.id,mode:'dryRun'});
+ await db.doc('legalHoldRecords/'+held.uid).set({uid:held.uid,status:'active'});
+ await assert.rejects(call(operator,'executeDeletionRequest',{requestId:held.id,mode:'execute',expectedPlanHash:hp.planHash}),e=>/legal hold/.test(e.message));
+ assert.equal((await db.doc('users/'+held.uid).get()).exists,true);assert.equal((await auth.getUser(held.uid)).uid,held.uid);checks.push('late-hold-preserves-root-and-auth');
+ const orphan=await owner();const leaf=db.doc(`users/${orphan.uid}/memories/missing/parts/retained`);await leaf.set({synthetic:true});
+ const rp=await call(operator,'executeDeletionRequest',{requestId:orphan.id,mode:'dryRun'});
+ await assert.rejects(call(operator,'executeDeletionRequest',{requestId:orphan.id,mode:'execute',expectedPlanHash:rp.planHash}));
+ const residual=(await db.doc('deletionRequests/'+orphan.id).get()).data();assert.equal(residual.deletionCompletionVerified,false);assert.equal(residual.deletionCompletionResidualSummary.firestoreCounts.userDescendants,1);assert.equal((await leaf.get()).exists,true);checks.push('orphan-descendant-blocks-active-completion');
+ await leaf.delete();console.log('LOCAL_DELETION_LIFECYCLE_PASS '+JSON.stringify({checks:checks.length,details:checks,globalDeletionCertified:false}));
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{for(const uid of owners){await db.doc('legalHoldRecords/'+uid).delete();await db.doc('exportProcessingLeases/'+uid).delete();await db.recursiveDelete(db.doc('users/'+uid));await auth.deleteUser(uid).catch(e=>{if(e.code!=='auth/user-not-found')throw e});}for(const c of clients)await deleteApp(c);await db.terminate();await adminDelete(sdk)});
